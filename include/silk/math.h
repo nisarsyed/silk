@@ -15,9 +15,8 @@ extern "C" {
 /* Comparison tolerance in length units (~8 ULP of 1.0f); pinned by
  * tests/test_math.c. */
 #define SL_EPSILON 1e-6f
-
-/* Normalize cutoff as squared length: vectors under SL_EPSILON in length yield
- * zero. */
+/* Normalize cutoff as squared length: vectors under SL_EPSILON in length
+ * yield zero. */
 #define SL_VEC2_LENGTH_EPS_SQ (SL_EPSILON * SL_EPSILON)
 
 static inline float sl_min(float a, float b)
@@ -45,6 +44,11 @@ static inline float sl_abs(float v)
 static inline bool sl_feq(float a, float b, float eps)
 {
     return sl_abs(a - b) <= eps;
+}
+
+static inline bool sl_is_finite(float v)
+{
+    return isfinite(v);
 }
 
 typedef struct sl_vec2 {
@@ -120,6 +124,11 @@ static inline sl_vec2 sl_vec2_normalize(sl_vec2 v)
 static inline sl_vec2 sl_vec2_perp(sl_vec2 v)
 {
     return sl_vec2_make(-v.y, v.x);
+}
+
+static inline bool sl_vec2_is_finite(sl_vec2 v)
+{
+    return sl_is_finite(v.x) && sl_is_finite(v.y);
 }
 
 static inline sl_vec2 sl_vec2_lerp(sl_vec2 a, sl_vec2 b, float t)
