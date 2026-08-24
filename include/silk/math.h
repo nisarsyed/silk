@@ -12,10 +12,12 @@ extern "C" {
 
 #define SL_PI 3.14159265358979323846f
 
-/* Comparison tolerance in length units (~8 ULP of 1.0f); pinned by tests/test_math.c. */
+/* Comparison tolerance in length units (~8 ULP of 1.0f); pinned by
+ * tests/test_math.c. */
 #define SL_EPSILON 1e-6f
 
-/* Normalize cutoff as squared length: vectors under SL_EPSILON in length yield zero. */
+/* Normalize cutoff as squared length: vectors under SL_EPSILON in length yield
+ * zero. */
 #define SL_VEC2_LENGTH_EPS_SQ (SL_EPSILON * SL_EPSILON)
 
 static inline float sl_min(float a, float b)
