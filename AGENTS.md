@@ -52,6 +52,8 @@ Performance:
 Experience/naming:
 - Public API prefix `sl_`; `snake_case`; no abbreviations except established domain terms (`vec2`, `mat2`); related names use equal-length words so they align.
 - Big-endian naming — most significant word first: `connection_count_max`, not `max_connection_count`; `vec2_length_sq`, not `sq_length`. Capacity macros follow suit: `SL_BODY_COUNT_MAX`, never `SL_MAX_BODIES`.
+- Comments state contracts the code can't express — units, frames, sign conventions, valid ranges, NaN behavior, invariants — never structure, narration, or what the signature already says.
+- Tuned constants carry a trail: derivation, source, or the test that pins them (`beta = 0.2f` at 60 Hz, bounded by tests/stacking). A bare magic number is debt.
 - No technical debt: do it right the first time. Prefer simple, elegant structures over clever ones.
 
 ## Workflow

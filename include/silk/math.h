@@ -11,10 +11,6 @@ extern "C" {
 #define SL_PI 3.14159265358979323846f
 #define SL_EPSILON 1e-6f
 
-/* ------------------------------------------------------------------ */
-/* Scalar utilities                                                    */
-/* ------------------------------------------------------------------ */
-
 static inline float sl_min(float a, float b)
 {
     return (a < b) ? a : b;
@@ -40,10 +36,6 @@ static inline bool sl_feq(float a, float b, float eps)
 {
     return sl_abs(a - b) <= eps;
 }
-
-/* ------------------------------------------------------------------ */
-/* 2D vectors                                                          */
-/* ------------------------------------------------------------------ */
 
 typedef struct sl_vec2 {
     float x, y;
@@ -125,13 +117,7 @@ static inline sl_vec2 sl_vec2_lerp(sl_vec2 a, sl_vec2 b, float t)
     return sl_vec2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
 }
 
-/* ------------------------------------------------------------------ */
-/* 2x2 matrices (row-major storage, column-vector convention)          */
-/*                                                                     */
-/*     | m00  m01 |   applied as: out = M * v                          */
-/*     | m10  m11 |                                                    */
-/* ------------------------------------------------------------------ */
-
+/* Row-major storage, column-vector convention: out = M * v. */
 typedef struct sl_mat2 {
     float m00, m01;
     float m10, m11;
