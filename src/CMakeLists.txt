@@ -1,5 +1,6 @@
 add_library(silk STATIC
     silk.c
+    world.c
 )
 add_library(silk::silk ALIAS silk)
 
