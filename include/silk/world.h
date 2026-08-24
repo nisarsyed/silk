@@ -101,15 +101,22 @@ uint32_t sl_world_body_capacity(const sl_world *world);
 
 /* Walks live bodies in packed order: deterministic for a given operation
  * sequence, not creation order across destroys. Destroying mid-walk
- * skips the body swapped into the hole — to remove while walking,
- * destroy then do not advance. next() asserts its argument; both ends of
- * the walk read as the null handle. */
+ * swaps another body into the hole; next() asserts its argument, so
+ * capture the successor before removing:
+ *
+ *     sl_body_handle ahead = sl_world_body_next(&world, it);
+ *     if (remove) {
+ *         sl_world_body_destroy(&world, it);
+ *     }
+ *     it = ahead;
+ *
+ * Both ends of the walk read as the null handle. */
 sl_body_handle sl_world_body_first(const sl_world *world);
 sl_body_handle sl_world_body_next(const sl_world *world,
                                   sl_body_handle current);
 
-/* Accessors assert handle validity; setters additionally ignore values
- * create() would reject, leaving state unchanged. */
+/* Accessors assert handle validity. Setters return false — leaving
+ * state unchanged — for values create() would reject, true otherwise. */
 sl_vec2 sl_world_body_get_position(const sl_world *world,
                                    sl_body_handle handle);
 sl_vec2 sl_world_body_get_velocity(const sl_world *world,
@@ -117,11 +124,11 @@ sl_vec2 sl_world_body_get_velocity(const sl_world *world,
 float sl_world_body_get_mass(const sl_world *world, sl_body_handle handle);
 float sl_world_body_get_inv_mass(const sl_world *world, sl_body_handle handle);
 
-void sl_world_body_set_position(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
                                 sl_vec2 position);
-void sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
                                 sl_vec2 velocity);
-void sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass);
+bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass);
 
 #ifdef __cplusplus
 }

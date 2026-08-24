@@ -267,36 +267,39 @@ float sl_world_body_get_inv_mass(const sl_world *world, sl_body_handle handle)
     return world->inv_masses[world->slots[handle.index].dense];
 }
 
-void sl_world_body_set_position(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
                                 sl_vec2 position)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
     if (!sl_vec2_is_finite(position)) {
-        return;
+        return false;
     }
     world->positions[world->slots[handle.index].dense] = position;
+    return true;
 }
 
-void sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
                                 sl_vec2 velocity)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
     if (!sl_vec2_is_finite(velocity)) {
-        return;
+        return false;
     }
     world->velocities[world->slots[handle.index].dense] = velocity;
+    return true;
 }
 
-void sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass)
+bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
     if (!body_mass_valid(mass)) {
-        return;
+        return false;
     }
     const uint32_t dense = world->slots[handle.index].dense;
     world->masses[dense] = mass;
     world->inv_masses[dense] = 1.0f / mass;
+    return true;
 }

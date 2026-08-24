@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <silk/world.h>
 
@@ -346,14 +347,14 @@ static void test_set_mass_updates_inv_mass(void)
                           2.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
 
-    sl_world_body_set_mass(&world, h, 5.0f);
+    SL_EXPECT(sl_world_body_set_mass(&world, h, 5.0f));
     SL_EXPECT(sl_world_body_get_mass(&world, h) == 5.0f);
     SL_EXPECT_NEAR(sl_world_body_get_inv_mass(&world, h), 0.2f, k_eps);
 
-    /* Rejected masses leave both cached values untouched. */
+    /* Rejected masses report false and leave both cached values untouched. */
     const float rejected[] = { -1.0f, 0.0f, NAN, INFINITY, 1e-40f };
     for (uint32_t i = 0u; i < 5u; ++i) {
-        sl_world_body_set_mass(&world, h, rejected[i]);
+        SL_EXPECT(!sl_world_body_set_mass(&world, h, rejected[i]));
         SL_EXPECT(sl_world_body_get_mass(&world, h) == 5.0f);
         SL_EXPECT_NEAR(sl_world_body_get_inv_mass(&world, h), 0.2f, k_eps);
     }
@@ -371,8 +372,10 @@ static void test_setters_roundtrip(void)
                           1.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
 
-    sl_world_body_set_position(&world, h, sl_vec2_make(-7.5f, 9.25f));
-    sl_world_body_set_velocity(&world, h, sl_vec2_make(100.0f, -200.0f));
+    SL_EXPECT(
+        sl_world_body_set_position(&world, h, sl_vec2_make(-7.5f, 9.25f)));
+    SL_EXPECT(
+        sl_world_body_set_velocity(&world, h, sl_vec2_make(100.0f, -200.0f)));
 
     sl_vec2 position = sl_world_body_get_position(&world, h);
     SL_EXPECT(position.x == -7.5f && position.y == 9.25f);
@@ -383,7 +386,7 @@ static void test_setters_roundtrip(void)
     sl_world_destroy(&world);
 }
 
-static void test_setters_ignore_non_finite(void)
+static void test_setters_report_rejected_values(void)
 {
     sl_world_config config = { 1u };
     sl_world world;
@@ -393,8 +396,9 @@ static void test_setters_ignore_non_finite(void)
                           1.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
 
-    sl_world_body_set_position(&world, h, sl_vec2_make(NAN, 0.0f));
-    sl_world_body_set_velocity(&world, h, sl_vec2_make(0.0f, INFINITY));
+    SL_EXPECT(!sl_world_body_set_position(&world, h, sl_vec2_make(NAN, 0.0f)));
+    SL_EXPECT(
+        !sl_world_body_set_velocity(&world, h, sl_vec2_make(0.0f, INFINITY)));
 
     sl_vec2 position = sl_world_body_get_position(&world, h);
     SL_EXPECT(position.x == 1.0f && position.y == 2.0f);
@@ -547,7 +551,7 @@ static const sl_test_case k_cases[] = {
     { "reset_invalidates_and_refills", test_reset_invalidates_and_refills },
     { "set_mass_updates_inv_mass", test_set_mass_updates_inv_mass },
     { "setters_roundtrip", test_setters_roundtrip },
-    { "setters_ignore_non_finite", test_setters_ignore_non_finite },
+    { "setters_report_rejected_values", test_setters_report_rejected_values },
     { "churn_stress_matches_model", test_churn_stress_matches_model },
 };
 
