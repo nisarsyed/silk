@@ -1,0 +1,82 @@
+name: Bug Report
+description: Report incorrect behavior, a crash, or a reproducible problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening an issue, search existing issues to make sure this has not already been reported.
+
+  - type: checkboxes
+    id: existing-issue
+    attributes:
+      label: Existing issue
+      options:
+        - label: I have searched the existing issues.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clearly describe what went wrong.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest reproduction you can.
+      placeholder: |
+        1. Initialize...
+        2. Create...
+        3. Step simulation...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: input
+    id: seed
+    attributes:
+      label: Random seed
+      description: If the issue involves randomized or property-based tests, include the exact PRNG seed so the failure reproduces.
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include relevant platform, compiler, Silk version, and build configuration.
+      placeholder: |
+        Silk:
+        OS:
+        Architecture:
+        Compiler:
+        Compiler version:
+        Build type:
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Include relevant compiler errors, assertions, crashes, or other output.
+      render: text
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that may help diagnose the issue.
