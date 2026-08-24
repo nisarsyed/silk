@@ -9,25 +9,25 @@ Agent guidance for `silk`: a portable, data-oriented physics/simulation engine i
 ## Build & test
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug   # needs CMake >= 3.28
-cmake --build build                            # builds lib + tests + sandbox
-ctest --test-dir build --output-on-failure     # or run ./build/tests/sl_tests directly
+cmake --preset debug         # configure (presets: debug, release, sanitize); needs CMake >= 3.28
+cmake --build --preset debug # builds lib + tests + sandbox
+ctest --preset debug         # or run ./build/debug/tests/sl_tests directly
 ```
 
-There is no linter or formatter config; warning-clean compilation (below) is the quality gate.
+There is no linter or formatter config; warning-clean compilation (below) is the quality gate, enforced by CI (GitHub Actions: gcc + clang on Linux, macOS, and an ASan+UBSan sanitizer job).
 
 ## Hard constraints
 
 - **C17 with `C_EXTENSIONS OFF`**: portable ISO C only. No POSIX, no GNU/MSVC extensions, no third-party libraries — the core `silk` library has zero dependencies; build tooling and examples are exempt.
-- The `silk` library compiles with `-Wall -Wextra -Wpedantic -Werror` (MSVC `/W4 /WX`). Only the lib target enforces this, but all engine code must stay warning-clean.
+- The `silk` library compiles with `-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Werror` (MSVC `/W4 /WX`). Only the lib target enforces this, but all engine code must stay warning-clean.
 - The version is duplicated: `project(silk VERSION ...)` in `CMakeLists.txt` and `SL_VERSION_{MAJOR,MINOR,PATCH}` in `include/silk/silk.h`. Bump both together.
-- Simulation must stay **deterministic, fixed-timestep**. Bulk entity state is SoA (struct-of-arrays); transient solver structures (e.g., contact manifolds) may be AoS when that is the natural fit. Never introduce wall-clock time, uninitialized reads, or iteration-order-dependent floating point into simulation results.
+- Simulation must stay **deterministic, fixed-timestep**. Bulk entity state is SoA (struct-of-arrays); transient solver structures (e.g., contact manifolds) may be AoS when that is the natural fit. Never introduce wall-clock time, uninitialized reads, or iteration-order-dependent floating point into simulation results. Bitwise determinism holds per platform and build; cross-platform or future GPU results are held to numerical equivalence within explicit tolerances, not bit-identical floats.
 - Simulation state must remain **finite and numerically sound**: never store NaN or infinity as ordinary state, validate externally supplied floats, compare with explicit tolerances (`sl_feq`, `SL_EXPECT_NEAR`) — no exact float equality unless exactness is the property under test.
 - Design data layouts and APIs so future SIMD, threading, GPU, and WASM ports stay possible, but never introduce GPU or rendering abstractions speculatively — CPU correctness first.
 
 ## Testing
 
-The test runner is a hand-rolled header (`tests/silk_test.h`), not an external framework. There is no per-test filter; assertions are `SL_EXPECT`, `SL_EXPECT_INT_EQ`, `SL_EXPECT_NEAR`.
+The test runner is a hand-rolled header (`tests/silk_test.h`), not an external framework. There is no per-test filter; assertions are `SL_EXPECT`, `SL_EXPECT_INT_EQ`, `SL_EXPECT_NEAR`. Randomized/property tests must use seeded deterministic PRNGs with the seed committed to source — never seed from wall-clock time (`rand()`, `time()`), or failures stop being reproducible.
 
 Adding a suite requires touching four files — missing any of the last two means the suite silently never runs:
 
@@ -51,7 +51,7 @@ Performance:
 
 Experience/naming:
 - Public API prefix `sl_`; `snake_case`; no abbreviations except established domain terms (`vec2`, `mat2`); related names use equal-length words so they align.
-- Big-endian naming — most significant word first: `connection_count_max`, not `max_connection_count`; `vec2_length_sq`, not `sq_length`.
+- Big-endian naming — most significant word first: `connection_count_max`, not `max_connection_count`; `vec2_length_sq`, not `sq_length`. Capacity macros follow suit: `SL_BODY_COUNT_MAX`, never `SL_MAX_BODIES`.
 - No technical debt: do it right the first time. Prefer simple, elegant structures over clever ones.
 
 ## Workflow
