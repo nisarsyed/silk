@@ -15,6 +15,8 @@ extern "C" {
 /* Comparison tolerance in length units (~8 ULP of 1.0f); pinned by
  * tests/test_math.c. */
 #define SL_EPSILON 1e-6f
+/* Normalize cutoff as squared length: vectors under SL_EPSILON in length
+ * yield zero. */
 #define SL_VEC2_LENGTH_EPS_SQ (SL_EPSILON * SL_EPSILON)
 
 static inline float sl_min(float a, float b)
@@ -38,7 +40,7 @@ static inline float sl_abs(float v)
     return fabsf(v);
 }
 
-/* False if either operand is NaN. */
+/* True when |a - b| <= eps; false if either operand is NaN. */
 static inline bool sl_feq(float a, float b, float eps)
 {
     return sl_abs(a - b) <= eps;
@@ -106,8 +108,9 @@ static inline float sl_vec2_distance(sl_vec2 a, sl_vec2 b)
     return sl_vec2_length(sl_vec2_sub(a, b));
 }
 
-/* Degenerate inputs (length under SL_VEC2_LENGTH_EPS_SQ, or overflowing)
- * yield the zero vector instead of NaN. */
+/* Returns the unit vector of v. Inputs whose squared length is below
+ * SL_VEC2_LENGTH_EPS_SQ or overflows to infinity yield the zero vector
+ * instead of NaN — a physics-safe default. */
 static inline sl_vec2 sl_vec2_normalize(sl_vec2 v)
 {
     float len_sq = sl_vec2_length_sq(v);
@@ -117,7 +120,7 @@ static inline sl_vec2 sl_vec2_normalize(sl_vec2 v)
     return sl_vec2_scale(v, 1.0f / sqrtf(len_sq));
 }
 
-/* Counter-clockwise. */
+/* Counter-clockwise perpendicular: (-y, x). */
 static inline sl_vec2 sl_vec2_perp(sl_vec2 v)
 {
     return sl_vec2_make(-v.y, v.x);
