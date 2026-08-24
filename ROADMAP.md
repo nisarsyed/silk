@@ -24,7 +24,7 @@ Five standalone PRs, serial: branch off `main` after each merge.
 - [x] Repository setup — public repo, MIT license
 - [x] PR 1 — project scaffold: CMake targets (core, tests, sandbox), test framework, sandbox stub ([#1](https://github.com/nisarsyed/silk/pull/1), merged)
 - [x] Tooling pass — CMake presets, sanitizers, strict warnings, GitHub Actions CI, `SL_ASSERT` ([#3](https://github.com/nisarsyed/silk/pull/3), merged); added during the eng-standards review, beyond the original plan
-- [ ] PR 2 — 2D math library: `vec2`, `mat2`, scalar utilities, epsilon comparison + tests ([#2](https://github.com/nisarsyed/silk/pull/2))
+- [x] PR 2 — 2D math library: `vec2`, `mat2`, scalar utilities, epsilon comparison + tests ([#2](https://github.com/nisarsyed/silk/pull/2), merged)
 - [ ] PR 3 — simulation state: SoA world, body pool, generational handles + tests
 - [ ] PR 4 — integration & forces: fixed-timestep loop, force accumulation, determinism tests
 - [ ] PR 5 — raylib sandbox: interactive demo — spawn/drag bodies, debug draw, pause/step
