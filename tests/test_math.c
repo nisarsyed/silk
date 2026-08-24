@@ -1,0 +1,182 @@
+#include "silk_test.h"
+#include <silk/math.h>
+
+/* Exact equality is used only where IEEE-754 guarantees it (construction
+ * and integer-valued arithmetic); everything flowing through sqrt/trig
+ * compares via SL_EXPECT_NEAR. Rotation cases need the looser epsilon
+ * because SL_PI / 2 rounds, so cos/sin land near, not on, 0 and 1. */
+#define SL_TEST_EPS 1e-5f
+
+static void test_scalar_min_max(void)
+{
+    SL_EXPECT(sl_min(1.0f, 2.0f) == 1.0f);
+    SL_EXPECT(sl_min(-1.0f, -2.0f) == -2.0f);
+    SL_EXPECT(sl_max(1.0f, 2.0f) == 2.0f);
+}
+
+static void test_scalar_clamp(void)
+{
+    SL_EXPECT(sl_clamp(0.5f, 0.0f, 1.0f) == 0.5f);
+    SL_EXPECT(sl_clamp(-1.0f, 0.0f, 1.0f) == 0.0f);
+    SL_EXPECT(sl_clamp(2.0f, 0.0f, 1.0f) == 1.0f);
+}
+
+static void test_scalar_feq(void)
+{
+    SL_EXPECT(sl_feq(1.0f, 1.0f + 1e-7f, SL_EPSILON));
+    SL_EXPECT(!sl_feq(1.0f, 1.1f, SL_EPSILON));
+}
+
+static void test_vec2_make_and_components(void)
+{
+    sl_vec2 v = sl_vec2_make(3.0f, 4.0f);
+    SL_EXPECT(v.x == 3.0f && v.y == 4.0f);
+}
+
+static void test_vec2_add_sub_neg_scale(void)
+{
+    sl_vec2 a = sl_vec2_make(1.0f, 2.0f);
+    sl_vec2 b = sl_vec2_make(3.0f, -4.0f);
+
+    sl_vec2 sum = sl_vec2_add(a, b);
+    SL_EXPECT(sum.x == 4.0f && sum.y == -2.0f);
+
+    sl_vec2 diff = sl_vec2_sub(a, b);
+    SL_EXPECT(diff.x == -2.0f && diff.y == 6.0f);
+
+    sl_vec2 neg = sl_vec2_neg(a);
+    SL_EXPECT(neg.x == -1.0f && neg.y == -2.0f);
+
+    sl_vec2 scaled = sl_vec2_scale(b, 2.0f);
+    SL_EXPECT(scaled.x == 6.0f && scaled.y == -8.0f);
+}
+
+static void test_vec2_dot(void)
+{
+    /* Perpendicular vectors have zero dot product. */
+    sl_vec2 x = sl_vec2_make(1.0f, 0.0f);
+    sl_vec2 y = sl_vec2_make(0.0f, 1.0f);
+    SL_EXPECT_NEAR(sl_vec2_dot(x, y), 0.0f, SL_EPSILON);
+
+    /* Parallel: |a||b| when same direction. */
+    sl_vec2 a = sl_vec2_make(3.0f, 0.0f);
+    SL_EXPECT_NEAR(sl_vec2_dot(a, a), 9.0f, SL_EPSILON);
+}
+
+static void test_vec2_cross_sign(void)
+{
+    sl_vec2 x = sl_vec2_make(1.0f, 0.0f);
+    sl_vec2 y = sl_vec2_make(0.0f, 1.0f);
+    SL_EXPECT(sl_vec2_cross(x, y) > 0.0f);   /* CCW */
+    SL_EXPECT(sl_vec2_cross(y, x) < 0.0f);   /* CW */
+    SL_EXPECT_NEAR(sl_vec2_cross(x, y), 1.0f, SL_EPSILON);
+    SL_EXPECT_NEAR(sl_vec2_cross(y, x), -1.0f, SL_EPSILON);
+}
+
+static void test_vec2_length_normalize(void)
+{
+    sl_vec2 v = sl_vec2_make(3.0f, 4.0f);
+    SL_EXPECT_NEAR(sl_vec2_length(v), 5.0f, SL_EPSILON);
+
+    sl_vec2 unit = sl_vec2_normalize(v);
+    SL_EXPECT_NEAR(sl_vec2_length(unit), 1.0f, SL_EPSILON);
+
+    /* Zero-safe normalize. */
+    sl_vec2 zero = sl_vec2_normalize(sl_vec2_make(0.0f, 0.0f));
+    SL_EXPECT(zero.x == 0.0f && zero.y == 0.0f);
+}
+
+static void test_vec2_perp_is_orthogonal_ccw(void)
+{
+    sl_vec2 v = sl_vec2_make(2.0f, 1.0f);
+    sl_vec2 p = sl_vec2_perp(v);
+    SL_EXPECT(p.x == -1.0f && p.y == 2.0f);
+    SL_EXPECT_NEAR(sl_vec2_dot(v, p), 0.0f, SL_EPSILON);
+}
+
+static void test_vec2_lerp_endpoints(void)
+{
+    sl_vec2 a = sl_vec2_make(0.0f, 0.0f);
+    sl_vec2 b = sl_vec2_make(10.0f, -10.0f);
+
+    sl_vec2 at_a = sl_vec2_lerp(a, b, 0.0f);
+    sl_vec2 mid = sl_vec2_lerp(a, b, 0.5f);
+    sl_vec2 at_b = sl_vec2_lerp(a, b, 1.0f);
+
+    SL_EXPECT(at_a.x == 0.0f && at_a.y == 0.0f);
+    SL_EXPECT(mid.x == 5.0f && mid.y == -5.0f);
+    SL_EXPECT(at_b.x == 10.0f && at_b.y == -10.0f);
+}
+
+static void test_vec2_distance(void)
+{
+    float d = sl_vec2_distance(sl_vec2_make(0.0f, 0.0f), sl_vec2_make(3.0f, 4.0f));
+    SL_EXPECT_NEAR(d, 5.0f, SL_EPSILON);
+}
+
+static void test_mat2_identity(void)
+{
+    sl_mat2 id = sl_mat2_identity();
+    sl_vec2 v = sl_vec2_make(7.5f, -2.0f);
+    sl_vec2 r = sl_mat2_mul_vec2(id, v);
+    SL_EXPECT(r.x == v.x && r.y == v.y);
+}
+
+static void test_mat2_rotation_90deg(void)
+{
+    /* Rotating +x axis by 90 degrees CCW gives +y axis. */
+    sl_mat2 rot = sl_mat2_rotation(SL_PI / 2.0f);
+    sl_vec2 r = sl_mat2_mul_vec2(rot, sl_vec2_make(1.0f, 0.0f));
+    SL_EXPECT_NEAR(r.x, 0.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(r.y, 1.0f, SL_TEST_EPS);
+}
+
+static void test_mat2_rotation_composition(void)
+{
+    /* Two 90-degree rotations equal one 180-degree rotation. */
+    sl_mat2 quarter = sl_mat2_rotation(SL_PI / 2.0f);
+    sl_mat2 half = sl_mat2_rotation(SL_PI);
+
+    sl_vec2 via_composition = sl_mat2_mul_vec2(sl_mat2_multiply(quarter, quarter),
+                                               sl_vec2_make(1.0f, 0.0f));
+    sl_vec2 direct = sl_mat2_mul_vec2(half, sl_vec2_make(1.0f, 0.0f));
+
+    SL_EXPECT_NEAR(via_composition.x, direct.x, SL_TEST_EPS);
+    SL_EXPECT_NEAR(via_composition.y, direct.y, SL_TEST_EPS);
+}
+
+static void test_mat2_transpose_inverse_for_rotation(void)
+{
+    /* For pure rotations, transpose equals inverse: R^T * R == I. */
+    sl_mat2 rot = sl_mat2_rotation(0.7f);
+    sl_mat2 rt_r = sl_mat2_multiply(sl_mat2_transpose(rot), rot);
+    sl_mat2 id = sl_mat2_identity();
+
+    SL_EXPECT_NEAR(rt_r.m00, id.m00, SL_TEST_EPS);
+    SL_EXPECT_NEAR(rt_r.m01, id.m01, SL_TEST_EPS);
+    SL_EXPECT_NEAR(rt_r.m10, id.m10, SL_TEST_EPS);
+    SL_EXPECT_NEAR(rt_r.m11, id.m11, SL_TEST_EPS);
+}
+
+static const sl_test_case k_cases[] = {
+    { "scalar_min_max", test_scalar_min_max },
+    { "scalar_clamp", test_scalar_clamp },
+    { "scalar_feq", test_scalar_feq },
+    { "vec2_make_and_components", test_vec2_make_and_components },
+    { "vec2_add_sub_neg_scale", test_vec2_add_sub_neg_scale },
+    { "vec2_dot", test_vec2_dot },
+    { "vec2_cross_sign", test_vec2_cross_sign },
+    { "vec2_length_normalize", test_vec2_length_normalize },
+    { "vec2_perp_is_orthogonal_ccw", test_vec2_perp_is_orthogonal_ccw },
+    { "vec2_lerp_endpoints", test_vec2_lerp_endpoints },
+    { "vec2_distance", test_vec2_distance },
+    { "mat2_identity", test_mat2_identity },
+    { "mat2_rotation_90deg", test_mat2_rotation_90deg },
+    { "mat2_rotation_composition", test_mat2_rotation_composition },
+    { "mat2_transpose_inverse_for_rotation", test_mat2_transpose_inverse_for_rotation },
+};
+
+int sl_math_suite(void)
+{
+    return sl_run_suite("math", k_cases, (int)(sizeof(k_cases) / sizeof(k_cases[0])));
+}

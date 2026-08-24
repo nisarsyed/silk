@@ -7,6 +7,7 @@ int main(void)
     int failures = 0;
 
     failures += sl_core_suite();
+    failures += sl_math_suite();
 
     if (failures == 0) {
         printf("all tests passed\n");

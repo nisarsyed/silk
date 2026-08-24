@@ -4,5 +4,6 @@
 #define SILK_SUITES_H
 
 int sl_core_suite(void);
+int sl_math_suite(void);
 
 #endif /* SILK_SUITES_H */
