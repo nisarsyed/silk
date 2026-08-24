@@ -14,7 +14,7 @@ cmake --build --preset debug # builds lib + tests + sandbox
 ctest --preset debug         # or run ./build/debug/tests/sl_tests directly
 ```
 
-There is no linter or formatter config; warning-clean compilation (below) is the quality gate, enforced by CI (GitHub Actions: gcc + clang on Linux, macOS, and an ASan+UBSan sanitizer job).
+Formatting is clang-format (`.clang-format`, LLVM-based, 4-space indent); run `clang-format -i` on every touched C file before committing — CI checks formatting with a pinned clang-format version (22.1.3), so unformatted code fails the `format` job. Warning-clean compilation (below) is the quality gate, enforced by CI (GitHub Actions: gcc + clang on Linux, macOS, and an ASan+UBSan sanitizer job).
 
 ## Hard constraints
 

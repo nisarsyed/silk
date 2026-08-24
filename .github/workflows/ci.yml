@@ -10,6 +10,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to match .clang-format expectations; output differs across
+      # major versions, so an unpinned runner would fail valid PRs.
+      - run: pipx install clang-format==22.1.3
+      - run: clang-format --dry-run --Werror include/silk/*.h src/*.c tests/*.h tests/*.c examples/sandbox/*.c
+
   linux:
     name: ${{ matrix.cc }} / ubuntu
     runs-on: ubuntu-latest

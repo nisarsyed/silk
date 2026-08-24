@@ -69,8 +69,8 @@ static void test_vec2_cross_sign(void)
 {
     sl_vec2 x = sl_vec2_make(1.0f, 0.0f);
     sl_vec2 y = sl_vec2_make(0.0f, 1.0f);
-    SL_EXPECT(sl_vec2_cross(x, y) > 0.0f);   /* CCW */
-    SL_EXPECT(sl_vec2_cross(y, x) < 0.0f);   /* CW */
+    SL_EXPECT(sl_vec2_cross(x, y) > 0.0f); /* CCW */
+    SL_EXPECT(sl_vec2_cross(y, x) < 0.0f); /* CW */
     SL_EXPECT_NEAR(sl_vec2_cross(x, y), 1.0f, SL_EPSILON);
     SL_EXPECT_NEAR(sl_vec2_cross(y, x), -1.0f, SL_EPSILON);
 }
@@ -114,7 +114,8 @@ static void test_vec2_lerp_endpoints(void)
 
 static void test_vec2_distance(void)
 {
-    float d = sl_vec2_distance(sl_vec2_make(0.0f, 0.0f), sl_vec2_make(3.0f, 4.0f));
+    float d =
+        sl_vec2_distance(sl_vec2_make(0.0f, 0.0f), sl_vec2_make(3.0f, 4.0f));
     SL_EXPECT_NEAR(d, 5.0f, SL_EPSILON);
 }
 
@@ -162,8 +163,8 @@ static void test_mat2_rotation_composition(void)
     sl_mat2 quarter = sl_mat2_rotation(SL_PI / 2.0f);
     sl_mat2 half = sl_mat2_rotation(SL_PI);
 
-    sl_vec2 via_composition = sl_mat2_multiply_vec2(sl_mat2_multiply(quarter, quarter),
-                                                     sl_vec2_make(1.0f, 0.0f));
+    sl_vec2 via_composition = sl_mat2_multiply_vec2(
+        sl_mat2_multiply(quarter, quarter), sl_vec2_make(1.0f, 0.0f));
     sl_vec2 direct = sl_mat2_multiply_vec2(half, sl_vec2_make(1.0f, 0.0f));
 
     SL_EXPECT_NEAR(via_composition.x, direct.x, SL_TEST_EPS);
@@ -199,10 +200,12 @@ static const sl_test_case k_cases[] = {
     { "mat2_multiply_operand_order", test_mat2_multiply_operand_order },
     { "mat2_rotation_90deg", test_mat2_rotation_90deg },
     { "mat2_rotation_composition", test_mat2_rotation_composition },
-    { "mat2_transpose_inverse_for_rotation", test_mat2_transpose_inverse_for_rotation },
+    { "mat2_transpose_inverse_for_rotation",
+      test_mat2_transpose_inverse_for_rotation },
 };
 
 int sl_math_suite(void)
 {
-    return sl_run_suite("math", k_cases, (int)(sizeof(k_cases) / sizeof(k_cases[0])));
+    return sl_run_suite("math", k_cases,
+                        (int)(sizeof(k_cases) / sizeof(k_cases[0])));
 }
