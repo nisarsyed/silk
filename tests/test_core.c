@@ -1,4 +1,5 @@
 #include "silk_test.h"
+#include "suites.h"
 #include <silk/silk.h>
 
 static void test_version_matches_macros(void)
