@@ -1,0 +1,12 @@
+---
+# LLVM layout with this codebase's conventions: 4-space indent, braces on
+# their own line for functions but attached for control flow, padded brace
+# initializer lists ({ x, y }), pointers binding right.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 80
+AllowShortFunctionsOnASingleLine: None
+Cpp11BracedListStyle: false
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
