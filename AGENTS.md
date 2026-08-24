@@ -32,7 +32,7 @@ The test runner is a hand-rolled header (`tests/silk_test.h`), not an external f
 Adding a suite requires touching four files — missing any of the last two means the suite silently never runs:
 
 1. New `tests/test_<name>.c`: static case functions, a `k_cases[]` array, and `int sl_<name>_suite(void)` returning the failure count.
-2. Add the file to the `sl_tests` executable in `tests/CMakeLists.txt` (plus `add_test(NAME <name> COMMAND sl_tests)`).
+2. Add the file to the `sl_tests` executable in `tests/CMakeLists.txt`. ctest registration stays a single `add_test(NAME all COMMAND sl_tests)` — the runner executes every suite, so per-suite entries would re-run the whole binary.
 3. Declare the runner in `tests/suites.h`.
 4. Call the runner from `main()` in `tests/sl_tests.c` and sum its failures.
 
@@ -52,6 +52,8 @@ Performance:
 Experience/naming:
 - Public API prefix `sl_`; `snake_case`; no abbreviations except established domain terms (`vec2`, `mat2`); related names use equal-length words so they align.
 - Big-endian naming — most significant word first: `connection_count_max`, not `max_connection_count`; `vec2_length_sq`, not `sq_length`. Capacity macros follow suit: `SL_BODY_COUNT_MAX`, never `SL_MAX_BODIES`.
+- Comments state contracts the code can't express — units, frames, sign conventions, valid ranges, NaN behavior, invariants — never structure, narration, or what the signature already says.
+- Tuned constants carry a trail: derivation, source, or the test that pins them (`beta = 0.2f` at 60 Hz, bounded by tests/stacking). A bare magic number is debt.
 - No technical debt: do it right the first time. Prefer simple, elegant structures over clever ones.
 
 ## Workflow

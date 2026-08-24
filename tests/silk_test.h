@@ -70,7 +70,7 @@ int sl_run_suite(const char *suite, const sl_test_case *cases, int count)
         double sl_d_ = sl_a_ - sl_b_;                                         \
         if (sl_d_ < 0.0)                                                      \
             sl_d_ = -sl_d_;                                                   \
-        if (!(sl_d_ <= (eps))) {                                              \
+        if (!(sl_d_ <= (double)(eps))) {                                      \
             printf("\n    FAIL %s:%d: |%s - %s| = %g > %g\n",                 \
                    __FILE__, __LINE__, #a, #b, sl_d_, (double)(eps));         \
             sl_test_failures++;                                               \

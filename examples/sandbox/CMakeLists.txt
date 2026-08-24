@@ -1,2 +1,2 @@
 add_executable(sandbox main.c)
-target_link_libraries(sandbox PRIVATE silk)
+target_link_libraries(sandbox PRIVATE silk silk_warnings)
