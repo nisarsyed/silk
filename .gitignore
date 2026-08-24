@@ -1,0 +1,15 @@
+# Build
+build/
+build-*/
+out/
+cmake-build-*/
+compile_commands.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Package / dependency artifacts
+.cache/
