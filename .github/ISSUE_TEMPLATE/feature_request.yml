@@ -1,0 +1,47 @@
+name: Feature Request
+description: Propose a new feature or capability for Silk.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests should describe the problem or capability rather than prescribing a specific implementation.
+
+  - type: checkboxes
+    id: existing
+    attributes:
+      label: Existing issue
+      options:
+        - label: I have searched the existing issues.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this feature solve?
+      placeholder: What are you trying to accomplish?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe what you would like Silk to support.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe alternative approaches or workarounds.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Examples, references, benchmarks, papers, or other relevant information.

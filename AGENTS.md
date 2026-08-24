@@ -56,6 +56,6 @@ Experience/naming:
 
 ## Workflow
 
-Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`), optionally scoped by subsystem (`feat(math): ...`, `fix(collision): ...`); short-lived `feat/*` branches PR'd into `main`.
+Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`), optionally scoped by subsystem (`feat(math): ...`, `fix(collision): ...`); short-lived `feat/*` branches PR'd into `main`. Pull requests follow `.github/PULL_REQUEST_TEMPLATE.md`; issues go through the forms under `.github/ISSUE_TEMPLATE/`.
 
 Run the relevant tests after every change. Never weaken assertions, tests, warnings, or limits to make a change pass; if a check is wrong, fix the code or the check explicitly and say why.
