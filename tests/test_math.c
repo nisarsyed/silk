@@ -1,11 +1,13 @@
 #include "silk_test.h"
+#include "suites.h"
 #include <silk/math.h>
 
-/* Exact equality is used only where IEEE-754 guarantees it (construction
- * and integer-valued arithmetic); everything flowing through sqrt/trig
- * compares via SL_EXPECT_NEAR. Rotation cases need the looser epsilon
- * because SL_PI / 2 rounds, so cos/sin land near, not on, 0 and 1. */
-#define SL_TEST_EPS 1e-5f
+/* Exact equality is used only where IEEE-754 guarantees it (construction,
+ * integer-valued arithmetic, and small-integer matrix products); everything
+ * flowing through sqrt/trig compares via SL_EXPECT_NEAR. Rotation cases
+ * need the looser epsilon because SL_PI / 2 rounds by up to ~3e-8 rad, so
+ * cos/sin land within ~1e-7 of 0 and 1 — 1e-6f leaves ~10x headroom. */
+#define SL_TEST_EPS 1e-6f
 
 static void test_scalar_min_max(void)
 {
@@ -79,7 +81,9 @@ static void test_vec2_length_normalize(void)
     SL_EXPECT_NEAR(sl_vec2_length(v), 5.0f, SL_EPSILON);
 
     sl_vec2 unit = sl_vec2_normalize(v);
-    SL_EXPECT_NEAR(sl_vec2_length(unit), 1.0f, SL_EPSILON);
+    SL_EXPECT_NEAR(unit.x, 0.6f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(unit.y, 0.8f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(sl_vec2_length(unit), 1.0f, SL_TEST_EPS);
 
     /* Zero-safe normalize. */
     sl_vec2 zero = sl_vec2_normalize(sl_vec2_make(0.0f, 0.0f));
@@ -118,15 +122,36 @@ static void test_mat2_identity(void)
 {
     sl_mat2 id = sl_mat2_identity();
     sl_vec2 v = sl_vec2_make(7.5f, -2.0f);
-    sl_vec2 r = sl_mat2_mul_vec2(id, v);
+    sl_vec2 r = sl_mat2_multiply_vec2(id, v);
     SL_EXPECT(r.x == v.x && r.y == v.y);
+}
+
+/* Operand order: matrix multiply is not commutative, and every rotation
+ * product commutes, so this integer case is what actually pins which
+ * operand is applied on the left. Exact equality is safe here: all
+ * intermediate values are integers <= 50. */
+static void test_mat2_multiply_operand_order(void)
+{
+    sl_mat2 a = { 1.0f, 2.0f, 3.0f, 4.0f };
+    sl_mat2 b = { 5.0f, 6.0f, 7.0f, 8.0f };
+
+    /* a * b = | 1*5+2*7  1*6+2*8 |   = | 19  22 |
+               | 3*5+4*7  3*6+4*8 |     | 43  50 | */
+    sl_mat2 ab = sl_mat2_multiply(a, b);
+    SL_EXPECT(ab.m00 == 19.0f && ab.m01 == 22.0f);
+    SL_EXPECT(ab.m10 == 43.0f && ab.m11 == 50.0f);
+
+    /* b * a differs in every entry; a swapped implementation lands here. */
+    sl_mat2 ba = sl_mat2_multiply(b, a);
+    SL_EXPECT(ba.m00 == 23.0f && ba.m01 == 34.0f);
+    SL_EXPECT(ba.m10 == 31.0f && ba.m11 == 46.0f);
 }
 
 static void test_mat2_rotation_90deg(void)
 {
     /* Rotating +x axis by 90 degrees CCW gives +y axis. */
     sl_mat2 rot = sl_mat2_rotation(SL_PI / 2.0f);
-    sl_vec2 r = sl_mat2_mul_vec2(rot, sl_vec2_make(1.0f, 0.0f));
+    sl_vec2 r = sl_mat2_multiply_vec2(rot, sl_vec2_make(1.0f, 0.0f));
     SL_EXPECT_NEAR(r.x, 0.0f, SL_TEST_EPS);
     SL_EXPECT_NEAR(r.y, 1.0f, SL_TEST_EPS);
 }
@@ -137,9 +162,9 @@ static void test_mat2_rotation_composition(void)
     sl_mat2 quarter = sl_mat2_rotation(SL_PI / 2.0f);
     sl_mat2 half = sl_mat2_rotation(SL_PI);
 
-    sl_vec2 via_composition = sl_mat2_mul_vec2(sl_mat2_multiply(quarter, quarter),
-                                               sl_vec2_make(1.0f, 0.0f));
-    sl_vec2 direct = sl_mat2_mul_vec2(half, sl_vec2_make(1.0f, 0.0f));
+    sl_vec2 via_composition = sl_mat2_multiply_vec2(sl_mat2_multiply(quarter, quarter),
+                                                     sl_vec2_make(1.0f, 0.0f));
+    sl_vec2 direct = sl_mat2_multiply_vec2(half, sl_vec2_make(1.0f, 0.0f));
 
     SL_EXPECT_NEAR(via_composition.x, direct.x, SL_TEST_EPS);
     SL_EXPECT_NEAR(via_composition.y, direct.y, SL_TEST_EPS);
@@ -171,6 +196,7 @@ static const sl_test_case k_cases[] = {
     { "vec2_lerp_endpoints", test_vec2_lerp_endpoints },
     { "vec2_distance", test_vec2_distance },
     { "mat2_identity", test_mat2_identity },
+    { "mat2_multiply_operand_order", test_mat2_multiply_operand_order },
     { "mat2_rotation_90deg", test_mat2_rotation_90deg },
     { "mat2_rotation_composition", test_mat2_rotation_composition },
     { "mat2_transpose_inverse_for_rotation", test_mat2_transpose_inverse_for_rotation },

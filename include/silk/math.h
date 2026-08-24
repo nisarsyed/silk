@@ -1,15 +1,22 @@
 #ifndef SILK_MATH_H
 #define SILK_MATH_H
 
+#include <math.h>
+#include <stdbool.h>
+
+#include "silk/assert.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <math.h>
-#include <stdbool.h>
-
 #define SL_PI 3.14159265358979323846f
+
+/* Comparison tolerance in length units (~8 ULP of 1.0f); pinned by tests/test_math.c. */
 #define SL_EPSILON 1e-6f
+
+/* Normalize cutoff as squared length: vectors under SL_EPSILON in length yield zero. */
+#define SL_VEC2_LENGTH_EPS_SQ (SL_EPSILON * SL_EPSILON)
 
 static inline float sl_min(float a, float b)
 {
@@ -23,6 +30,7 @@ static inline float sl_max(float a, float b)
 
 static inline float sl_clamp(float v, float lo, float hi)
 {
+    SL_ASSERT(lo <= hi);
     return sl_min(sl_max(v, lo), hi);
 }
 
@@ -31,7 +39,7 @@ static inline float sl_abs(float v)
     return fabsf(v);
 }
 
-/* True when |a - b| <= eps. */
+/* True when |a - b| <= eps; false if either operand is NaN. */
 static inline bool sl_feq(float a, float b, float eps)
 {
     return sl_abs(a - b) <= eps;
@@ -94,13 +102,13 @@ static inline float sl_vec2_distance(sl_vec2 a, sl_vec2 b)
     return sl_vec2_length(sl_vec2_sub(a, b));
 }
 
-/* Returns the unit vector of v. Zero-length input yields the zero vector
- * instead of NaN — a physics-safe default. The threshold compares squared
- * length against SL_EPSILON, so it is not scale-invariant by design. */
+/* Returns the unit vector of v. Inputs whose squared length is below
+ * SL_VEC2_LENGTH_EPS_SQ or overflows to infinity yield the zero vector
+ * instead of NaN — a physics-safe default. */
 static inline sl_vec2 sl_vec2_normalize(sl_vec2 v)
 {
     float len_sq = sl_vec2_length_sq(v);
-    if (len_sq <= SL_EPSILON) {
+    if (len_sq <= SL_VEC2_LENGTH_EPS_SQ) {
         return sl_vec2_make(0.0f, 0.0f);
     }
     return sl_vec2_scale(v, 1.0f / sqrtf(len_sq));
@@ -129,7 +137,8 @@ static inline sl_mat2 sl_mat2_identity(void)
     return m;
 }
 
-/* Counter-clockwise rotation matrix for positive angles. */
+/* Counter-clockwise for positive angles; libm trig, so cross-platform
+ * results agree within tolerance rather than bitwise. */
 static inline sl_mat2 sl_mat2_rotation(float radians)
 {
     float c = cosf(radians);
@@ -148,7 +157,7 @@ static inline sl_mat2 sl_mat2_multiply(sl_mat2 a, sl_mat2 b)
     return r;
 }
 
-static inline sl_vec2 sl_mat2_mul_vec2(sl_mat2 m, sl_vec2 v)
+static inline sl_vec2 sl_mat2_multiply_vec2(sl_mat2 m, sl_vec2 v)
 {
     return sl_vec2_make(m.m00 * v.x + m.m01 * v.y, m.m10 * v.x + m.m11 * v.y);
 }
