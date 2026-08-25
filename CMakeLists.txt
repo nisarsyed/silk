@@ -41,4 +41,11 @@ endif()
 
 add_subdirectory(src)
 add_subdirectory(tests)
-add_subdirectory(examples/sandbox)
+
+# Interactive raylib sandbox: an off-by-default dev tool, not a tested
+# artifact — enabling it fetches raylib at configure time and needs a
+# display to run. See examples/sandbox/CMakeLists.txt.
+option(SL_SANDBOX "Build the raylib sandbox example" OFF)
+if(SL_SANDBOX)
+    add_subdirectory(examples/sandbox)
+endif()
