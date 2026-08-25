@@ -14,7 +14,7 @@ static const float k_eps = 1e-6f;
 
 static void test_init_destroy_roundtrip(void)
 {
-    sl_world_config config = { 4u };
+    sl_world_config config = { .body_capacity = 4u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
     SL_EXPECT_INT_EQ(world.body_capacity, 4);
@@ -34,20 +34,20 @@ static void test_init_rejects_bad_capacity(void)
 {
     sl_world world;
 
-    sl_world_config zero = { 0u };
+    sl_world_config zero = { .body_capacity = 0u };
     SL_EXPECT(!sl_world_init(&world, &zero));
     SL_EXPECT(world.memory == NULL && world.body_capacity == 0u);
 
-    sl_world_config overflow = { SL_BODY_COUNT_MAX + 1u };
+    sl_world_config overflow = { .body_capacity = SL_BODY_COUNT_MAX + 1u };
     SL_EXPECT(!sl_world_init(&world, &overflow));
     SL_EXPECT(world.memory == NULL && world.body_capacity == 0u);
 
     /* Both bounds themselves are accepted. */
-    sl_world_config one = { 1u };
+    sl_world_config one = { .body_capacity = 1u };
     SL_EXPECT(sl_world_init(&world, &one));
     sl_world_destroy(&world);
 
-    sl_world_config full = { SL_BODY_COUNT_MAX };
+    sl_world_config full = { .body_capacity = SL_BODY_COUNT_MAX };
     SL_EXPECT(sl_world_init(&world, &full));
     SL_EXPECT_INT_EQ(world.body_capacity, SL_BODY_COUNT_MAX);
     sl_world_destroy(&world);
@@ -55,7 +55,7 @@ static void test_init_rejects_bad_capacity(void)
 
 static void test_create_roundtrips_state(void)
 {
-    sl_world_config config = { 2u };
+    sl_world_config config = { .body_capacity = 2u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -80,7 +80,7 @@ static void test_create_roundtrips_state(void)
 
 static void test_create_rejects_non_finite_state(void)
 {
-    sl_world_config config = { 2u };
+    sl_world_config config = { .body_capacity = 2u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -109,7 +109,7 @@ static void test_create_rejects_non_finite_state(void)
 
 static void test_create_rejects_non_positive_mass(void)
 {
-    sl_world_config config = { 2u };
+    sl_world_config config = { .body_capacity = 2u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -126,7 +126,7 @@ static void test_create_rejects_non_positive_mass(void)
 
 static void test_create_rejects_inverse_overflow(void)
 {
-    sl_world_config config = { 2u };
+    sl_world_config config = { .body_capacity = 2u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -146,7 +146,7 @@ static void test_create_rejects_inverse_overflow(void)
 
 static void test_fill_to_capacity(void)
 {
-    sl_world_config config = { 3u };
+    sl_world_config config = { .body_capacity = 3u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -168,7 +168,7 @@ static void test_fill_to_capacity(void)
 
 static void test_destroy_invalidates_handle(void)
 {
-    sl_world_config config = { 2u };
+    sl_world_config config = { .body_capacity = 2u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -186,7 +186,7 @@ static void test_destroy_invalidates_handle(void)
 
 static void test_destroy_tolerates_bad_handles(void)
 {
-    sl_world_config config = { 1u };
+    sl_world_config config = { .body_capacity = 1u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -218,7 +218,7 @@ static void test_destroy_tolerates_bad_handles(void)
 
 static void test_slot_reuse_bumps_generation(void)
 {
-    sl_world_config config = { 1u };
+    sl_world_config config = { .body_capacity = 1u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -241,7 +241,7 @@ static void test_slot_reuse_bumps_generation(void)
 
 static void test_arrays_stay_packed_on_middle_destroy(void)
 {
-    sl_world_config config = { 4u };
+    sl_world_config config = { .body_capacity = 4u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -276,7 +276,7 @@ static void test_arrays_stay_packed_on_middle_destroy(void)
 
 static void test_traversal_visits_each_body_once(void)
 {
-    sl_world_config config = { 8u };
+    sl_world_config config = { .body_capacity = 8u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -309,7 +309,7 @@ static void test_traversal_visits_each_body_once(void)
 
 static void test_reset_invalidates_and_refills(void)
 {
-    sl_world_config config = { 4u };
+    sl_world_config config = { .body_capacity = 4u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -339,7 +339,7 @@ static void test_reset_invalidates_and_refills(void)
 
 static void test_set_mass_updates_inv_mass(void)
 {
-    sl_world_config config = { 1u };
+    sl_world_config config = { .body_capacity = 1u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -364,7 +364,7 @@ static void test_set_mass_updates_inv_mass(void)
 
 static void test_setters_roundtrip(void)
 {
-    sl_world_config config = { 1u };
+    sl_world_config config = { .body_capacity = 1u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -388,7 +388,7 @@ static void test_setters_roundtrip(void)
 
 static void test_setters_report_rejected_values(void)
 {
-    sl_world_config config = { 1u };
+    sl_world_config config = { .body_capacity = 1u };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -434,7 +434,7 @@ static uint32_t model_generation_bump(uint32_t generation)
 
 static void test_churn_stress_matches_model(void)
 {
-    sl_world_config config = { CHURN_CAPACITY };
+    sl_world_config config = { .body_capacity = CHURN_CAPACITY };
     sl_world world;
     SL_EXPECT(sl_world_init(&world, &config));
 

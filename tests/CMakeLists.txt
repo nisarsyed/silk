@@ -3,6 +3,7 @@ add_executable(sl_tests
     test_core.c
     test_math.c
     test_world.c
+    test_step.c
 )
 target_link_libraries(sl_tests PRIVATE silk silk_warnings)
 target_include_directories(sl_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
