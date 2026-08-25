@@ -11,7 +11,7 @@ Agent guidance for `silk`: a portable, data-oriented physics/simulation engine i
 ```sh
 cmake --preset debug         # configure (presets: debug, release, sanitize, sandbox); needs CMake >= 3.28
 cmake --build --preset debug # builds lib + tests; the sandbox builds under the sandbox preset
-ctest --preset debug         # or run ./build/debug/tests/sl_tests directly
+ctest --preset debug         # or run ./build/debug/bin/sl_tests directly
 ```
 
 Formatting is clang-format (`.clang-format`, LLVM-based, 4-space indent); run `clang-format -i` on every touched C file before committing — CI checks formatting with a pinned clang-format version (22.1.3), so unformatted code fails the `format` job. Warning-clean compilation (below) is the quality gate, enforced by CI (GitHub Actions: gcc + clang on Linux, macOS, and an ASan+UBSan sanitizer job).

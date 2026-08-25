@@ -39,6 +39,10 @@ elseif(MSVC)
     target_compile_options(silk_warnings INTERFACE /W4 /WX)
 endif()
 
+# Executables land in one predictable place per preset (<build>/bin),
+# independent of their depth in the source tree.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 add_subdirectory(src)
 add_subdirectory(tests)
 
