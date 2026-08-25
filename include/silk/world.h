@@ -44,6 +44,8 @@ typedef struct sl_body_desc {
 
 typedef struct sl_world_config {
     uint32_t body_capacity; /* in [1, SL_BODY_COUNT_MAX], fixed at init */
+    sl_vec2 gravity;        /* world units / second^2; default {0, 0} */
+    float linear_drag;      /* 1 / seconds, >= 0; default 0 */
 } sl_world_config;
 
 typedef struct sl_body_slot {
@@ -56,6 +58,9 @@ typedef struct sl_world {
     uint32_t body_capacity; /* slot count, fixed at init */
     uint32_t free_count;
 
+    sl_vec2 gravity;   /* world units / second^2 */
+    float linear_drag; /* 1 / seconds, >= 0 */
+
     /* Dual indexing: slots[handle.index] -> packed row, slot_of[row] ->
      * owning slot. Swap-remove repairs exactly one slot_of entry. */
     sl_body_slot *slots;
@@ -67,12 +72,15 @@ typedef struct sl_world {
     sl_vec2 *velocities; /* world units / second */
     float *masses;       /* kilograms, > 0 */
     float *inv_masses;   /* 1 / mass; set_mass is its only writer */
+    sl_vec2 *forces;     /* kilograms * world units / second^2; the
+                          * stepper clears them every step */
 
     void *memory; /* backing block carved into every array above */
 } sl_world;
 
 /* Returns false, leaving *world zeroed, when body_capacity is outside
- * [1, SL_BODY_COUNT_MAX] or allocation fails. Everything is allocated
+ * [1, SL_BODY_COUNT_MAX], gravity is non-finite, linear_drag is
+ * non-finite or negative, or allocation fails. Everything is allocated
  * here; nothing allocates during simulation. */
 bool sl_world_init(sl_world *world, const sl_world_config *config);
 
@@ -98,6 +106,9 @@ bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle);
 
 uint32_t sl_world_body_count(const sl_world *world);
 uint32_t sl_world_body_capacity(const sl_world *world);
+
+sl_vec2 sl_world_get_gravity(const sl_world *world);
+float sl_world_get_linear_drag(const sl_world *world);
 
 /* Walks live bodies in packed order: deterministic for a given operation
  * sequence, not creation order across destroys. Destroying mid-walk
@@ -129,6 +140,13 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
 bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
                                 sl_vec2 velocity);
 bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass);
+
+/* Adds force to the body's accumulator; the stepper consumes and clears
+ * it each step. Returns false — leaving the accumulator unchanged — for
+ * non-finite force or an accumulation that would overflow to infinity. */
+bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
+                               sl_vec2 force);
+sl_vec2 sl_world_body_get_force(const sl_world *world, sl_body_handle handle);
 
 #ifdef __cplusplus
 }

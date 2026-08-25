@@ -24,7 +24,7 @@ Living document, updated as milestones land. It records direction, not dates or 
 - [x] Tooling pass — CMake presets, sanitizers, strict warnings, GitHub Actions CI, `SL_ASSERT` ([#3](https://github.com/nisarsyed/silk/pull/3), merged); added during the eng-standards review, beyond the original plan
 - [x] 2D math library: `vec2`, `mat2`, scalar utilities, epsilon comparison + tests ([#2](https://github.com/nisarsyed/silk/pull/2), merged)
 - [x] Simulation state: SoA world, body pool, generational handles + tests ([#8](https://github.com/nisarsyed/silk/pull/8), merged)
-- [ ] Integration & forces: fixed-timestep loop, force accumulation, determinism tests
+- [x] Integration & forces: fixed-timestep loop, force accumulation, determinism tests ([#9](https://github.com/nisarsyed/silk/pull/9))
 - [ ] Raylib sandbox: interactive demo — spawn/drag bodies, debug draw, pause/step
 
 ## Phase Progression

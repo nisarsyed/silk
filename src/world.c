@@ -58,6 +58,10 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
         config->body_capacity > SL_BODY_COUNT_MAX) {
         return false;
     }
+    if (!sl_vec2_is_finite(config->gravity) ||
+        !sl_is_finite(config->linear_drag) || config->linear_drag < 0.0f) {
+        return false;
+    }
 
     const size_t capacity = (size_t)config->body_capacity;
     const size_t slots_bytes = align_up(capacity * sizeof(sl_body_slot));
@@ -65,7 +69,7 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     const size_t vec2_bytes = align_up(capacity * sizeof(sl_vec2));
     const size_t float_bytes = align_up(capacity * sizeof(float));
     const size_t total_bytes =
-        slots_bytes + 2u * index_bytes + 2u * vec2_bytes + 2u * float_bytes;
+        slots_bytes + 2u * index_bytes + 3u * vec2_bytes + 2u * float_bytes;
 
     unsigned char *base = malloc(total_bytes);
     if (base == NULL) {
@@ -86,11 +90,15 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->masses = (float *)(base + offset);
     offset += float_bytes;
     world->inv_masses = (float *)(base + offset);
+    offset += float_bytes;
+    world->forces = (sl_vec2 *)(base + offset);
     world->memory = base;
 
     world->body_count = 0u;
     world->body_capacity = config->body_capacity;
     world->free_count = config->body_capacity;
+    world->gravity = config->gravity;
+    world->linear_drag = config->linear_drag;
 
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
         /* Descending push => LIFO pops hand out slots 0,1,2,... */
@@ -150,6 +158,7 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
     world->velocities[dense] = desc->velocity;
     world->masses[dense] = desc->mass;
     world->inv_masses[dense] = 1.0f / desc->mass;
+    world->forces[dense] = sl_vec2_make(0.0f, 0.0f);
 
     return handle_for(world, dense);
 }
@@ -179,6 +188,7 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
         world->velocities[dense] = world->velocities[last];
         world->masses[dense] = world->masses[last];
         world->inv_masses[dense] = world->inv_masses[last];
+        world->forces[dense] = world->forces[last];
 
         const uint32_t moved_slot = world->slot_of[last];
         world->slot_of[dense] = moved_slot;
@@ -215,6 +225,18 @@ uint32_t sl_world_body_capacity(const sl_world *world)
 {
     SL_ASSERT(world != NULL);
     return world->body_capacity;
+}
+
+sl_vec2 sl_world_get_gravity(const sl_world *world)
+{
+    SL_ASSERT(world != NULL);
+    return world->gravity;
+}
+
+float sl_world_get_linear_drag(const sl_world *world)
+{
+    SL_ASSERT(world != NULL);
+    return world->linear_drag;
 }
 
 sl_body_handle sl_world_body_first(const sl_world *world)
@@ -302,4 +324,28 @@ bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass)
     world->masses[dense] = mass;
     world->inv_masses[dense] = 1.0f / mass;
     return true;
+}
+
+bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
+                               sl_vec2 force)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    if (!sl_vec2_is_finite(force)) {
+        return false;
+    }
+    const uint32_t dense = world->slots[handle.index].dense;
+    const sl_vec2 summed = sl_vec2_add(world->forces[dense], force);
+    if (!sl_vec2_is_finite(summed)) {
+        return false;
+    }
+    world->forces[dense] = summed;
+    return true;
+}
+
+sl_vec2 sl_world_body_get_force(const sl_world *world, sl_body_handle handle)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    return world->forces[world->slots[handle.index].dense];
 }
