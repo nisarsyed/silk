@@ -322,13 +322,16 @@ static void test_destroy_during_traversal_visits_each_once(void)
     /* Destroying every visited body must still visit all four exactly
      * once: each removal refills the cursor row, so the walk order is
      * 1, 4, 3, 2. Capturing a successor instead would skip the last
-     * body — the bug the row-cursor idiom exists to prevent. */
+     * body — the bug the row-cursor idiom exists to prevent. Both loop
+     * guards are structural: the pool shrinks every pass and visited
+     * bounds the expected-table index, so neither can run out of range
+     * even while an expectation has already failed. */
     const float expected[4] = { 1.0f, 4.0f, 3.0f, 2.0f };
     uint32_t visited = 0u;
-    for (uint32_t row = 0u; row < sl_world_body_count(&world);) {
-        sl_body_handle body = sl_world_body_at(&world, row);
-        SL_EXPECT(visited < 4u);
-        sl_vec2 position = sl_world_body_get_position(&world, body);
+    while (sl_world_body_count(&world) > 0u && visited < 4u) {
+        /* This walk always destroys row 0, so it never advances. */
+        const sl_body_handle body = sl_world_body_at(&world, 0u);
+        const sl_vec2 position = sl_world_body_get_position(&world, body);
         SL_EXPECT(position.x == expected[visited]);
         visited++;
         sl_world_body_destroy(&world, body);
