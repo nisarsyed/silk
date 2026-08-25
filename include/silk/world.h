@@ -153,7 +153,10 @@ bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass);
 
 /* Adds force to the body's accumulator; the stepper consumes and clears
  * it each step. Returns false — leaving the accumulator unchanged — for
- * non-finite force or an accumulation that would overflow to infinity. */
+ * non-finite force, an accumulation that would overflow to infinity, or
+ * an accumulated acceleration that overflows at the body's current mass.
+ * This rejects at application time only; integration itself neither
+ * clamps nor saturates (see step.h). */
 bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
                                sl_vec2 force);
 sl_vec2 sl_world_body_get_force(const sl_world *world, sl_body_handle handle);

@@ -168,6 +168,32 @@ static void test_apply_force_rejects_overflowing_sum(void)
     sl_world_destroy(&world);
 }
 
+static void test_apply_force_rejects_acceleration_overflow(void)
+{
+    sl_world_config config = { .body_capacity = 1u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    /* Mass 1e-35 keeps a representable inverse, and the force is finite
+     * on its own — but f / m overflows. Application must reject instead
+     * of banking infinity for the stepper to consume. */
+    sl_body_desc tiny = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
+                          1e-35f };
+    sl_body_handle h = sl_world_body_create(&world, &tiny);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    SL_EXPECT(!sl_world_body_apply_force(&world, h, sl_vec2_make(3e38f, 0.0f)));
+    sl_vec2 unchanged = sl_world_body_get_force(&world, h);
+    SL_EXPECT(unchanged.x == 0.0f && unchanged.y == 0.0f);
+
+    /* Stepping the untouched body keeps all state finite. */
+    sl_world_step(&world, k_dt);
+    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_velocity(&world, h)));
+    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_position(&world, h)));
+
+    sl_world_destroy(&world);
+}
+
 static void test_drag_halves_velocity_per_step(void)
 {
     sl_world_config config = { .body_capacity = 1u,
@@ -673,6 +699,8 @@ static const sl_test_case k_cases[] = {
     { "apply_force_rejects_non_finite", test_apply_force_rejects_non_finite },
     { "apply_force_rejects_overflowing_sum",
       test_apply_force_rejects_overflowing_sum },
+    { "apply_force_rejects_acceleration_overflow",
+      test_apply_force_rejects_acceleration_overflow },
     { "drag_halves_velocity_per_step", test_drag_halves_velocity_per_step },
     { "drag_extreme_coefficient_stable", test_drag_extreme_coefficient_stable },
     { "advance_runs_steps_and_carries_remainder",

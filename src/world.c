@@ -349,6 +349,14 @@ bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
     if (!sl_vec2_is_finite(summed)) {
         return false;
     }
+    /* The stepper consumes force * inv_mass, so a finite accumulation
+     * can still overflow through a tiny mass; reject it here rather
+     * than bank infinity. */
+    const sl_vec2 acceleration =
+        sl_vec2_scale(summed, world->inv_masses[dense]);
+    if (!sl_vec2_is_finite(acceleration)) {
+        return false;
+    }
     world->forces[dense] = summed;
     return true;
 }
