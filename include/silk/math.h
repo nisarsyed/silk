@@ -108,10 +108,10 @@ static inline float sl_vec2_distance(sl_vec2 a, sl_vec2 b)
     return sl_vec2_length(sl_vec2_sub(a, b));
 }
 
-/* Returns the unit vector of v. Inputs whose squared length is below
- * SL_VEC2_LENGTH_EPS_SQ, overflows to infinity, or is not finite at all
- * (infinite or NaN components) yield the zero vector instead of NaN — a
- * physics-safe default. */
+/* Returns the unit vector of v. Inputs whose squared length falls below
+ * SL_VEC2_LENGTH_EPS_SQ, or is not finite — infinite or NaN components,
+ * or finite ones whose squares overflow — yield the zero vector instead
+ * of NaN, a physics-safe default. */
 static inline sl_vec2 sl_vec2_normalize(sl_vec2 v)
 {
     float len_sq = sl_vec2_length_sq(v);
