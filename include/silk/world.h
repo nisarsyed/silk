@@ -112,21 +112,29 @@ uint32_t sl_world_body_capacity(const sl_world *world);
 sl_vec2 sl_world_get_gravity(const sl_world *world);
 float sl_world_get_linear_drag(const sl_world *world);
 
-/* Walks live bodies in packed order: deterministic for a given operation
- * sequence, not creation order across destroys. Destroying mid-walk
- * swaps another body into the hole; next() asserts its argument, so
- * capture the successor before removing:
+/* Read-only walks visit live bodies in packed order: deterministic for
+ * a given operation sequence, not creation order across destroys. Both
+ * ends read as the null handle. Destroy is a swap-remove — the last
+ * packed body lands behind the cursor — so handles cannot express
+ * removal during such a walk; destroying walks use at() with a row
+ * cursor instead, retesting the row a removal just refilled:
  *
- *     sl_body_handle ahead = sl_world_body_next(&world, it);
- *     if (remove) {
- *         sl_world_body_destroy(&world, it);
+ *     for (uint32_t row = 0u; row < sl_world_body_count(&world);) {
+ *         sl_body_handle body = sl_world_body_at(&world, row);
+ *         if (remove(&world, body)) {
+ *             sl_world_body_destroy(&world, body);
+ *         } else {
+ *             row++;
+ *         }
  *     }
- *     it = ahead;
- *
- * Both ends of the walk read as the null handle. */
+ */
 sl_body_handle sl_world_body_first(const sl_world *world);
 sl_body_handle sl_world_body_next(const sl_world *world,
                                   sl_body_handle current);
+
+/* Handle of the body at packed row; asserts row < body_count. Pairs
+ * with destroy() for removal-during-traversal walks (see above). */
+sl_body_handle sl_world_body_at(const sl_world *world, uint32_t row);
 
 /* Accessors assert handle validity. Setters return false — leaving
  * state unchanged — for values create() would reject, true otherwise. */

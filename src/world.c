@@ -264,6 +264,13 @@ sl_body_handle sl_world_body_next(const sl_world *world, sl_body_handle current)
     return handle_for(world, next_dense);
 }
 
+sl_body_handle sl_world_body_at(const sl_world *world, uint32_t row)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(row < world->body_count);
+    return handle_for(world, row);
+}
+
 sl_vec2 sl_world_body_get_position(const sl_world *world, sl_body_handle handle)
 {
     SL_ASSERT(world != NULL);

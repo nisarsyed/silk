@@ -307,6 +307,113 @@ static void test_traversal_visits_each_body_once(void)
     sl_world_destroy(&world);
 }
 
+static void test_destroy_during_traversal_visits_each_once(void)
+{
+    sl_world_config config = { .body_capacity = 4u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    for (uint32_t i = 0u; i < 4u; ++i) {
+        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
+                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
+    }
+
+    /* Destroying every visited body must still visit all four exactly
+     * once: each removal refills the cursor row, so the walk order is
+     * 1, 4, 3, 2. Capturing a successor instead would skip the last
+     * body — the bug the row-cursor idiom exists to prevent. */
+    const float expected[4] = { 1.0f, 4.0f, 3.0f, 2.0f };
+    uint32_t visited = 0u;
+    for (uint32_t row = 0u; row < sl_world_body_count(&world);) {
+        sl_body_handle body = sl_world_body_at(&world, row);
+        SL_EXPECT(visited < 4u);
+        sl_vec2 position = sl_world_body_get_position(&world, body);
+        SL_EXPECT(position.x == expected[visited]);
+        visited++;
+        sl_world_body_destroy(&world, body);
+    }
+    SL_EXPECT_INT_EQ(visited, 4u);
+    SL_EXPECT_INT_EQ(sl_world_body_count(&world), 0u);
+
+    sl_world_destroy(&world);
+}
+
+static void test_partial_cull_during_traversal(void)
+{
+    sl_world_config config = { .body_capacity = 4u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    for (uint32_t i = 0u; i < 4u; ++i) {
+        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
+                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
+    }
+
+    /* Removing only x == 2 swaps x == 4 into its hole behind the
+     * cursor; the retested row keeps it. Surviving order: 1, 4, 3. */
+    for (uint32_t row = 0u; row < sl_world_body_count(&world);) {
+        sl_body_handle body = sl_world_body_at(&world, row);
+        if (sl_world_body_get_position(&world, body).x == 2.0f) {
+            sl_world_body_destroy(&world, body);
+        } else {
+            row++;
+        }
+    }
+
+    SL_EXPECT_INT_EQ(sl_world_body_count(&world), 3u);
+    const float expected_x[3] = { 1.0f, 4.0f, 3.0f };
+    uint32_t visited = 0u;
+    for (sl_body_handle it = sl_world_body_first(&world);
+         !sl_body_handle_is_null(it); it = sl_world_body_next(&world, it)) {
+        SL_EXPECT(visited < 3u);
+        sl_vec2 position = sl_world_body_get_position(&world, it);
+        SL_EXPECT(position.x == expected_x[visited]);
+        visited++;
+    }
+    SL_EXPECT_INT_EQ(visited, 3u);
+
+    sl_world_destroy(&world);
+}
+
+static void test_at_matches_handle_traversal(void)
+{
+    sl_world_config config = { .body_capacity = 8u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    for (uint32_t i = 0u; i < 6u; ++i) {
+        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
+                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
+    }
+    /* Remove one mid-pack so the two APIs must agree across a swap. */
+    sl_body_handle middle = sl_world_body_at(&world, 3u);
+    sl_world_body_destroy(&world, middle);
+
+    float via_rows[8] = { 0.0f };
+    uint32_t rows = 0u;
+    for (uint32_t row = 0u; row < sl_world_body_count(&world); ++row) {
+        sl_body_handle body = sl_world_body_at(&world, row);
+        via_rows[rows++] = sl_world_body_get_position(&world, body).x;
+    }
+
+    float via_handles[8] = { 0.0f };
+    uint32_t handles = 0u;
+    for (sl_body_handle it = sl_world_body_first(&world);
+         !sl_body_handle_is_null(it); it = sl_world_body_next(&world, it)) {
+        via_handles[handles++] = sl_world_body_get_position(&world, it).x;
+    }
+
+    SL_EXPECT_INT_EQ(rows, handles);
+    for (uint32_t i = 0u; i < rows; ++i) {
+        SL_EXPECT(via_rows[i] == via_handles[i]);
+    }
+
+    sl_world_destroy(&world);
+}
+
 static void test_reset_invalidates_and_refills(void)
 {
     sl_world_config config = { .body_capacity = 4u };
@@ -548,6 +655,10 @@ static const sl_test_case k_cases[] = {
     { "arrays_stay_packed_on_middle_destroy",
       test_arrays_stay_packed_on_middle_destroy },
     { "traversal_visits_each_body_once", test_traversal_visits_each_body_once },
+    { "destroy_during_traversal_visits_each_once",
+      test_destroy_during_traversal_visits_each_once },
+    { "partial_cull_during_traversal", test_partial_cull_during_traversal },
+    { "at_matches_handle_traversal", test_at_matches_handle_traversal },
     { "reset_invalidates_and_refills", test_reset_invalidates_and_refills },
     { "set_mass_updates_inv_mass", test_set_mass_updates_inv_mass },
     { "setters_roundtrip", test_setters_roundtrip },
