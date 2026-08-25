@@ -2,7 +2,7 @@
 
 Living document, updated as milestones land. It records direction, not dates or commitments. Design principles and coding law live in [AGENTS.md](AGENTS.md).
 
-**Status:** Phase 1 · Milestone 1 — Foundations (in progress)
+**Status:** Phase 2 · Basic simulation (in progress)
 
 ## Baseline
 
@@ -24,8 +24,8 @@ Living document, updated as milestones land. It records direction, not dates or 
 - [x] Tooling pass — CMake presets, sanitizers, strict warnings, GitHub Actions CI, `SL_ASSERT` ([#3](https://github.com/nisarsyed/silk/pull/3), merged); added during the eng-standards review, beyond the original plan
 - [x] 2D math library: `vec2`, `mat2`, scalar utilities, epsilon comparison + tests ([#2](https://github.com/nisarsyed/silk/pull/2), merged)
 - [x] Simulation state: SoA world, body pool, generational handles + tests ([#8](https://github.com/nisarsyed/silk/pull/8), merged)
-- [x] Integration & forces: fixed-timestep loop, force accumulation, determinism tests ([#9](https://github.com/nisarsyed/silk/pull/9))
-- [ ] Raylib sandbox: interactive demo — spawn/drag bodies, debug draw, pause/step
+- [x] Integration & forces: fixed-timestep loop, force accumulation, determinism tests ([#9](https://github.com/nisarsyed/silk/pull/9), merged)
+- [x] Raylib sandbox: interactive demo — spawn/drag bodies, debug draw, pause/step
 
 ## Phase Progression
 
@@ -33,8 +33,8 @@ Condensed from the technical specification. Near-term phases stay itemized; late
 
 | Phase | Theme | Scope |
 | --- | --- | --- |
-| 1 | Foundation *(current)* | Milestone 1 above |
-| 2 | Basic simulation | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
+| 1 | Foundation | Milestone 1 above |
+| 2 | Basic simulation *(current)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
 | 3 | 2D rigid-body physics | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
 | 4 | 2D engine maturity | Determinism hardening; memory & data-oriented optimization; debug rendering; profiling & benchmarking; public engine API |
 | 5 | WebAssembly | WASM build target; C ↔ JavaScript API boundary; browser demo infrastructure & web debug visualization |

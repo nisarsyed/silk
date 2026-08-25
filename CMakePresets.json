@@ -28,6 +28,15 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SL_SANITIZERS": "ON"
             }
+        },
+        {
+            "name": "sandbox",
+            "displayName": "Raylib Sandbox",
+            "inherits": "debug",
+            "binaryDir": "${sourceDir}/build/sandbox",
+            "cacheVariables": {
+                "SL_SANDBOX": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -42,6 +51,10 @@
         {
             "name": "sanitize",
             "configurePreset": "sanitize"
+        },
+        {
+            "name": "sandbox",
+            "configurePreset": "sandbox"
         }
     ],
     "testPresets": [
@@ -62,6 +75,13 @@
         {
             "name": "sanitize",
             "configurePreset": "sanitize",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "sandbox",
+            "configurePreset": "sandbox",
             "output": {
                 "outputOnFailure": true
             }
