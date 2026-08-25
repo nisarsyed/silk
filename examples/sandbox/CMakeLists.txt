@@ -13,8 +13,13 @@ FetchContent_Declare(raylib
 # Trim raylib to the library itself; the sandbox ships no extras.
 # BUILD_EXAMPLES already defaults off under FetchContent (raylib keys it
 # on PROJECT_IS_TOP_LEVEL); pinned anyway so a default flip cannot
-# drag examples into this build.
+# drag examples into this build. Audio is pinned off too — the sandbox
+# plays no sound, which drops raylib's ALSA requirement on Linux. Note
+# USE_AUDIO is a dependent option gated on CUSTOMIZE_BUILD, so both are
+# forced together.
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CUSTOMIZE_BUILD ON CACHE BOOL "" FORCE)
+set(USE_AUDIO OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(raylib)
 
