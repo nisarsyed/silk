@@ -68,6 +68,43 @@ static const float k_sb_launch_speed_max = 1500.0f; /* px/s */
 /* Extra grab distance beyond the drawn radius, for pointer slop. */
 static const float k_sb_pick_slack = 12.0f; /* px */
 
+/* Debug-draw palette, Box2D v3 vocabulary (the b2World_Draw colors):
+ * color encodes simulation state, never decoration. Red is reserved
+ * for faults and PAUSED; royal blue stays reserved for kinematic
+ * bodies. Fill derives from the outline via ColorBrightness(c, -0.4f)
+ * and the velocity trace via Fade(c, 0.45f) — no other derivations.
+ * State precedence once body kinds land, first match wins (mirrors
+ * b2World_Draw): fault red > disabled slate gray > sensor wheat >
+ * static pale green > kinematic royal blue > awake pink > sleeping
+ * gray; until then every body is dynamic. */
+static const Color k_sb_color_ground = { 43, 45, 49, 255 }; /* graphite */
+static const Color k_sb_color_grid_major = { 255, 255, 255,
+                                             26 }; /* white @ 10% */
+static const Color k_sb_color_grid_minor = { 255, 255, 255,
+                                             10 }; /* white @ 4% */
+static const Color k_sb_color_dynamic = { 255, 192, 203,
+                                          255 }; /* Box2D v3 Pink */
+static const Color k_sb_color_interaction = { 245, 245, 245,
+                                              255 }; /* Box2D v3 WhiteSmoke */
+static const Color k_sb_color_force = { 255, 0, 255,
+                                        255 }; /* Box2D v3 Magenta */
+static const Color k_sb_color_hud_value = { 245, 245, 245,
+                                            255 }; /* WhiteSmoke */
+static const Color k_sb_color_hud_label = { 128, 128, 128,
+                                            255 }; /* Box2D v3 Gray */
+static const Color k_sb_color_hud_alert = { 255, 0, 0, 255 }; /* Box2D v3 Red */
+
+/* interaction at 60% alpha, precomputed: 153 == round(0.6 * 255). */
+static const Color k_sb_color_interaction_dim = { 245, 245, 245, 153 };
+
+/* Grid weave encodes the unit system (100 px = 1 m, see header). */
+static const int k_sb_grid_minor_px = 50;  /* px, 0.5 m */
+static const int k_sb_grid_major_px = 100; /* px, 1 m */
+
+/* Ring outline smoothness at the 40 px maximum drawn radius under
+ * 4x MSAA. */
+static const int k_sb_ring_segments = 48;
+
 typedef struct sb_app {
     sl_world world;
     sl_stepper stepper;
@@ -122,6 +159,22 @@ static float sb_draw_radius(const sl_world *world, sl_body_handle body)
 {
     return k_sb_radius_per_sqrt_mass *
            sqrtf(sl_world_body_get_mass(world, body));
+}
+
+/* Held bodies light up instead of recoloring: the fill jumps from the
+ * 0.6x derivation to the full outline color. Interaction is a
+ * highlight layer over state, never a state. */
+static Color sb_body_fill(Color outline, bool held)
+{
+    return held ? outline : ColorBrightness(outline, -0.4f);
+}
+
+/* 2 px outline ring centered on radius (inner r-1, outer r+1);
+ * DrawCircleLinesV is 1 px and aliased. */
+static void sb_draw_ring(Vector2 center, float radius, Color color)
+{
+    DrawRing(center, radius - 1.0f, radius + 1.0f, 0.0f, 360.0f,
+             k_sb_ring_segments, color);
 }
 
 static void sb_spawn_default_scene(sl_world *world)
@@ -300,34 +353,58 @@ static void sb_cull_fallen(sb_app *app)
 
 static void sb_draw_grid(void)
 {
-    for (int x = 0; x <= SB_SCREEN_WIDTH; x += 64) {
-        DrawLine(x, 0, x, SB_SCREEN_HEIGHT, Fade(DARKGRAY, 0.25f));
+    /* Minor lines first so major lines overpaint intersections. */
+    for (int x = 0; x <= SB_SCREEN_WIDTH; x += k_sb_grid_minor_px) {
+        DrawLine(x, 0, x, SB_SCREEN_HEIGHT, k_sb_color_grid_minor);
     }
-    for (int y = 0; y <= SB_SCREEN_HEIGHT; y += 64) {
-        DrawLine(0, y, SB_SCREEN_WIDTH, y, Fade(DARKGRAY, 0.25f));
+    for (int y = 0; y <= SB_SCREEN_HEIGHT; y += k_sb_grid_minor_px) {
+        DrawLine(0, y, SB_SCREEN_WIDTH, y, k_sb_color_grid_minor);
+    }
+    for (int x = 0; x <= SB_SCREEN_WIDTH; x += k_sb_grid_major_px) {
+        DrawLine(x, 0, x, SB_SCREEN_HEIGHT, k_sb_color_grid_major);
+    }
+    for (int y = 0; y <= SB_SCREEN_HEIGHT; y += k_sb_grid_major_px) {
+        DrawLine(0, y, SB_SCREEN_WIDTH, y, k_sb_color_grid_major);
     }
 }
 
+/* Three passes over the body list — trace, fill, ring — not one: with
+ * no collision, overlap is the common case, and drawing all fills
+ * before any outline keeps every ring unbroken. Traces go first so
+ * they emerge from under their body. */
 static void sb_draw_bodies(const sb_app *app)
 {
     const sl_world *world = &app->world;
+
+    /* Velocity trace: one tenth of a second of travel, the body's own
+     * hue drained to 45%; a held body's trace is interaction-colored.
+     * Not the tether line (sb_draw_interactions): that runs toward the
+     * cursor; this runs along velocity. */
     for (sl_body_handle it = sl_world_body_first(world);
          !sl_body_handle_is_null(it); it = sl_world_body_next(world, it)) {
+        const bool held = sb_handle_eq(it, app->tether_body);
         const sl_vec2 pos = sl_world_body_get_position(world, it);
         const sl_vec2 vel = sl_world_body_get_velocity(world, it);
-
-        /* Velocity trace: one tenth of a second of travel. */
         const sl_vec2 trace = sl_vec2_add(pos, sl_vec2_scale(vel, 0.1f));
+        const Color color = held ? k_sb_color_interaction : k_sb_color_dynamic;
         DrawLineEx(sb_to_raylib(pos), sb_to_raylib(trace), 2.0f,
-                   Fade(GREEN, 0.6f));
+                   Fade(color, 0.45f));
+    }
 
-        const bool tethered = sb_handle_eq(it, app->tether_body);
-        const Color fill = tethered ? SKYBLUE : ORANGE;
-        DrawCircleV(sb_to_raylib(pos), sb_draw_radius(world, it), fill);
-        /* Outline keeps overlapping circles readable — with no
-         * collision, overlap is the common case. */
-        DrawCircleLinesV(sb_to_raylib(pos), sb_draw_radius(world, it),
-                         DARKBROWN);
+    for (sl_body_handle it = sl_world_body_first(world);
+         !sl_body_handle_is_null(it); it = sl_world_body_next(world, it)) {
+        const bool held = sb_handle_eq(it, app->tether_body);
+        const sl_vec2 pos = sl_world_body_get_position(world, it);
+        DrawCircleV(sb_to_raylib(pos), sb_draw_radius(world, it),
+                    sb_body_fill(k_sb_color_dynamic, held));
+    }
+
+    for (sl_body_handle it = sl_world_body_first(world);
+         !sl_body_handle_is_null(it); it = sl_world_body_next(world, it)) {
+        const bool held = sb_handle_eq(it, app->tether_body);
+        const sl_vec2 pos = sl_world_body_get_position(world, it);
+        sb_draw_ring(sb_to_raylib(pos), sb_draw_radius(world, it),
+                     held ? k_sb_color_interaction : k_sb_color_dynamic);
     }
 }
 
@@ -344,22 +421,23 @@ static void sb_draw_forces(const sb_app *app)
     const float length = sl_min(magnitude * 0.03f, 140.0f);
     const sl_vec2 tip = sl_vec2_add(
         pos, sl_vec2_scale(sl_vec2_normalize(app->tether_force), length));
-    DrawLineEx(sb_to_raylib(pos), sb_to_raylib(tip), 3.0f, RED);
-    DrawCircleV(sb_to_raylib(tip), 4.0f, RED);
+    DrawLineEx(sb_to_raylib(pos), sb_to_raylib(tip), 3.0f, k_sb_color_force);
+    DrawCircleV(sb_to_raylib(tip), 4.0f, k_sb_color_force);
 }
 
 static void sb_draw_interactions(const sb_app *app)
 {
     if (app->sling_armed) {
         DrawLineEx(sb_to_raylib(app->press_point), sb_to_raylib(app->cursor),
-                   2.0f, WHITE);
-        DrawCircleV(sb_to_raylib(app->press_point), 4.0f, WHITE);
+                   2.0f, k_sb_color_interaction);
+        DrawCircleV(sb_to_raylib(app->press_point), 4.0f,
+                    k_sb_color_interaction);
     }
     if (!sl_body_handle_is_null(app->tether_body)) {
         const sl_vec2 pos =
             sl_world_body_get_position(&app->world, app->tether_body);
         DrawLineEx(sb_to_raylib(pos), sb_to_raylib(app->cursor), 2.0f,
-                   Fade(SKYBLUE, 0.8f));
+                   k_sb_color_interaction_dim);
     }
 }
 
@@ -368,26 +446,39 @@ static void sb_draw_hud(const sb_app *app)
     const uint32_t count = sl_world_body_count(&app->world);
     const uint32_t capacity = sl_world_body_capacity(&app->world);
 
-    DrawText(TextFormat("bodies %u/%u", count, capacity), 12, 10, 20, LIME);
-    DrawText(TextFormat("steps %u", app->last_steps), 12, 34, 20, LIME);
-    DrawText(
-        TextFormat("bank %.1f ms", (double)app->stepper.remainder * 1000.0), 12,
-        58, 20, LIME);
-    DrawText(TextFormat("%d fps", GetFPS()), 12, 82, 20, LIME);
+    /* Fixed label and value columns so rows align regardless of label
+     * length; hierarchy comes from color, not size — all text is
+     * 20 px, the first crisp multiple of raylib's 10 px bitmap font. */
+    DrawText("bodies", 16, 16, 20, k_sb_color_hud_label);
+    DrawText(TextFormat("%u/%u", count, capacity), 100, 16, 20,
+             k_sb_color_hud_value);
+    DrawText("steps", 16, 40, 20, k_sb_color_hud_label);
+    DrawText(TextFormat("%u", app->last_steps), 100, 40, 20,
+             k_sb_color_hud_value);
+    DrawText("bank", 16, 64, 20, k_sb_color_hud_label);
+    DrawText(TextFormat("%.1f ms", (double)app->stepper.remainder * 1000.0),
+             100, 64, 20, k_sb_color_hud_value);
+    DrawText("fps", 16, 88, 20, k_sb_color_hud_label);
+    DrawText(TextFormat("%d", GetFPS()), 100, 88, 20, k_sb_color_hud_value);
 
     if (app->paused) {
-        DrawText("PAUSED", SB_SCREEN_WIDTH - 130, 10, 20, RED);
+        /* Right-aligned status word; red stays reserved for faults. */
+        const int text_width = MeasureText("PAUSED", 20);
+        DrawText("PAUSED", SB_SCREEN_WIDTH - text_width - 16, 16, 20,
+                 k_sb_color_hud_alert);
     }
 
+    /* Help line stays one piece at size 20; if the wording ever
+     * outgrows W - 32 px, split it into rows — never shrink the font. */
     DrawText("drag: spawn + slingshot   hold body: tether   space: pause   "
              "period: step   r: reset",
-             12, SB_SCREEN_HEIGHT - 28, 16, GRAY);
+             16, SB_SCREEN_HEIGHT - 36, 20, k_sb_color_hud_label);
 }
 
 static void sb_draw(const sb_app *app)
 {
     BeginDrawing();
-    ClearBackground(BLACK);
+    ClearBackground(k_sb_color_ground);
     sb_draw_grid();
     sb_draw_interactions(app);
     sb_draw_bodies(app);
@@ -398,7 +489,7 @@ static void sb_draw(const sb_app *app)
 
 int main(void)
 {
-    SetConfigFlags(FLAG_VSYNC_HINT);
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
     InitWindow(SB_SCREEN_WIDTH, SB_SCREEN_HEIGHT, "silk sandbox");
     SetTargetFPS(60);
 
