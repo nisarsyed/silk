@@ -1,4 +1,4 @@
-/* silk sandbox — interactive debug playground closing Milestone 1.
+/* silk sandbox — interactive debug playground.
  *
  * World space == screen space: pixels, origin top-left, +y down.
  * Gravity is +y. 100 px = 1 m, so gravity is 981 px/s^2.
@@ -43,23 +43,21 @@ static const sl_vec2 k_sb_gravity = { 0.0f, 981.0f };
 
 static const float k_sb_timestep = 1.0f / 60.0f; /* seconds */
 
-/* Mild damping settles tether oscillation; any drag >= 0 is stable
- * under the integrator's divide form (see include/silk/step.h). */
+/* Mild damping settles tether oscillation (amplitude e-folds in
+ * 1/drag ≈ 10 s); any drag >= 0 is stable under the integrator's
+ * divide form (see include/silk/step.h). */
 static const float k_sb_linear_drag = 0.1f; /* 1 / seconds */
 
 /* Drawn body radius: 18 px per sqrt(kg); default masses span
  * [1, 5] kg, so circles span [18, 40] px. */
 static const float k_sb_radius_per_sqrt_mass = 18.0f; /* px */
 
-/* Tether spring, applied per rendered frame and topped up to exactly
- * one application's worth before the next advance consumes it (forces
- * clear per step). Top-up removes double-strength pulses when several
- * short frames bank onto one step; a long frame spanning multiple steps
- * still leaves its later steps unforced, since sl_world_advance has no
- * per-step hook — residual wobble, invisible at 60 Hz. Trail: at the
- * default-scene mean mass near 3 kg, a ~200 px offset yields ~1000
- * px/s^2, one gravity-equivalent, which tracks the cursor without
- * whipping at 60 Hz alongside the drag above. */
+/* Tether spring, applied per rendered frame; the banking protocol it
+ * feeds lives in sb_apply_tether. Trail: at the default-scene mean mass
+ * near 3 kg, a ~200 px offset yields ~1000 px/s^2, one
+ * gravity-equivalent, which tracks the cursor without whipping at
+ * 60 Hz alongside the drag above. Known limit, documented with the
+ * protocol: steps after the first within one advance go unforced. */
 static const float k_sb_tether_gain = 15.0f; /* N per px of offset */
 
 /* Slingshot: 6 px of drag buys 1 px/s of launch speed, capped so a
@@ -258,7 +256,10 @@ static void sb_apply_tether(sb_app *app)
     /* Top up rather than add: short frames can outnumber the steps an
      * advance executes, and plain addition would stack duplicate
      * applications onto the one step that finally fires. Differencing
-     * against the accumulator lands every path on this exact force. */
+     * against the accumulator lands every path on this exact force. A
+     * long frame spanning several steps still forces only its first —
+     * sl_world_advance has no per-step hook — leaving residual wobble,
+     * invisible at 60 Hz. */
     const sl_vec2 banked =
         sl_world_body_get_force(&app->world, app->tether_body);
     /* Delta stays displacement-bounded, so overflow rejection cannot
@@ -280,6 +281,8 @@ static void sb_apply_tether(sb_app *app)
  * off-screen makes it unattended, so it despawns the next frame. */
 static void sb_cull_fallen(sb_app *app)
 {
+    /* Margin below the view edge: bodies despawn only after fully
+     * leaving sight. */
     const float kill_y = (float)SB_SCREEN_HEIGHT + 64.0f; /* px */
 
     sl_body_handle it = sl_world_body_first(&app->world);
