@@ -78,7 +78,9 @@ typedef struct sl_world {
     void *memory; /* backing block carved into every array above */
 } sl_world;
 
-/* Returns false, leaving *world zeroed, when body_capacity is outside
+/* *world must be zero-initialized or previously destroyed: re-initializing
+ * a live world leaks its arena, so the assert fires in debug builds.
+ * Returns false, leaving *world zeroed, when body_capacity is outside
  * [1, SL_BODY_COUNT_MAX], gravity is non-finite, linear_drag is
  * non-finite or negative, or allocation fails. Everything is allocated
  * here; nothing allocates during simulation. */

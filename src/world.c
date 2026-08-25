@@ -51,6 +51,9 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(config != NULL);
+    /* A live world carries an arena pointer that init would drop on the
+     * floor; zero-init makes the read defined and the misuse loud. */
+    SL_ASSERT(world->memory == NULL);
 
     memset(world, 0, sizeof(*world));
 
