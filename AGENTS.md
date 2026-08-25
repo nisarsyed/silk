@@ -9,8 +9,8 @@ Agent guidance for `silk`: a portable, data-oriented physics/simulation engine i
 ## Build & test
 
 ```sh
-cmake --preset debug         # configure (presets: debug, release, sanitize); needs CMake >= 3.28
-cmake --build --preset debug # builds lib + tests + sandbox
+cmake --preset debug         # configure (presets: debug, release, sanitize, sandbox); needs CMake >= 3.28
+cmake --build --preset debug # builds lib + tests; the sandbox builds under the sandbox preset
 ctest --preset debug         # or run ./build/debug/tests/sl_tests directly
 ```
 

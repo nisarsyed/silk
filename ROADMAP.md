@@ -9,7 +9,7 @@ Living document, updated as milestones land. It records direction, not dates or 
 | Concern | Direction |
 | --- | --- |
 | Language | C17, portable ISO C only (`C_EXTENSIONS OFF`) |
-| Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` presets |
+| Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` / `sandbox` presets |
 | Toolchain | Clang + GCC on Linux/macOS CI; warnings-as-errors on the core |
 | Dependencies | None in the core; raylib linked only by the sandbox example |
 | API | `sl_` prefix, snake_case; SoA simulation state; generational body handles |
