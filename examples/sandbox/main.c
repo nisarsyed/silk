@@ -60,7 +60,7 @@ static const float k_sb_radius_per_sqrt_mass = 18.0f; /* px */
  * protocol: steps after the first within one advance go unforced. */
 static const float k_sb_tether_gain = 15.0f; /* N per px of offset */
 
-/* Slingshot: 6 px of drag buys 1 px/s of launch speed, capped so a
+/* Slingshot: 1 px of drag buys 6 px/s of launch speed, capped so a
  * full-window fling stays well inside float-safe integration bounds. */
 static const float k_sb_launch_gain = 6.0f;         /* (px/s) per px */
 static const float k_sb_launch_speed_max = 1500.0f; /* px/s */
@@ -81,7 +81,8 @@ typedef struct sb_app {
     sl_vec2 tether_force; /* pre-consumption snapshot for the arrow */
 
     bool paused;
-    uint32_t last_steps; /* steps executed by the most recent advance */
+    uint32_t last_steps; /* steps executed by the most recent advance
+                          * or manual single-step */
 } sb_app;
 
 static uint32_t sb_rng_state = SB_RNG_SEED;
@@ -176,9 +177,9 @@ static sl_body_handle sb_pick_body(const sl_world *world, sl_vec2 point)
 
 static void sb_spawn_at_cursor(sb_app *app)
 {
-    /* Capacity is enforced client-side, but create() still tolerates a
-     * full world: a null handle drops the spawn silently and the HUD
-     * body count already reflects the miss. */
+    /* Nothing checks capacity here: create() tolerates a full world by
+     * returning the null handle, which drops the spawn silently — the
+     * HUD body count already reflects the miss. */
     sl_body_desc desc;
     desc.position = app->cursor;
     desc.velocity = sl_vec2_make(0.0f, 0.0f);
@@ -221,6 +222,7 @@ static void sb_handle_input(sb_app *app)
     }
     if (IsKeyPressed(KEY_PERIOD) && app->paused) {
         sl_world_step(&app->world, k_sb_timestep);
+        app->last_steps = 1u;
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -233,6 +235,18 @@ static void sb_handle_input(sb_app *app)
     }
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         if (!sl_body_handle_is_null(app->tether_body)) {
+            /* Drop the banked tether force with the grab. The tether is
+             * this app's only accumulator writer — gravity and drag go
+             * through the world config — so negating the whole bank
+             * zeroes it exactly (x + (-x) is +0, rejection impossible).
+             * Without this, the next step consumes the stale force as a
+             * launch-assist kick on a body no longer held. */
+            const sl_vec2 banked =
+                sl_world_body_get_force(&app->world, app->tether_body);
+            const bool cleared = sl_world_body_apply_force(
+                &app->world, app->tether_body, sl_vec2_neg(banked));
+            SL_ASSERT(cleared);
+            (void)cleared;
             app->tether_body = sl_body_handle_null();
         } else if (app->sling_armed) {
             app->sling_armed = false;
@@ -241,12 +255,18 @@ static void sb_handle_input(sb_app *app)
     }
 }
 
-/* Paused frames apply nothing: zero steps means zero consumption, so
- * holding the tether while paused cannot bank unbounded force. */
+/* Tether force tops up every rendered frame, paused or not: zero steps
+ * consume nothing, and recomputing from the frozen body lands the exact
+ * same force each frame, so the differencing delta is zero and holding
+ * cannot bank unbounded force. A manual single-step therefore shows the
+ * tether acting. One accepted wrinkle: the step fires inside input
+ * handling, before this tops up, so a manual step consumes last frame's
+ * force — the body is frozen, only cursor movement since the previous
+ * frame is stale. */
 static void sb_apply_tether(sb_app *app)
 {
     app->tether_force = sl_vec2_make(0.0f, 0.0f);
-    if (app->paused || sl_body_handle_is_null(app->tether_body)) {
+    if (sl_body_handle_is_null(app->tether_body)) {
         return;
     }
     const sl_vec2 pos =
@@ -274,8 +294,9 @@ static void sb_apply_tether(sb_app *app)
 
 /* Despawn unattended bodies that fell out of view: with no collision
  * there is no floor, and off-screen bodies would silently exhaust the
- * spawn cap. Destroying mid-walk swaps another body into the hole, so
- * the successor is captured before removal (see include/silk/world.h).
+ * spawn cap. Destroy is a swap-remove — the relocated body lands behind
+ * a captured-successor cursor — so this walks rows with at() instead,
+ * retesting whatever refills a removed row (see include/silk/world.h).
  * Bodies under active interaction are exempt — a fast tethered body
  * may leave the view and be reeled back in — and releasing one
  * off-screen makes it unattended, so it despawns the next frame. */
@@ -285,16 +306,16 @@ static void sb_cull_fallen(sb_app *app)
      * leaving sight. */
     const float kill_y = (float)SB_SCREEN_HEIGHT + 64.0f; /* px */
 
-    sl_body_handle it = sl_world_body_first(&app->world);
-    while (!sl_body_handle_is_null(it)) {
-        const sl_body_handle ahead = sl_world_body_next(&app->world, it);
-        const sl_vec2 pos = sl_world_body_get_position(&app->world, it);
-        const bool held = sb_handle_eq(it, app->tether_body) ||
-                          sb_handle_eq(it, app->sling_body);
+    for (uint32_t row = 0u; row < sl_world_body_count(&app->world);) {
+        const sl_body_handle body = sl_world_body_at(&app->world, row);
+        const sl_vec2 pos = sl_world_body_get_position(&app->world, body);
+        const bool held = sb_handle_eq(body, app->tether_body) ||
+                          sb_handle_eq(body, app->sling_body);
         if (pos.y > kill_y && !held) {
-            sl_world_body_destroy(&app->world, it);
+            sl_world_body_destroy(&app->world, body);
+        } else {
+            row++;
         }
-        it = ahead;
     }
 }
 
