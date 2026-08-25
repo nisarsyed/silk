@@ -196,16 +196,15 @@ static void sb_launch_slingshot(sb_app *app)
         velocity =
             sl_vec2_scale(sl_vec2_normalize(velocity), k_sb_launch_speed_max);
     }
-    /* Speed is clamped above, so rejection cannot happen. A full world
-     * drops the spawn silently; the HUD body count already shows it.
-     * The call stays outside SL_ASSERT: it carries the spawn side
-     * effect. */
+    /* Speed is clamped above, so the velocity cannot be rejected. A
+     * full world returns the null handle and drops the spawn silently;
+     * the HUD body count already shows it. The result is intentionally
+     * discarded. */
     sl_body_desc desc;
     desc.position = app->press_point;
     desc.velocity = velocity;
     desc.mass = app->sling_mass;
-    const sl_body_handle spawned = sl_world_body_create(&app->world, &desc);
-    (void)spawned;
+    sl_world_body_create(&app->world, &desc);
 }
 
 static void sb_handle_input(sb_app *app)
