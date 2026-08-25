@@ -1,6 +1,7 @@
 #include "silk_test.h"
 #include "suites.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -127,6 +128,42 @@ static void test_apply_force_rejects_non_finite(void)
         !sl_world_body_apply_force(&world, h, sl_vec2_make(0.0f, INFINITY)));
     sl_vec2 unchanged = sl_world_body_get_force(&world, h);
     SL_EXPECT(unchanged.x == 3.0f && unchanged.y == 4.0f);
+
+    sl_world_destroy(&world);
+}
+
+static void test_apply_force_rejects_overflowing_sum(void)
+{
+    sl_world_config config = { .body_capacity = 2u };
+    sl_world world;
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
+                          1.0f };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    sl_body_handle c = sl_world_body_create(&world, &desc);
+
+    /* Each application is finite on its own; the accumulation overflows
+     * and must be rejected whole — y is untouched when x overflows. */
+    SL_EXPECT(
+        sl_world_body_apply_force(&world, h, sl_vec2_make(FLT_MAX, 0.0f)));
+    SL_EXPECT(
+        !sl_world_body_apply_force(&world, h, sl_vec2_make(1.0e38f, 5.0f)));
+    sl_vec2 saturated = sl_world_body_get_force(&world, h);
+    SL_EXPECT(saturated.x == FLT_MAX && saturated.y == 0.0f);
+
+    /* Exact cancellation stays inside range and must stay legal. */
+    SL_EXPECT(
+        sl_world_body_apply_force(&world, c, sl_vec2_make(FLT_MAX, 0.0f)));
+    SL_EXPECT(
+        sl_world_body_apply_force(&world, c, sl_vec2_make(-FLT_MAX, 0.0f)));
+    sl_vec2 cancelled = sl_world_body_get_force(&world, c);
+    SL_EXPECT(cancelled.x == 0.0f && cancelled.y == 0.0f);
+
+    /* Stepping the saturated accumulator keeps all state finite. */
+    sl_world_step(&world, k_dt);
+    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_velocity(&world, h)));
+    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_position(&world, h)));
 
     sl_world_destroy(&world);
 }
@@ -634,6 +671,8 @@ static const sl_test_case k_cases[] = {
     { "step_applies_force_via_inv_mass", test_step_applies_force_via_inv_mass },
     { "force_clears_after_step", test_force_clears_after_step },
     { "apply_force_rejects_non_finite", test_apply_force_rejects_non_finite },
+    { "apply_force_rejects_overflowing_sum",
+      test_apply_force_rejects_overflowing_sum },
     { "drag_halves_velocity_per_step", test_drag_halves_velocity_per_step },
     { "drag_extreme_coefficient_stable", test_drag_extreme_coefficient_stable },
     { "advance_runs_steps_and_carries_remainder",

@@ -22,8 +22,11 @@ extern "C" {
  *
  * Semi-implicit Euler — position uses the post-drag velocity. The drag
  * form divides instead of subtracting, so any drag >= 0 stays stable.
- * dt is THE fixed timestep and must be identical across the calls of a
- * run; timing policy lives above this function. Consumed forces clear. */
+ * Integration neither clamps nor saturates: force, velocity, and
+ * gravity magnitudes must stay within float range across a step, or
+ * state overflows. dt is THE fixed timestep and must be identical
+ * across the calls of a run; timing policy lives above this function.
+ * Consumed forces clear. */
 void sl_world_step(sl_world *world, float dt);
 
 typedef struct sl_stepper {
@@ -37,8 +40,9 @@ bool sl_stepper_init(sl_stepper *stepper, float timestep);
 
 /* Accumulates frame_time seconds and runs floor((remainder +
  * frame_time) / timestep) fixed steps, capped at SL_STEP_COUNT_MAX —
- * leftover beyond the cap is dropped, never carried. Non-finite or
- * negative frame_time reads as 0. Returns the number of steps executed.
+ * leftover beyond the cap is dropped, never carried. stepper must come
+ * from sl_stepper_init first. Non-finite or negative frame_time reads
+ * as 0. Returns the number of steps executed.
  * Deterministic for a given call sequence; no wall-clock time enters. */
 uint32_t sl_world_advance(sl_world *world, sl_stepper *stepper,
                           float frame_time);

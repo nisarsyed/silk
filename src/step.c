@@ -44,6 +44,8 @@ uint32_t sl_world_advance(sl_world *world, sl_stepper *stepper,
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(stepper != NULL);
+    SL_ASSERT(sl_is_finite(stepper->timestep));
+    SL_ASSERT(stepper->timestep > 0.0f);
 
     float available = stepper->remainder;
     if (sl_is_finite(frame_time) && frame_time > 0.0f) {

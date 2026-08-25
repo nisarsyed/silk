@@ -335,7 +335,11 @@ bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
         return false;
     }
     const uint32_t dense = world->slots[handle.index].dense;
-    world->forces[dense] = sl_vec2_add(world->forces[dense], force);
+    const sl_vec2 summed = sl_vec2_add(world->forces[dense], force);
+    if (!sl_vec2_is_finite(summed)) {
+        return false;
+    }
+    world->forces[dense] = summed;
     return true;
 }
 
