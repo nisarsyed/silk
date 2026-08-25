@@ -34,7 +34,7 @@ static void test_step_moves_body_under_gravity(void)
     sl_world_config config = { .body_capacity = 2u,
                                .gravity = sl_vec2_make(0.0f, -10.0f),
                                .linear_drag = 0.0f };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
@@ -59,7 +59,7 @@ static void test_step_moves_body_under_gravity(void)
 static void test_step_applies_force_via_inv_mass(void)
 {
     sl_world_config config = { .body_capacity = 2u };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     /* mass 2 kg: accumulated f = (4, 0) must integrate a = f/m = 2. */
@@ -85,7 +85,7 @@ static void test_step_applies_force_via_inv_mass(void)
 static void test_force_clears_after_step(void)
 {
     sl_world_config config = { .body_capacity = 1u };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
@@ -115,7 +115,7 @@ static void test_force_clears_after_step(void)
 static void test_apply_force_rejects_non_finite(void)
 {
     sl_world_config config = { .body_capacity = 1u };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
@@ -135,7 +135,7 @@ static void test_apply_force_rejects_non_finite(void)
 static void test_apply_force_rejects_overflowing_sum(void)
 {
     sl_world_config config = { .body_capacity = 2u };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
@@ -168,12 +168,38 @@ static void test_apply_force_rejects_overflowing_sum(void)
     sl_world_destroy(&world);
 }
 
+static void test_apply_force_rejects_acceleration_overflow(void)
+{
+    sl_world_config config = { .body_capacity = 1u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    /* Mass 1e-35 keeps a representable inverse, and the force is finite
+     * on its own — but f / m overflows. Application must reject instead
+     * of banking infinity for the stepper to consume. */
+    sl_body_desc tiny = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
+                          1e-35f };
+    sl_body_handle h = sl_world_body_create(&world, &tiny);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    SL_EXPECT(!sl_world_body_apply_force(&world, h, sl_vec2_make(3e38f, 0.0f)));
+    sl_vec2 unchanged = sl_world_body_get_force(&world, h);
+    SL_EXPECT(unchanged.x == 0.0f && unchanged.y == 0.0f);
+
+    /* Stepping the untouched body keeps all state finite. */
+    sl_world_step(&world, k_dt);
+    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_velocity(&world, h)));
+    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_position(&world, h)));
+
+    sl_world_destroy(&world);
+}
+
 static void test_drag_halves_velocity_per_step(void)
 {
     sl_world_config config = { .body_capacity = 1u,
                                .gravity = sl_vec2_make(0.0f, 0.0f),
                                .linear_drag = 10.0f };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
     SL_EXPECT(sl_world_get_linear_drag(&world) == 10.0f);
 
@@ -199,7 +225,7 @@ static void test_drag_extreme_coefficient_stable(void)
     sl_world_config config = { .body_capacity = 1u,
                                .gravity = sl_vec2_make(0.0f, 0.0f),
                                .linear_drag = 1e30f };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(1.0f, 0.0f),
@@ -220,7 +246,7 @@ static void test_advance_runs_steps_and_carries_remainder(void)
     sl_world_config config = { .body_capacity = 2u,
                                .gravity = sl_vec2_make(0.0f, -10.0f),
                                .linear_drag = 0.0f };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
@@ -251,7 +277,7 @@ static void test_advance_runs_steps_and_carries_remainder(void)
 static void test_advance_drops_debt_at_cap(void)
 {
     sl_world_config config = { .body_capacity = 1u };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_stepper stepper;
@@ -271,7 +297,7 @@ static void test_advance_drops_debt_at_cap(void)
 static void test_advance_ignores_garbage_frame_time(void)
 {
     sl_world_config config = { .body_capacity = 1u };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
     sl_stepper stepper;
@@ -313,9 +339,9 @@ static void test_determinism_identical_sequences_bitwise(void)
     sl_world_config config = { .body_capacity = 8u,
                                .gravity = sl_vec2_make(0.5f, -10.0f),
                                .linear_drag = 2.0f };
-    sl_world a;
+    sl_world a = { 0 };
     SL_EXPECT(sl_world_init(&a, &config));
-    sl_world b;
+    sl_world b = { 0 };
     SL_EXPECT(sl_world_init(&b, &config));
 
     sl_stepper sa;
@@ -383,7 +409,7 @@ static void test_results_independent_of_packed_layout(void)
 
     /* World A: tags 0..5 created in order, then tag 2 destroyed —
      * packed rows become tags 0, 1, 5, 4, 3. */
-    sl_world a;
+    sl_world a = { 0 };
     SL_EXPECT(sl_world_init(&a, &config));
     sl_body_handle ha[6];
     for (uint32_t i = 0u; i < 6u; ++i) {
@@ -394,7 +420,7 @@ static void test_results_independent_of_packed_layout(void)
 
     /* World B: same six tags, permuted creation order, tag 2 destroyed —
      * packed rows become tags 5, 3, 1, 4, 0. */
-    sl_world b;
+    sl_world b = { 0 };
     SL_EXPECT(sl_world_init(&b, &config));
     const uint32_t order[6] = { 5u, 3u, 1u, 4u, 2u, 0u };
     sl_body_handle hb[6];
@@ -436,7 +462,7 @@ static void test_results_independent_of_packed_layout(void)
 
 static void test_config_rejects_bad_gravity_or_drag(void)
 {
-    sl_world world;
+    sl_world world = { 0 };
 
     sl_world_config nan_gravity = { .body_capacity = 4u,
                                     .gravity = sl_vec2_make(NAN, 0.0f),
@@ -509,9 +535,9 @@ static void test_churn_step_stress_matches_model(void)
     sl_world_config config = { .body_capacity = CHURN_CAPACITY,
                                .gravity = sl_vec2_make(0.2f, -9.8f),
                                .linear_drag = 1.5f };
-    sl_world world;
+    sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
-    sl_world twin;
+    sl_world twin = { 0 };
     SL_EXPECT(sl_world_init(&twin, &config));
 
     sl_stepper stepper;
@@ -673,6 +699,8 @@ static const sl_test_case k_cases[] = {
     { "apply_force_rejects_non_finite", test_apply_force_rejects_non_finite },
     { "apply_force_rejects_overflowing_sum",
       test_apply_force_rejects_overflowing_sum },
+    { "apply_force_rejects_acceleration_overflow",
+      test_apply_force_rejects_acceleration_overflow },
     { "drag_halves_velocity_per_step", test_drag_halves_velocity_per_step },
     { "drag_extreme_coefficient_stable", test_drag_extreme_coefficient_stable },
     { "advance_runs_steps_and_carries_remainder",

@@ -1,5 +1,7 @@
 #include "silk_test.h"
 #include "suites.h"
+#include <math.h>
+
 #include <silk/math.h>
 
 /* Exact equality is used only where IEEE-754 guarantees it (construction,
@@ -88,6 +90,18 @@ static void test_vec2_length_normalize(void)
     /* Zero-safe normalize. */
     sl_vec2 zero = sl_vec2_normalize(sl_vec2_make(0.0f, 0.0f));
     SL_EXPECT(zero.x == 0.0f && zero.y == 0.0f);
+
+    /* Squared length overflows to infinity: still the zero vector.
+     * Regression pin — this held before the finiteness guard via
+     * v * (1 / inf), and must keep holding now it is explicit. */
+    sl_vec2 huge = sl_vec2_normalize(sl_vec2_make(3e19f, 1e19f));
+    SL_EXPECT(huge.x == 0.0f && huge.y == 0.0f);
+
+    /* Non-finite components used to produce NaN (inf * 0): now zero. */
+    sl_vec2 infinite = sl_vec2_normalize(sl_vec2_make(INFINITY, 0.0f));
+    SL_EXPECT(infinite.x == 0.0f && infinite.y == 0.0f);
+    sl_vec2 nan_input = sl_vec2_normalize(sl_vec2_make(NAN, 1.0f));
+    SL_EXPECT(nan_input.x == 0.0f && nan_input.y == 0.0f);
 }
 
 static void test_vec2_perp_is_orthogonal_ccw(void)

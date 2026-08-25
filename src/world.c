@@ -51,6 +51,9 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(config != NULL);
+    /* A live world carries an arena pointer that init would drop on the
+     * floor; zero-init makes the read defined and the misuse loud. */
+    SL_ASSERT(world->memory == NULL);
 
     memset(world, 0, sizeof(*world));
 
@@ -261,6 +264,13 @@ sl_body_handle sl_world_body_next(const sl_world *world, sl_body_handle current)
     return handle_for(world, next_dense);
 }
 
+sl_body_handle sl_world_body_at(const sl_world *world, uint32_t row)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(row < world->body_count);
+    return handle_for(world, row);
+}
+
 sl_vec2 sl_world_body_get_position(const sl_world *world, sl_body_handle handle)
 {
     SL_ASSERT(world != NULL);
@@ -337,6 +347,14 @@ bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
     const uint32_t dense = world->slots[handle.index].dense;
     const sl_vec2 summed = sl_vec2_add(world->forces[dense], force);
     if (!sl_vec2_is_finite(summed)) {
+        return false;
+    }
+    /* The stepper consumes force * inv_mass, so a finite accumulation
+     * can still overflow through a tiny mass; reject it here rather
+     * than bank infinity. */
+    const sl_vec2 acceleration =
+        sl_vec2_scale(summed, world->inv_masses[dense]);
+    if (!sl_vec2_is_finite(acceleration)) {
         return false;
     }
     world->forces[dense] = summed;
