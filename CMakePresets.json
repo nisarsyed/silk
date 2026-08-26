@@ -37,6 +37,15 @@
             "cacheVariables": {
                 "SL_SANDBOX": "ON"
             }
+        },
+        {
+            "name": "sandbox-release",
+            "displayName": "Raylib Sandbox (Release)",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/build/sandbox-release",
+            "cacheVariables": {
+                "SL_SANDBOX": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -55,6 +64,10 @@
         {
             "name": "sandbox",
             "configurePreset": "sandbox"
+        },
+        {
+            "name": "sandbox-release",
+            "configurePreset": "sandbox-release"
         }
     ],
     "testPresets": [
@@ -82,6 +95,13 @@
         {
             "name": "sandbox",
             "configurePreset": "sandbox",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "sandbox-release",
+            "configurePreset": "sandbox-release",
             "output": {
                 "outputOnFailure": true
             }
