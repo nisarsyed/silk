@@ -61,9 +61,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Raylib's GLFW build needs the X11/GL dev headers even for a
-      # compile-only check; audio is pinned off in the sandbox
-      # CMakeLists, so no ALSA. This job is the only place main.c
-      # compiles against the public headers.
+      # compile-only check; audio (miniaudio) loads its backends at
+      # runtime, so no ALSA dev package. This job is the only place
+      # main.c compiles against the public headers.
       - run: >
           sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev
           libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev
