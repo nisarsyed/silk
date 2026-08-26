@@ -2,6 +2,7 @@ add_executable(sl_tests
     sl_tests.c
     test_core.c
     test_math.c
+    test_shape.c
     test_world.c
     test_step.c
 )
