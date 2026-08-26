@@ -136,8 +136,10 @@ static float sb_draw_radius(const sl_world *world, sl_body_handle body)
 
 static void sb_spawn_default_scene(sl_world *world)
 {
-    for (uint32_t i = 0; i < 32u; ++i) {
-        sl_body_desc desc;
+    for (uint32_t i = 0u; i < 32u; ++i) {
+        /* Zero-init keeps appended descriptor fields at their dynamic,
+         * shapeless defaults; only the linear state is set below. */
+        sl_body_desc desc = { 0 };
         desc.position.x = sb_rng_range(96.0f, 1184.0f);
         desc.position.y = sb_rng_range(64.0f, 320.0f);
         desc.velocity.x = sb_rng_range(-90.0f, 90.0f);
@@ -200,7 +202,7 @@ static void sb_launch_slingshot(sb_app *app)
      * full world returns the null handle and drops the spawn silently;
      * the HUD body count already shows it. The result is intentionally
      * discarded. */
-    sl_body_desc desc;
+    sl_body_desc desc = { 0 };
     desc.position = app->press_point;
     desc.velocity = velocity;
     desc.mass = app->sling_mass;
