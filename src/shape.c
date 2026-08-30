@@ -10,11 +10,8 @@ _Static_assert(sizeof(sl_shape) == 72u, "sl_shape layout drifted");
 
 static bool circle_radius_valid(float radius)
 {
-    if (!sl_is_finite(radius) || radius <= SL_EPSILON) {
-        return false;
-    }
-    /* An overflowing r*r would poison area, bounds, and ray math. */
-    return sl_is_finite(radius * radius);
+    return sl_is_finite(radius) && radius > SL_EPSILON &&
+           radius <= SL_SHAPE_EXTENT_MAX;
 }
 
 static sl_vec2 edge_between(const sl_vec2 *vertices, uint32_t count, uint32_t i)
@@ -58,8 +55,10 @@ static void polygon_mass_about(const sl_vec2 *vertices, uint32_t count,
  * exercise identical rules:
  *   1. count in [3, SL_POLYGON_VERTEX_COUNT_MAX], before touching points
  *   2. every point finite
- *   3. every edge resolvable: finite length above the normalize cutoff,
- *      which rules out near-duplicate vertices
+ *   3. every edge resolvable: finite length above the normalize cutoff
+ *      and at most 2*SL_SHAPE_EXTENT_MAX; the lower bound rules out
+ *      near-duplicate vertices and the upper bound is an early numeric
+ *      guard implied by rule 7
  *   4. strictly convex CCW turns -- written as !(cross > threshold) so
  *      an overflowing threshold also rejects
  *   5. total turn below 3*pi: a simple convex loop turns exactly 2*pi,
@@ -67,6 +66,7 @@ static void polygon_mass_about(const sl_vec2 *vertices, uint32_t count,
  *      2*pi*k for k >= 2; rule 4 bounds each atan2f to (0, pi)
  *   6. positive finite fan area and finite centroid about points[0],
  *      which avoids cancellation for far-from-origin input
+ *   7. every vertex within SL_SHAPE_EXTENT_MAX of the centroid
  * On success *centroid carries the fan centroid: sl_shape_make_polygon
  * subtracts it to recenter, sl_shape_is_valid checks a stored record is
  * already centered. */
@@ -84,10 +84,13 @@ static bool polygon_check(const sl_vec2 *points, uint32_t count,
 
     sl_vec2 edges[SL_POLYGON_VERTEX_COUNT_MAX];
     float lengths[SL_POLYGON_VERTEX_COUNT_MAX];
+    const float edge_length_max = 2.0f * SL_SHAPE_EXTENT_MAX;
+    const float edge_length_max_sq = edge_length_max * edge_length_max;
     for (uint32_t i = 0u; i < count; ++i) {
         edges[i] = edge_between(points, count, i);
         const float len_sq = sl_vec2_length_sq(edges[i]);
-        if (!sl_is_finite(len_sq) || len_sq <= SL_VEC2_LENGTH_EPS_SQ) {
+        if (!sl_is_finite(len_sq) || len_sq <= SL_VEC2_LENGTH_EPS_SQ ||
+            len_sq > edge_length_max_sq) {
             return false;
         }
         lengths[i] = sqrtf(len_sq);
@@ -122,12 +125,42 @@ static bool polygon_check(const sl_vec2 *points, uint32_t count,
     if (!sl_is_finite(area) || area <= 0.0f || !sl_vec2_is_finite(*centroid)) {
         return false;
     }
+    const float extent_max_sq = SL_SHAPE_EXTENT_MAX * SL_SHAPE_EXTENT_MAX;
+    for (uint32_t i = 0u; i < count; ++i) {
+        const sl_vec2 centered = sl_vec2_sub(points[i], *centroid);
+        const float extent_sq = sl_vec2_length_sq(centered);
+        if (!sl_is_finite(extent_sq) || extent_sq > extent_max_sq) {
+            return false;
+        }
+    }
     return true;
 }
 
-/* Rule 7: finite shifted storage after recentering onto the body
- * origin. The vertex tail past count is zeroed so two records with the
- * same geometry are also identical byte for byte. */
+static bool polygon_record_valid(const sl_polygon *polygon)
+{
+    /* Rules 1-7 on the stored vertices; rule 1 fires before any
+     * indexing, so a tampered count cannot read out of bounds. */
+    sl_vec2 centroid;
+    if (!polygon_check(polygon->vertices, polygon->count, &centroid)) {
+        return false;
+    }
+
+    /* Rules 1-7 are translation invariant, so they cannot see a record
+     * whose geometry is sound but whose centroid was moved off the body
+     * origin. Recentering an already-centered polygon shifts by a few
+     * ULP-scale terms of the extent at most. */
+    float extent = 0.0f;
+    for (uint32_t i = 0u; i < polygon->count; ++i) {
+        extent = sl_max(extent, sl_abs(polygon->vertices[i].x));
+        extent = sl_max(extent, sl_abs(polygon->vertices[i].y));
+    }
+    const float tolerance = (float)polygon->count * SL_EPSILON * extent;
+    return sl_abs(centroid.x) <= tolerance && sl_abs(centroid.y) <= tolerance;
+}
+
+/* Rule 8: finite, centroid-centered storage at the body origin. The
+ * vertex tail past count is zeroed so two records with the same geometry
+ * are also identical byte for byte. */
 static bool polygon_build(const sl_vec2 *points, uint32_t count,
                           sl_polygon *out)
 {
@@ -139,11 +172,26 @@ static bool polygon_build(const sl_vec2 *points, uint32_t count,
     sl_polygon built = { 0 };
     built.count = count;
     for (uint32_t i = 0u; i < count; ++i) {
-        const sl_vec2 shifted = sl_vec2_sub(points[i], centroid);
-        if (!sl_vec2_is_finite(shifted)) {
-            return false;
-        }
-        built.vertices[i] = shifted;
+        built.vertices[i] = sl_vec2_sub(points[i], centroid);
+    }
+
+    /* Subtracting a far-from-origin centroid rounds at the input's
+     * coarser spacing and can leave an ordinary-scale stored polygon
+     * visibly off-center. Re-derive once after the first shift, where
+     * coordinates are local and precise, then gate on the one predicate
+     * sl_shape_is_valid applies: a degenerate fan leaves residual
+     * non-finite, which its rule 2 rejects. Only the residual is wanted
+     * here; area and inertia are recomputed per query. */
+    float area = 0.0f;
+    float inertia_about_origin = 0.0f;
+    sl_vec2 residual = sl_vec2_make(0.0f, 0.0f);
+    polygon_mass_about(built.vertices, built.count, sl_vec2_make(0.0f, 0.0f),
+                       &area, &residual, &inertia_about_origin);
+    for (uint32_t i = 0u; i < count; ++i) {
+        built.vertices[i] = sl_vec2_sub(built.vertices[i], residual);
+    }
+    if (!polygon_record_valid(&built)) {
+        return false;
     }
     *out = built;
     return true;
@@ -203,28 +251,8 @@ bool sl_shape_is_valid(const sl_shape *shape)
         return true;
     case SL_SHAPE_CIRCLE:
         return circle_radius_valid(shape->circle.radius);
-    case SL_SHAPE_POLYGON: {
-        const sl_polygon *p = &shape->polygon;
-        /* Rules 1-6 on the stored vertices; rule 1 fires before any
-         * indexing, so a tampered count cannot read out of bounds. */
-        sl_vec2 centroid;
-        if (!polygon_check(p->vertices, p->count, &centroid)) {
-            return false;
-        }
-        /* Rules 1-6 are translation invariant, so they cannot see a
-         * record whose geometry is sound but whose centroid was moved
-         * off the body origin. Recentering an already-centered polygon
-         * shifts by recomputation rounding -- a few ULP-scale terms of
-         * the extent at most -- so anything above that is tampering. */
-        float extent = 0.0f;
-        for (uint32_t i = 0u; i < p->count; ++i) {
-            extent = sl_max(extent, sl_abs(p->vertices[i].x));
-            extent = sl_max(extent, sl_abs(p->vertices[i].y));
-        }
-        const float tolerance = (float)p->count * SL_EPSILON * extent;
-        return sl_abs(centroid.x) <= tolerance &&
-               sl_abs(centroid.y) <= tolerance;
-    }
+    case SL_SHAPE_POLYGON:
+        return polygon_record_valid(&shape->polygon);
     default:
         return false;
     }
@@ -268,6 +296,9 @@ sl_mass_data sl_shape_mass_data(const sl_shape *shape)
         SL_ASSERT(false);
         break;
     }
+    SL_ASSERT(sl_is_finite(data.area));
+    SL_ASSERT(sl_vec2_is_finite(data.centroid));
+    SL_ASSERT(sl_is_finite(data.inertia_per_unit_mass));
     return data;
 }
 

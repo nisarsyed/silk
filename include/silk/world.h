@@ -18,6 +18,14 @@ extern "C" {
  * on profiling evidence, together with the budget test. */
 #define SL_BODY_COUNT_MAX 65536u
 
+/* Maximum absolute body-center coordinate. IEEE-754 binary32 spacing at
+ * 8192 is 0.0009765625; a shape adds at most SL_SHAPE_EXTENT_MAX, and the
+ * largest delta between two resulting points is at most 18432, where
+ * spacing is 0.001953125 -- under half the 0.005-unit contact slop planned
+ * for Phase 3. Typical bodies should span 0.1-10 world units. Pinned by
+ * tests/test_world.c and tests/test_step.c. */
+#define SL_POSITION_ABS_MAX 8192.0f
+
 /* slots[i].dense marker for a free slot; also the liveness bit.
  * Invariant: body_count + free_count == body_capacity. */
 #define SL_BODY_DENSE_NONE UINT32_MAX
@@ -51,7 +59,9 @@ typedef enum sl_body_type {
 } sl_body_type;
 
 typedef struct sl_body_desc {
-    sl_vec2 position; /* world units */
+    /* World units; each component in
+     * [-SL_POSITION_ABS_MAX, SL_POSITION_ABS_MAX]. */
+    sl_vec2 position;
     sl_vec2 velocity; /* world units / second; {0, 0} for static */
     /* Kilograms: > 0 with representable inverse for dynamic; exactly 0
      * encodes infinite mass for static and kinematic. */
@@ -82,6 +92,9 @@ typedef struct sl_body_slot {
     uint32_t generation; /* bumped on destroy (wrap skips 0) */
 } sl_body_slot;
 
+/* Owning runtime object: initialize from zero, never copy after init, and
+ * treat every field below as engine-private. Copying duplicates arena
+ * ownership and makes destruction unsafe. */
 typedef struct sl_world {
     uint32_t body_count;    /* rows used by every packed array below */
     uint32_t body_capacity; /* slot count, fixed at init */
@@ -146,7 +159,8 @@ void sl_world_destroy(sl_world *world);
 void sl_world_reset(sl_world *world);
 
 /* Returns the null handle -- leaving the world unchanged -- when any
- * descriptor rule fails: position or velocity non-finite, unknown type,
+ * descriptor rule fails: position outside SL_POSITION_ABS_MAX, velocity
+ * non-finite, unknown type,
  * a mass violating its type's rule (positive with representable inverse
  * for dynamic, exactly 0 for static and kinematic), a static carrying
  * velocity or spin, a non-finite angle or angular velocity, a shape
@@ -277,8 +291,10 @@ bool sl_world_body_apply_torque(sl_world *world, sl_body_handle handle,
 
 /* Accumulates the force and the torque cross(point - position, force)
  * together: both accumulators change or neither does. Dynamic bodies
- * only, under the same overflow rules as apply_force and
- * apply_torque. */
+ * only, under the same overflow rules as apply_force and apply_torque.
+ * Each point component must lie within SL_POSITION_ABS_MAX +
+ * SL_SHAPE_EXTENT_MAX, the coordinate domain reachable by a point on a
+ * valid body. */
 bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
                                         sl_vec2 force, sl_vec2 point);
 

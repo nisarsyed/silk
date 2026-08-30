@@ -35,12 +35,16 @@ extern "C" {
  * infinite rotational inertia still damps toward zero spin.
  * Integration neither clamps nor saturates: force, torque, velocity,
  * angular velocity, and gravity magnitudes are expected to stay within
- * float range across a step. A row whose integration overflows anyway
- * is not committed -- the body holds its previous velocity, spin,
- * position and angle -- because the alternative is storing infinity, or
- * a NaN angle once wrapping an infinite one, as ordinary state. dt is THE fixed
- * timestep and must be identical across the calls of a run; timing policy lives
- * above this function. Consumed forces and torques clear. */
+ * float range across a step. Linear axes commit independently: a
+ * non-finite candidate velocity leaves that axis unchanged; a position
+ * inside SL_POSITION_ABS_MAX commits with its finite velocity; and a
+ * position outside the domain holds. On that last case a dynamic velocity
+ * component is zeroed, preventing unbounded outward accumulation and
+ * allowing inward acceleration to recover on the next step; kinematic
+ * velocity remains controller-owned. Spin commits when finite and angle
+ * holds when wrapping would be non-finite. dt is THE fixed timestep and
+ * must be identical across the calls of a run; timing policy lives above
+ * this function. Consumed forces and torques always clear. */
 void sl_world_step(sl_world *world, float dt);
 
 typedef struct sl_stepper {

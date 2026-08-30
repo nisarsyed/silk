@@ -205,6 +205,70 @@ static void test_step_holds_last_finite_state_on_overflow(void)
     sl_world_destroy(&world);
 }
 
+static void test_position_domain_holds_pose_and_allows_recovery(void)
+{
+    sl_world_config config = { .body_capacity = 1u,
+                               .gravity = sl_vec2_make(1.0f, 0.0f) };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc desc = {
+        .position = sl_vec2_make(SL_POSITION_ABS_MAX, 0.0f),
+        .mass = 1.0f,
+    };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    /* Pin one million outward-gravity attempts: the domain boundary
+     * consumes each rejected dynamic velocity instead of banking it. */
+    const uint32_t step_count = 1000000u;
+    for (uint32_t i = 0u; i < step_count; ++i) {
+        sl_world_step(&world, 1.0f);
+    }
+    SL_EXPECT_NEAR(sl_world_body_get_position(&world, h).x, SL_POSITION_ABS_MAX,
+                   1e-6f);
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&world, h).x, 0.0f, 1e-6f);
+
+    /* A bounded restoring force overcomes gravity and moves inward on
+     * the very next step; no stale outward velocity must be unwound. */
+    SL_EXPECT(sl_world_body_apply_force(&world, h, sl_vec2_make(-2.0f, 0.0f)));
+    sl_world_step(&world, 1.0f);
+    SL_EXPECT_NEAR(sl_world_body_get_position(&world, h).x,
+                   SL_POSITION_ABS_MAX - 1.0f, 1e-6f);
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&world, h).x, -1.0f, 1e-6f);
+
+    sl_world_destroy(&world);
+}
+
+static void test_position_domain_rejects_axes_independently(void)
+{
+    sl_world_config config = { .body_capacity = 1u,
+                               .gravity = sl_vec2_make(0.0f, -1.0f) };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc desc = {
+        .position = sl_vec2_make(SL_POSITION_ABS_MAX - 0.25f, 0.0f),
+        .velocity = sl_vec2_make(0.5f, 0.0f),
+        .mass = 1.0f,
+    };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    /* The x extrapolation crosses its boundary while y remains valid.
+     * Holding the whole vector here would make the body hover despite
+     * gravity, even as its downward velocity continued to grow. */
+    sl_world_step(&world, 1.0f);
+    const sl_vec2 position = sl_world_body_get_position(&world, h);
+    const sl_vec2 velocity = sl_world_body_get_velocity(&world, h);
+    SL_EXPECT_NEAR(position.x, desc.position.x, 1e-6f);
+    SL_EXPECT_NEAR(position.y, -1.0f, 1e-6f);
+    SL_EXPECT_NEAR(velocity.x, 0.0f, 1e-6f);
+    SL_EXPECT_NEAR(velocity.y, -1.0f, 1e-6f);
+
+    sl_world_destroy(&world);
+}
+
 static void test_apply_force_rejects_acceleration_overflow(void)
 {
     sl_world_config config = { .body_capacity = 1u };
@@ -1250,6 +1314,10 @@ static const sl_test_case k_cases[] = {
       test_apply_force_rejects_acceleration_overflow },
     { "step_holds_last_finite_state_on_overflow",
       test_step_holds_last_finite_state_on_overflow },
+    { "position_domain_holds_pose_and_allows_recovery",
+      test_position_domain_holds_pose_and_allows_recovery },
+    { "position_domain_rejects_axes_independently",
+      test_position_domain_rejects_axes_independently },
     { "drag_halves_velocity_per_step", test_drag_halves_velocity_per_step },
     { "drag_extreme_coefficient_stable", test_drag_extreme_coefficient_stable },
     { "advance_runs_steps_and_carries_remainder",

@@ -78,6 +78,22 @@ static bool body_mass_valid_for(sl_body_type type, float mass)
     return mass == 0.0f;
 }
 
+/* Comparisons reject NaN and infinities as well as coordinates outside
+ * the supported body-center domain. */
+static bool position_valid(sl_vec2 position)
+{
+    return sl_abs(position.x) <= SL_POSITION_ABS_MAX &&
+           sl_abs(position.y) <= SL_POSITION_ABS_MAX;
+}
+
+/* A point on a body reaches one shape extent past its center, so the
+ * force-point domain is wider than the body-center domain. */
+static bool point_valid(sl_vec2 point)
+{
+    const float point_abs_max = SL_POSITION_ABS_MAX + SL_SHAPE_EXTENT_MAX;
+    return sl_abs(point.x) <= point_abs_max && sl_abs(point.y) <= point_abs_max;
+}
+
 static bool body_type_valid(sl_body_type type)
 {
     return type == SL_BODY_DYNAMIC || type == SL_BODY_KINEMATIC ||
@@ -171,8 +187,8 @@ static float body_inertia_for(float mass, const sl_shape *shape)
 
 static bool body_desc_valid(const sl_body_desc *desc)
 {
-    if (!sl_vec2_is_finite(desc->position) ||
-        !sl_vec2_is_finite(desc->velocity) || !body_type_valid(desc->type) ||
+    if (!position_valid(desc->position) || !sl_vec2_is_finite(desc->velocity) ||
+        !body_type_valid(desc->type) ||
         !body_mass_valid_for(desc->type, desc->mass)) {
         return false;
     }
@@ -329,7 +345,6 @@ void sl_world_reset(sl_world *world)
 
     world->body_count = 0u;
     world->free_count = world->body_capacity;
-
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
         /* Bump past every handle ever issued against this slot. */
         world->slots[i].dense = SL_BODY_DENSE_NONE;
@@ -606,7 +621,7 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
-    if (!sl_vec2_is_finite(position)) {
+    if (!position_valid(position)) {
         return false;
     }
     world->positions[world->slots[handle.index].dense] = position;
@@ -778,7 +793,7 @@ bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
     if (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC) {
         return false;
     }
-    if (!sl_vec2_is_finite(force) || !sl_vec2_is_finite(point)) {
+    if (!sl_vec2_is_finite(force) || !point_valid(point)) {
         return false;
     }
 

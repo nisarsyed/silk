@@ -16,6 +16,14 @@ extern "C" {
  * SL_BODY_COUNT_MAX; anything rounder than an octagon is a circle. */
 #define SL_POLYGON_VERTEX_COUNT_MAX 8u
 
+/* Maximum radius from a shape's centroid, in world length units. Silk is
+ * tuned for ordinary body extents around 0.1-10 units; this cap leaves
+ * two orders of magnitude for exceptional geometry while bounding every
+ * area and inertia derivation far below float overflow. Together with
+ * SL_POSITION_ABS_MAX it also bounds future contact-coordinate deltas.
+ * Pinned by tests/test_shape.c. */
+#define SL_SHAPE_EXTENT_MAX 1024.0f
+
 /* "kind", not "type": body type (static/kinematic/dynamic) is a world
  * concern. Zero is the shapeless body -- a point particle -- so a
  * zeroed record is a valid NONE. */
@@ -25,7 +33,8 @@ typedef enum sl_shape_kind {
     SL_SHAPE_POLYGON
 } sl_shape_kind;
 
-/* Centered on the body origin; radius > SL_EPSILON. */
+/* Centered on the body origin; radius in
+ * (SL_EPSILON, SL_SHAPE_EXTENT_MAX]. */
 typedef struct sl_circle {
     float radius;
 } sl_circle;
@@ -105,7 +114,7 @@ bool sl_shape_make_box(float half_width, float half_height, sl_shape *out);
  * shape attachment on it. */
 bool sl_shape_is_valid(const sl_shape *shape);
 
-/* Requires a valid shape; asserts otherwise in debug builds. */
+/* Requires a valid shape. */
 sl_mass_data sl_shape_mass_data(const sl_shape *shape);
 
 /* World-frame bounds; NONE degenerates to {position, position}. */

@@ -367,9 +367,10 @@ static void sb_apply_tether_for_step(sb_app *app)
     const sl_vec2 grab_world = sl_transform_apply(tf, app->grab_local);
     const sl_vec2 offset = sl_vec2_sub(app->cursor, grab_world);
     const sl_vec2 force = sl_vec2_scale(offset, k_sb_tether_gain);
-    /* Displacement-bounded inputs cannot trip the accumulator's
-     * overflow rejection; the call stays outside SL_ASSERT because it
-     * carries the side effect. */
+    /* The body's bounded center and extent keep grab_world inside the
+     * force-point domain, while screen-scale displacement keeps both
+     * accumulators finite. Preserve the false path because rejection is
+     * still part of the API contract. */
     if (sl_world_body_apply_force_at_point(&app->world, app->tether_body, force,
                                            grab_world)) {
         app->tether_force = force;

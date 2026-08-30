@@ -141,8 +141,14 @@ static void constructors_zero_unused_payload(void)
 
 static void circle_make_rejects_bad_radius(void)
 {
-    const float bad[] = { NAN,   INFINITY,   -INFINITY, 0.0f,
-                          -1.0f, SL_EPSILON, 1e20f };
+    const float bad[] = { NAN,
+                          INFINITY,
+                          -INFINITY,
+                          0.0f,
+                          -1.0f,
+                          SL_EPSILON,
+                          SL_SHAPE_EXTENT_MAX + 1.0f,
+                          1e20f };
     for (uint32_t i = 0u; i < sizeof(bad) / sizeof(bad[0]); ++i) {
         sl_shape out = sl_shape_none();
         out.circle.radius = 5.0f; /* sentinel payload */
@@ -156,6 +162,59 @@ static void circle_make_rejects_bad_radius(void)
     SL_EXPECT(shape.kind == SL_SHAPE_CIRCLE);
     SL_EXPECT(shape.circle.radius == 2.0f);
     SL_EXPECT(sl_shape_is_valid(&shape));
+}
+
+static void shape_extent_limit_bounds_derived_data(void)
+{
+    sl_shape circle = sl_shape_none();
+    SL_EXPECT(sl_shape_make_circle(SL_SHAPE_EXTENT_MAX, &circle));
+    const sl_mass_data circle_data = sl_shape_mass_data(&circle);
+    SL_EXPECT(sl_is_finite(circle_data.area));
+    SL_EXPECT(sl_is_finite(circle_data.inertia_per_unit_mass));
+
+    const sl_vec2 at_limit[4] = {
+        { 0.0f, -SL_SHAPE_EXTENT_MAX },
+        { SL_SHAPE_EXTENT_MAX, 0.0f },
+        { 0.0f, SL_SHAPE_EXTENT_MAX },
+        { -SL_SHAPE_EXTENT_MAX, 0.0f },
+    };
+    sl_shape polygon = sl_shape_none();
+    SL_EXPECT(sl_shape_make_polygon(at_limit, 4u, &polygon));
+    const sl_mass_data polygon_data = sl_shape_mass_data(&polygon);
+    SL_EXPECT(sl_is_finite(polygon_data.area));
+    SL_EXPECT(sl_is_finite(polygon_data.inertia_per_unit_mass));
+
+    const float outside = SL_SHAPE_EXTENT_MAX + 1.0f;
+    const sl_vec2 over_limit[4] = {
+        { 0.0f, -outside },
+        { outside, 0.0f },
+        { 0.0f, outside },
+        { -outside, 0.0f },
+    };
+    sl_shape untouched = sl_shape_none();
+    SL_EXPECT(!sl_shape_make_polygon(over_limit, 4u, &untouched));
+    SL_EXPECT(untouched.kind == SL_SHAPE_NONE);
+}
+
+static void far_origin_polygon_is_canonical_and_valid(void)
+{
+    /* At 1e7, binary32 spacing is one world unit. The first centroid
+     * subtraction therefore leaves a one-third-unit residual even
+     * though this triangle has ordinary local extents. Construction
+     * must refine that residual before publishing the record. */
+    const sl_vec2 points[3] = {
+        { 9999998.0f, 9999999.0f },
+        { 10000003.0f, 9999999.0f },
+        { 10000000.0f, 10000002.0f },
+    };
+    sl_shape shape = sl_shape_none();
+    SL_EXPECT(sl_shape_make_polygon(points, 3u, &shape));
+    SL_EXPECT(sl_shape_is_valid(&shape));
+
+    const sl_mass_data data = sl_shape_mass_data(&shape);
+    SL_EXPECT(sl_is_finite(data.area));
+    SL_EXPECT(sl_vec2_is_finite(data.centroid));
+    SL_EXPECT(sl_is_finite(data.inertia_per_unit_mass));
 }
 
 static void circle_mass_data_matches_closed_form(void)
@@ -436,6 +495,15 @@ static void shape_is_valid_accepts_made_rejects_tampered(void)
     sl_shape bad_radius = circle;
     bad_radius.circle.radius = 0.0f;
     SL_EXPECT(!sl_shape_is_valid(&bad_radius));
+    bad_radius.circle.radius = SL_SHAPE_EXTENT_MAX + 1.0f;
+    SL_EXPECT(!sl_shape_is_valid(&bad_radius));
+
+    sl_shape oversized = box;
+    for (uint32_t i = 0u; i < oversized.polygon.count; ++i) {
+        oversized.polygon.vertices[i] = sl_vec2_scale(
+            oversized.polygon.vertices[i], 2.0f * SL_SHAPE_EXTENT_MAX);
+    }
+    SL_EXPECT(!sl_shape_is_valid(&oversized));
 
     sl_shape bad_kind = box;
     bad_kind.kind = (sl_shape_kind)7;
@@ -868,6 +936,10 @@ static const sl_test_case k_cases[] = {
     { "none_shape_is_zeroed_and_inert", none_shape_is_zeroed_and_inert },
     { "constructors_zero_unused_payload", constructors_zero_unused_payload },
     { "circle_make_rejects_bad_radius", circle_make_rejects_bad_radius },
+    { "shape_extent_limit_bounds_derived_data",
+      shape_extent_limit_bounds_derived_data },
+    { "far_origin_polygon_is_canonical_and_valid",
+      far_origin_polygon_is_canonical_and_valid },
     { "circle_mass_data_matches_closed_form",
       circle_mass_data_matches_closed_form },
     { "circle_aabb_ignores_rotation", circle_aabb_ignores_rotation },
