@@ -10,7 +10,8 @@ _Static_assert(sizeof(sl_shape) == 72u, "sl_shape layout drifted");
 
 static bool circle_radius_valid(float radius)
 {
-    if (!sl_is_finite(radius) || radius <= SL_EPSILON) {
+    if (!sl_is_finite(radius) || radius <= SL_EPSILON ||
+        radius > SL_SHAPE_EXTENT_MAX) {
         return false;
     }
     /* An overflowing r*r would poison area, bounds, and ray math. */
@@ -67,6 +68,7 @@ static void polygon_mass_about(const sl_vec2 *vertices, uint32_t count,
  *      2*pi*k for k >= 2; rule 4 bounds each atan2f to (0, pi)
  *   6. positive finite fan area and finite centroid about points[0],
  *      which avoids cancellation for far-from-origin input
+ *   7. every vertex within SL_SHAPE_EXTENT_MAX of the centroid
  * On success *centroid carries the fan centroid: sl_shape_make_polygon
  * subtracts it to recenter, sl_shape_is_valid checks a stored record is
  * already centered. */
@@ -84,10 +86,13 @@ static bool polygon_check(const sl_vec2 *points, uint32_t count,
 
     sl_vec2 edges[SL_POLYGON_VERTEX_COUNT_MAX];
     float lengths[SL_POLYGON_VERTEX_COUNT_MAX];
+    const float edge_length_max = 2.0f * SL_SHAPE_EXTENT_MAX;
+    const float edge_length_max_sq = edge_length_max * edge_length_max;
     for (uint32_t i = 0u; i < count; ++i) {
         edges[i] = edge_between(points, count, i);
         const float len_sq = sl_vec2_length_sq(edges[i]);
-        if (!sl_is_finite(len_sq) || len_sq <= SL_VEC2_LENGTH_EPS_SQ) {
+        if (!sl_is_finite(len_sq) || len_sq <= SL_VEC2_LENGTH_EPS_SQ ||
+            len_sq > edge_length_max_sq) {
             return false;
         }
         lengths[i] = sqrtf(len_sq);
@@ -122,10 +127,18 @@ static bool polygon_check(const sl_vec2 *points, uint32_t count,
     if (!sl_is_finite(area) || area <= 0.0f || !sl_vec2_is_finite(*centroid)) {
         return false;
     }
+    const float extent_max_sq = SL_SHAPE_EXTENT_MAX * SL_SHAPE_EXTENT_MAX;
+    for (uint32_t i = 0u; i < count; ++i) {
+        const sl_vec2 centered = sl_vec2_sub(points[i], *centroid);
+        const float extent_sq = sl_vec2_length_sq(centered);
+        if (!sl_is_finite(extent_sq) || extent_sq > extent_max_sq) {
+            return false;
+        }
+    }
     return true;
 }
 
-/* Rule 7: finite shifted storage after recentering onto the body
+/* Rule 8: finite shifted storage after recentering onto the body
  * origin. The vertex tail past count is zeroed so two records with the
  * same geometry are also identical byte for byte. */
 static bool polygon_build(const sl_vec2 *points, uint32_t count,
@@ -233,6 +246,7 @@ bool sl_shape_is_valid(const sl_shape *shape)
 sl_mass_data sl_shape_mass_data(const sl_shape *shape)
 {
     SL_ASSERT(shape != NULL);
+    SL_ASSERT(sl_shape_is_valid(shape));
     sl_mass_data data;
     data.area = 0.0f;
     data.centroid = sl_vec2_make(0.0f, 0.0f);
@@ -268,6 +282,9 @@ sl_mass_data sl_shape_mass_data(const sl_shape *shape)
         SL_ASSERT(false);
         break;
     }
+    SL_ASSERT(sl_is_finite(data.area));
+    SL_ASSERT(sl_vec2_is_finite(data.centroid));
+    SL_ASSERT(sl_is_finite(data.inertia_per_unit_mass));
     return data;
 }
 

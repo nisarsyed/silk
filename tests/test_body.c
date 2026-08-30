@@ -534,6 +534,12 @@ static void apply_force_at_point_rejects_atomically(void)
     SL_EXPECT(sl_world_body_get_force(&world, g).y == 0.0f);
     SL_EXPECT(sl_world_body_get_torque(&world, g) == 0.0f);
 
+    SL_EXPECT(!sl_world_body_apply_force_at_point(
+        &world, g, sl_vec2_make(1.0f, 0.0f),
+        sl_vec2_make(SL_POSITION_ABS_MAX + 1.0f, 0.0f)));
+    SL_EXPECT(sl_world_body_get_force(&world, g).x == 0.0f);
+    SL_EXPECT(sl_world_body_get_torque(&world, g) == 0.0f);
+
     /* Non-dynamic bodies refuse the whole operation. */
     sl_body_desc stat = { .type = SL_BODY_STATIC };
     sl_body_handle hs = sl_world_body_create(&world, &stat);

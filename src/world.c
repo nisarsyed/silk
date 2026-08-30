@@ -78,6 +78,13 @@ static bool body_mass_valid_for(sl_body_type type, float mass)
     return mass == 0.0f;
 }
 
+static bool position_valid(sl_vec2 position)
+{
+    return sl_vec2_is_finite(position) &&
+           sl_abs(position.x) <= SL_POSITION_ABS_MAX &&
+           sl_abs(position.y) <= SL_POSITION_ABS_MAX;
+}
+
 static bool body_type_valid(sl_body_type type)
 {
     return type == SL_BODY_DYNAMIC || type == SL_BODY_KINEMATIC ||
@@ -130,8 +137,8 @@ static float body_inertia_for(float mass, const sl_shape *shape)
 
 static bool body_desc_valid(const sl_body_desc *desc)
 {
-    if (!sl_vec2_is_finite(desc->position) ||
-        !sl_vec2_is_finite(desc->velocity) || !body_type_valid(desc->type) ||
+    if (!position_valid(desc->position) || !sl_vec2_is_finite(desc->velocity) ||
+        !body_type_valid(desc->type) ||
         !body_mass_valid_for(desc->type, desc->mass)) {
         return false;
     }
@@ -284,6 +291,7 @@ void sl_world_reset(sl_world *world)
 
     world->body_count = 0u;
     world->free_count = world->body_capacity;
+    world->step_rejection_count = 0u;
 
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
         /* Bump past every handle ever issued against this slot. */
@@ -435,6 +443,12 @@ float sl_world_get_angular_drag(const sl_world *world)
     return world->angular_drag;
 }
 
+uint32_t sl_world_get_step_rejection_count(const sl_world *world)
+{
+    SL_ASSERT(world != NULL);
+    return world->step_rejection_count;
+}
+
 sl_body_handle sl_world_body_first(const sl_world *world)
 {
     SL_ASSERT(world != NULL);
@@ -560,7 +574,7 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
-    if (!sl_vec2_is_finite(position)) {
+    if (!position_valid(position)) {
         return false;
     }
     world->positions[world->slots[handle.index].dense] = position;
@@ -728,7 +742,7 @@ bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
     if (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC) {
         return false;
     }
-    if (!sl_vec2_is_finite(force) || !sl_vec2_is_finite(point)) {
+    if (!sl_vec2_is_finite(force) || !position_valid(point)) {
         return false;
     }
 

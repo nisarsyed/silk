@@ -201,6 +201,44 @@ static void test_step_holds_last_finite_state_on_overflow(void)
     SL_EXPECT(angle == 0.0f);
     SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_velocity(&world, h)));
     SL_EXPECT(sl_is_finite(sl_world_body_get_angular_velocity(&world, h)));
+    SL_EXPECT_INT_EQ(sl_world_get_step_rejection_count(&world), 1u);
+
+    sl_world_destroy(&world);
+}
+
+static void test_step_rejection_count_saturates_and_reset_clears(void)
+{
+    sl_world_config config = { .body_capacity = 1u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc desc = {
+        .position = sl_vec2_make(SL_POSITION_ABS_MAX - 0.5f, 0.0f),
+        .velocity = sl_vec2_make(1.0f, 0.0f),
+        .mass = 1.0f,
+    };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+    SL_EXPECT(sl_world_body_apply_force(&world, h, sl_vec2_make(1.0f, 0.0f)));
+
+    sl_world_step(&world, 1.0f);
+    const sl_vec2 position = sl_world_body_get_position(&world, h);
+    const sl_vec2 velocity = sl_world_body_get_velocity(&world, h);
+    SL_EXPECT(position.x == desc.position.x && position.y == desc.position.y);
+    SL_EXPECT(velocity.x == desc.velocity.x && velocity.y == desc.velocity.y);
+    SL_EXPECT(sl_world_body_get_force(&world, h).x == 0.0f);
+    SL_EXPECT_INT_EQ(sl_world_get_step_rejection_count(&world), 1u);
+
+    /* Reach the representational limit without billions of steps, then
+     * prove another rejection cannot wrap the diagnostic to zero. */
+    world.step_rejection_count = UINT32_MAX - 1u;
+    sl_world_step(&world, 1.0f);
+    SL_EXPECT_INT_EQ(sl_world_get_step_rejection_count(&world), UINT32_MAX);
+    sl_world_step(&world, 1.0f);
+    SL_EXPECT_INT_EQ(sl_world_get_step_rejection_count(&world), UINT32_MAX);
+
+    sl_world_reset(&world);
+    SL_EXPECT_INT_EQ(sl_world_get_step_rejection_count(&world), 0u);
 
     sl_world_destroy(&world);
 }
@@ -368,7 +406,8 @@ static bool shapes_match(const sl_shape *a, const sl_shape *b)
  * from the churn stress below. */
 static bool twin_worlds_in_sync(const sl_world *a, const sl_world *b)
 {
-    if (a->body_count != b->body_count || a->free_count != b->free_count) {
+    if (a->body_count != b->body_count || a->free_count != b->free_count ||
+        a->step_rejection_count != b->step_rejection_count) {
         return false;
     }
     for (uint32_t i = 0u; i < a->body_count; ++i) {
@@ -1250,6 +1289,8 @@ static const sl_test_case k_cases[] = {
       test_apply_force_rejects_acceleration_overflow },
     { "step_holds_last_finite_state_on_overflow",
       test_step_holds_last_finite_state_on_overflow },
+    { "step_rejection_count_saturates_and_reset_clears",
+      test_step_rejection_count_saturates_and_reset_clears },
     { "drag_halves_velocity_per_step", test_drag_halves_velocity_per_step },
     { "drag_extreme_coefficient_stable", test_drag_extreme_coefficient_stable },
     { "advance_runs_steps_and_carries_remainder",

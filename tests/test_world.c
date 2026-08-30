@@ -141,6 +141,32 @@ static void test_create_rejects_non_finite_state(void)
     sl_world_destroy(&world);
 }
 
+static void test_position_domain_is_enforced(void)
+{
+    sl_world_config config = { .body_capacity = 2u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc edge = { .position = sl_vec2_make(SL_POSITION_ABS_MAX,
+                                                   -SL_POSITION_ABS_MAX),
+                          .mass = 1.0f };
+    sl_body_handle h = sl_world_body_create(&world, &edge);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    sl_body_desc outside = { .position =
+                                 sl_vec2_make(SL_POSITION_ABS_MAX + 1.0f, 0.0f),
+                             .mass = 1.0f };
+    SL_EXPECT(sl_body_handle_is_null(sl_world_body_create(&world, &outside)));
+
+    SL_EXPECT(!sl_world_body_set_position(
+        &world, h, sl_vec2_make(0.0f, -SL_POSITION_ABS_MAX - 1.0f)));
+    const sl_vec2 unchanged = sl_world_body_get_position(&world, h);
+    SL_EXPECT(unchanged.x == SL_POSITION_ABS_MAX);
+    SL_EXPECT(unchanged.y == -SL_POSITION_ABS_MAX);
+
+    sl_world_destroy(&world);
+}
+
 static void test_create_rejects_non_positive_mass(void)
 {
     sl_world_config config = { .body_capacity = 2u };
@@ -327,7 +353,7 @@ static void test_traversal_visits_each_body_once(void)
     SL_EXPECT(sl_body_handle_is_null(sl_world_body_first(&world)));
 
     for (uint32_t i = 0u; i < 8u; ++i) {
-        sl_body_desc desc = { .position = sl_vec2_make((float)i, (float)-i),
+        sl_body_desc desc = { .position = sl_vec2_make((float)i, -(float)i),
                               .velocity = sl_vec2_make(0.0f, 0.0f),
                               .mass = 1.0f };
         SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
@@ -702,6 +728,7 @@ static const sl_test_case k_cases[] = {
     { "memory_bytes_at_capacity_max_within_budget",
       test_memory_bytes_at_capacity_max_within_budget },
     { "create_rejects_non_finite_state", test_create_rejects_non_finite_state },
+    { "position_domain_is_enforced", test_position_domain_is_enforced },
     { "create_rejects_non_positive_mass",
       test_create_rejects_non_positive_mass },
     { "create_rejects_inverse_overflow", test_create_rejects_inverse_overflow },

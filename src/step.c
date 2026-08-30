@@ -2,6 +2,13 @@
 
 #include <string.h>
 
+static bool position_valid(sl_vec2 position)
+{
+    return sl_vec2_is_finite(position) &&
+           sl_abs(position.x) <= SL_POSITION_ABS_MAX &&
+           sl_abs(position.y) <= SL_POSITION_ABS_MAX;
+}
+
 void sl_world_step(sl_world *world, float dt)
 {
     SL_ASSERT(world != NULL);
@@ -55,14 +62,16 @@ void sl_world_step(sl_world *world, float dt)
              * documented [-pi, pi] range and trips the finite-transform
              * assert inside every later sl_shape query. Commit the row
              * only if all four values stayed sound, so an overflowing
-             * body holds its last finite state instead of poisoning
-             * the world. */
+             * body holds its last accepted state instead of poisoning
+             * the world or leaving its supported coordinate domain. */
             if (sl_vec2_is_finite(velocity) && sl_is_finite(spin) &&
-                sl_vec2_is_finite(position) && sl_is_finite(angle)) {
+                position_valid(position) && sl_is_finite(angle)) {
                 world->velocities[i] = velocity;
                 world->angular_velocities[i] = spin;
                 world->positions[i] = position;
                 world->angles[i] = angle;
+            } else if (world->step_rejection_count < UINT32_MAX) {
+                world->step_rejection_count++;
             }
         }
 

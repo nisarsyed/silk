@@ -12,8 +12,9 @@ extern "C" {
 
 #define SL_PI 3.14159265358979323846f
 
-/* Comparison tolerance in length units (~8 ULP of 1.0f); pinned by
- * tests/test_math.c. */
+/* Near-unit absolute comparison and normalization tolerance (~8 ULP of
+ * 1.0f); not a relative comparison or a collision/contact tolerance.
+ * Pinned by tests/test_math.c. */
 #define SL_EPSILON 1e-6f
 /* Normalize cutoff as squared length: vectors under SL_EPSILON in length
  * yield zero. */
