@@ -84,6 +84,46 @@ static bool body_type_valid(sl_body_type type)
            type == SL_BODY_STATIC;
 }
 
+/* Rebuilds a validated shape from only its live fields. The caller owns
+ * NULL-to-NONE policy and validation; keeping those outside makes this
+ * writer's contract match sl_shape_is_valid and lets create validate its
+ * complete descriptor before deriving any state. */
+static void shape_write_normalized(const sl_shape *shape, sl_shape *out)
+{
+    SL_ASSERT(shape != NULL);
+    SL_ASSERT(out != NULL);
+    SL_ASSERT(sl_shape_is_valid(shape));
+
+    switch (shape->kind) {
+    case SL_SHAPE_NONE:
+        *out = sl_shape_none();
+        return;
+    case SL_SHAPE_CIRCLE: {
+        const bool written = sl_shape_make_circle(shape->circle.radius, out);
+        SL_ASSERT(written);
+        (void)written;
+        return;
+    }
+    case SL_SHAPE_POLYGON: {
+        const uint32_t count = shape->polygon.count;
+        SL_ASSERT(count >= 3u && count <= SL_POLYGON_VERTEX_COUNT_MAX);
+
+        sl_shape normalized = sl_shape_none();
+        normalized.kind = SL_SHAPE_POLYGON;
+        normalized.polygon.count = count;
+        for (uint32_t i = 0u; i < count; ++i) {
+            normalized.polygon.vertices[i] = shape->polygon.vertices[i];
+        }
+        *out = normalized;
+        return;
+    }
+    }
+
+    /* Unreachable for a shape that passed sl_shape_is_valid. No default
+     * above: adding a shape kind must produce a compiler warning here. */
+    SL_ASSERT(false);
+}
+
 /* Inertia about the body origin: finite, non-negative, with a
  * representable inverse unless it is the zero (infinite) encoding. */
 static bool body_inertia_valid(float inertia)
@@ -120,7 +160,8 @@ static bool angular_accel_finite(float torque, float inv_inertia)
  * spin freely (zero inertia). Callers gate on body_inertia_valid. */
 static float body_inertia_for(float mass, const sl_shape *shape)
 {
-    if (shape == NULL || shape->kind == SL_SHAPE_NONE) {
+    SL_ASSERT(shape != NULL);
+    if (shape->kind == SL_SHAPE_NONE) {
         return 0.0f;
     }
     /* Constructed shapes are centroid-centered, so the body origin is
@@ -222,6 +263,10 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     if (base == NULL) {
         return false;
     }
+    /* The complete arena is persistent world state, including inactive
+     * packed rows and alignment gaps. Give every byte a deterministic
+     * initial value before carving typed slices out of it. */
+    memset(base, 0, total_bytes);
 
     /* Carved in declaration order; the closing assert fires if an array
      * joins one list but not the other. */
@@ -300,16 +345,14 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
     SL_ASSERT(world != NULL);
     SL_ASSERT(desc != NULL);
 
-    /* Descriptor first: body_inertia_for measures the shape, walking
-     * polygon.count vertices, so the record has to clear
-     * sl_shape_is_valid before it is touched -- a tampered count read
-     * here would run off the end of the vertex array. */
+    /* Validate the complete descriptor before deriving inertia, whose
+     * polygon path walks shape->polygon.count vertices. */
     if (!body_desc_valid(desc) || world->free_count == 0u) {
         return sl_body_handle_null();
     }
     /* Derived inertia is validated before any slot is consumed, so a
      * rejection here leaves the pool untouched. */
-    const float inertia = (desc->type == SL_BODY_DYNAMIC)
+    const float inertia = (desc->type == SL_BODY_DYNAMIC && desc->shape != NULL)
                               ? body_inertia_for(desc->mass, desc->shape)
                               : 0.0f;
     if (!body_inertia_valid(inertia)) {
@@ -339,8 +382,11 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
     body_write_inertia(world, dense, inertia);
 
     world->types[dense] = (uint8_t)desc->type;
-    world->shapes[dense] =
-        (desc->shape != NULL) ? *desc->shape : sl_shape_none();
+    if (desc->shape == NULL) {
+        world->shapes[dense] = sl_shape_none();
+    } else {
+        shape_write_normalized(desc->shape, &world->shapes[dense]);
+    }
 
     return handle_for(world, dense);
 }
@@ -652,15 +698,15 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
 
-    const sl_shape record = (shape != NULL) ? *shape : sl_shape_none();
-    if (!sl_shape_is_valid(&record)) {
+    if (shape != NULL && !sl_shape_is_valid(shape)) {
         return false;
     }
 
     const uint32_t dense = world->slots[handle.index].dense;
     const bool dynamic = world->types[dense] == (uint8_t)SL_BODY_DYNAMIC;
-    const float inertia =
-        dynamic ? body_inertia_for(world->masses[dense], &record) : 0.0f;
+    const float inertia = (dynamic && shape != NULL)
+                              ? body_inertia_for(world->masses[dense], shape)
+                              : 0.0f;
     if (!body_inertia_valid(inertia)) {
         return false;
     }
@@ -671,7 +717,11 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
                               inverse_or_zero(inertia))) {
         return false;
     }
-    world->shapes[dense] = record;
+    if (shape == NULL) {
+        world->shapes[dense] = sl_shape_none();
+    } else {
+        shape_write_normalized(shape, &world->shapes[dense]);
+    }
     body_write_inertia(world, dense, inertia);
     return true;
 }

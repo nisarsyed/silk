@@ -41,12 +41,11 @@ static bool hit_untouched(const sl_ray_hit *hit)
            hit->normal.y == -42.0f;
 }
 
-/* The whole record is copied by value into the world's per-body array,
- * so a constructor that writes only its live union member leaves the
- * tail carrying whatever was on the stack -- and any byte-wise hash,
- * memcmp, or serialization of world state then differs run to run.
- * Checked byte-wise because that is the property that matters; the
- * layout assert in shape.c pins sl_shape as padding-free. */
+/* A constructor that writes only its live union member leaves the tail
+ * carrying whatever was on the stack, so byte-wise hashes, comparisons,
+ * and serialization of shape records differ run to run. Checked
+ * byte-wise because that is the property that matters; the layout
+ * assert in shape.c pins sl_shape as padding-free. */
 static void expect_payload_zeroed(const sl_shape *shape)
 {
     const unsigned char *bytes = (const unsigned char *)shape;
@@ -80,8 +79,8 @@ static void none_shape_is_zeroed_and_inert(void)
     sl_shape zeroed;
     memset(&zeroed, 0, sizeof(zeroed));
     SL_EXPECT(zeroed.kind == SL_SHAPE_NONE);
-    /* And sl_shape_none is exactly that record -- the world stores one
-     * per shapeless body and must get the same bytes every time. */
+    /* And sl_shape_none is exactly that record -- the representation
+     * used for every shapeless body must have the same bytes. */
     SL_EXPECT(memcmp(&shape, &zeroed, sizeof(shape)) == 0);
 
     const sl_mass_data data = sl_shape_mass_data(&shape);
@@ -106,7 +105,7 @@ static void constructors_zero_unused_payload(void)
 {
     /* A circle leaves the 64-byte polygon arm of the union unused, and
      * a polygon leaves vertices[count..7] unused; neither may carry
-     * stack residue into the world. */
+     * stack residue in its output record. */
     soil_stack();
     sl_shape circle;
     SL_EXPECT(sl_shape_make_circle(1.5f, &circle));
