@@ -43,9 +43,10 @@ extern "C" {
  * allowing inward acceleration to recover on the next step, so the body
  * halts up to velocity * dt inside the bound rather than against it;
  * kinematic velocity remains controller-owned. Spin commits when finite and
- * angle holds when wrapping would be non-finite. dt is THE fixed timestep and
- * must be identical across the calls of a run; timing policy lives above
- * this function. Consumed forces and torques always clear. */
+ * angle holds when wrapping would be non-finite. dt is the caller-selected
+ * fixed timestep; Silk supplies no default. It must be identical across the
+ * calls of a run, and timing policy lives above this function. Consumed
+ * forces and torques always clear. */
 void sl_world_step(sl_world *world, float dt);
 
 typedef struct sl_stepper {
