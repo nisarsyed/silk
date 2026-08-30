@@ -2,11 +2,26 @@
 
 #include <string.h>
 
-static bool position_valid(sl_vec2 position)
+/* A dynamic body meets the position domain as an inelastic boundary:
+ * its rejected outward velocity is consumed instead of accumulating.
+ * Kinematic velocity remains controller-owned when its pose is held. */
+static inline void position_axis_commit(float velocity, float dt, bool dynamic,
+                                        float *position_stored,
+                                        float *velocity_stored)
 {
-    return sl_vec2_is_finite(position) &&
-           sl_abs(position.x) <= SL_POSITION_ABS_MAX &&
-           sl_abs(position.y) <= SL_POSITION_ABS_MAX;
+    SL_ASSERT(position_stored != NULL);
+    SL_ASSERT(velocity_stored != NULL);
+
+    if (!sl_is_finite(velocity)) {
+        return;
+    }
+    *velocity_stored = velocity;
+    const float position = *position_stored + velocity * dt;
+    if (sl_abs(position) <= SL_POSITION_ABS_MAX) {
+        *position_stored = position;
+    } else if (dynamic) {
+        *velocity_stored = 0.0f;
+    }
 }
 
 void sl_world_step(sl_world *world, float dt)
@@ -51,27 +66,22 @@ void sl_world_step(sl_world *world, float dt)
                 velocity = sl_vec2_scale(velocity, drag_scale);
                 spin = spin * angular_drag_scale;
             }
-            const sl_vec2 position =
-                sl_vec2_add(world->positions[i], sl_vec2_scale(velocity, dt));
-            const float angle = sl_angle_wrap(world->angles[i] + spin * dt);
-
-            /* dt is bounded only from below and a velocity only by
-             * finiteness, so an extreme pair still overflows here --
-             * and the angular side degrades worse than the linear one:
-             * fmodf of an infinite angle is NaN, which breaks the
-             * documented [-pi, pi] range and trips the finite-transform
-             * assert inside every later sl_shape query. Commit the row
-             * only if all four values stayed sound, so an overflowing
-             * body holds its last accepted state instead of poisoning
-             * the world or leaving its supported coordinate domain. */
-            if (sl_vec2_is_finite(velocity) && sl_is_finite(spin) &&
-                position_valid(position) && sl_is_finite(angle)) {
-                world->velocities[i] = velocity;
+            /* Axes commit independently so one boundary cannot freeze
+             * motion along the other. A rejected dynamic axis stops at
+             * zero velocity, preventing persistent outward acceleration
+             * while leaving the next inward acceleration free to move. */
+            position_axis_commit(velocity.x, dt, dynamic,
+                                 &world->positions[i].x,
+                                 &world->velocities[i].x);
+            position_axis_commit(velocity.y, dt, dynamic,
+                                 &world->positions[i].y,
+                                 &world->velocities[i].y);
+            if (sl_is_finite(spin)) {
                 world->angular_velocities[i] = spin;
-                world->positions[i] = position;
-                world->angles[i] = angle;
-            } else if (world->step_rejection_count < UINT32_MAX) {
-                world->step_rejection_count++;
+                const float angle = sl_angle_wrap(world->angles[i] + spin * dt);
+                if (sl_is_finite(angle)) {
+                    world->angles[i] = angle;
+                }
             }
         }
 

@@ -112,7 +112,7 @@ bool sl_shape_make_box(float half_width, float half_height, sl_shape *out);
  * shape attachment on it. */
 bool sl_shape_is_valid(const sl_shape *shape);
 
-/* Requires a valid shape; asserts otherwise in debug builds. */
+/* Requires a valid shape. */
 sl_mass_data sl_shape_mass_data(const sl_shape *shape);
 
 /* World-frame bounds; NONE degenerates to {position, position}. */

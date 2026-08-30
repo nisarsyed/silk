@@ -98,9 +98,6 @@ typedef struct sl_world {
     uint32_t body_count;    /* rows used by every packed array below */
     uint32_t body_capacity; /* slot count, fixed at init */
     uint32_t free_count;
-    /* Body integrations rejected since init/reset; saturates at
-     * UINT32_MAX rather than wrapping to a false zero. */
-    uint32_t step_rejection_count;
 
     sl_vec2 gravity;    /* world units / second^2 */
     float linear_drag;  /* 1 / seconds, >= 0 */
@@ -154,9 +151,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config);
 /* Frees all engine-owned memory and zeroes *world; safe to repeat. */
 void sl_world_destroy(sl_world *world);
 
-/* Destroys every body, clears step_rejection_count, and bumps every
- * generation, so handles held from before a reset never validate
- * afterwards. */
+/* Destroys every body and bumps every generation, so handles held from
+ * before a reset never validate afterwards. */
 void sl_world_reset(sl_world *world);
 
 /* Returns the null handle -- leaving the world unchanged -- when any
@@ -183,7 +179,6 @@ uint32_t sl_world_body_capacity(const sl_world *world);
 sl_vec2 sl_world_get_gravity(const sl_world *world);
 float sl_world_get_linear_drag(const sl_world *world);
 float sl_world_get_angular_drag(const sl_world *world);
-uint32_t sl_world_get_step_rejection_count(const sl_world *world);
 
 /* Read-only walks visit live bodies in packed order: deterministic for
  * a given operation sequence, not creation order across destroys. Both
@@ -291,8 +286,10 @@ bool sl_world_body_apply_torque(sl_world *world, sl_body_handle handle,
 
 /* Accumulates the force and the torque cross(point - position, force)
  * together: both accumulators change or neither does. Dynamic bodies
- * only, under the same overflow rules as apply_force and apply_torque;
- * point must lie inside SL_POSITION_ABS_MAX. */
+ * only, under the same overflow rules as apply_force and apply_torque.
+ * Each point component must lie within SL_POSITION_ABS_MAX +
+ * SL_SHAPE_EXTENT_MAX, the coordinate domain reachable by a point on a
+ * valid body. */
 bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
                                         sl_vec2 force, sl_vec2 point);
 

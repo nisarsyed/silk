@@ -153,6 +153,13 @@ static void test_position_domain_is_enforced(void)
     sl_body_handle h = sl_world_body_create(&world, &edge);
     SL_EXPECT(!sl_body_handle_is_null(h));
 
+    const sl_vec2 opposite_edge =
+        sl_vec2_make(-SL_POSITION_ABS_MAX, SL_POSITION_ABS_MAX);
+    SL_EXPECT(sl_world_body_set_position(&world, h, opposite_edge));
+    const sl_vec2 accepted = sl_world_body_get_position(&world, h);
+    SL_EXPECT(accepted.x == opposite_edge.x);
+    SL_EXPECT(accepted.y == opposite_edge.y);
+
     sl_body_desc outside = { .position =
                                  sl_vec2_make(SL_POSITION_ABS_MAX + 1.0f, 0.0f),
                              .mass = 1.0f };
@@ -161,8 +168,8 @@ static void test_position_domain_is_enforced(void)
     SL_EXPECT(!sl_world_body_set_position(
         &world, h, sl_vec2_make(0.0f, -SL_POSITION_ABS_MAX - 1.0f)));
     const sl_vec2 unchanged = sl_world_body_get_position(&world, h);
-    SL_EXPECT(unchanged.x == SL_POSITION_ABS_MAX);
-    SL_EXPECT(unchanged.y == -SL_POSITION_ABS_MAX);
+    SL_EXPECT(unchanged.x == opposite_edge.x);
+    SL_EXPECT(unchanged.y == opposite_edge.y);
 
     sl_world_destroy(&world);
 }

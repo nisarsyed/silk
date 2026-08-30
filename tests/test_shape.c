@@ -173,19 +173,49 @@ static void shape_extent_limit_bounds_derived_data(void)
     SL_EXPECT(sl_is_finite(circle_data.area));
     SL_EXPECT(sl_is_finite(circle_data.inertia_per_unit_mass));
 
-    /* A square at half the radial cap per axis has corner radius
-     * cap/sqrt(2), while a square at the cap per axis exceeds it. */
-    sl_shape box = sl_shape_none();
-    SL_EXPECT(sl_shape_make_box(0.5f * SL_SHAPE_EXTENT_MAX,
-                                0.5f * SL_SHAPE_EXTENT_MAX, &box));
-    const sl_mass_data box_data = sl_shape_mass_data(&box);
-    SL_EXPECT(sl_is_finite(box_data.area));
-    SL_EXPECT(sl_is_finite(box_data.inertia_per_unit_mass));
+    const sl_vec2 at_limit[4] = {
+        { 0.0f, -SL_SHAPE_EXTENT_MAX },
+        { SL_SHAPE_EXTENT_MAX, 0.0f },
+        { 0.0f, SL_SHAPE_EXTENT_MAX },
+        { -SL_SHAPE_EXTENT_MAX, 0.0f },
+    };
+    sl_shape polygon = sl_shape_none();
+    SL_EXPECT(sl_shape_make_polygon(at_limit, 4u, &polygon));
+    const sl_mass_data polygon_data = sl_shape_mass_data(&polygon);
+    SL_EXPECT(sl_is_finite(polygon_data.area));
+    SL_EXPECT(sl_is_finite(polygon_data.inertia_per_unit_mass));
 
+    const float outside = SL_SHAPE_EXTENT_MAX + 1.0f;
+    const sl_vec2 over_limit[4] = {
+        { 0.0f, -outside },
+        { outside, 0.0f },
+        { 0.0f, outside },
+        { -outside, 0.0f },
+    };
     sl_shape untouched = sl_shape_none();
-    SL_EXPECT(!sl_shape_make_box(SL_SHAPE_EXTENT_MAX, SL_SHAPE_EXTENT_MAX,
-                                 &untouched));
+    SL_EXPECT(!sl_shape_make_polygon(over_limit, 4u, &untouched));
     SL_EXPECT(untouched.kind == SL_SHAPE_NONE);
+}
+
+static void far_origin_polygon_is_canonical_and_valid(void)
+{
+    /* At 1e7, binary32 spacing is one world unit. The first centroid
+     * subtraction therefore leaves a one-third-unit residual even
+     * though this triangle has ordinary local extents. Construction
+     * must refine that residual before publishing the record. */
+    const sl_vec2 points[3] = {
+        { 9999998.0f, 9999999.0f },
+        { 10000003.0f, 9999999.0f },
+        { 10000000.0f, 10000002.0f },
+    };
+    sl_shape shape = sl_shape_none();
+    SL_EXPECT(sl_shape_make_polygon(points, 3u, &shape));
+    SL_EXPECT(sl_shape_is_valid(&shape));
+
+    const sl_mass_data data = sl_shape_mass_data(&shape);
+    SL_EXPECT(sl_is_finite(data.area));
+    SL_EXPECT(sl_vec2_is_finite(data.centroid));
+    SL_EXPECT(sl_is_finite(data.inertia_per_unit_mass));
 }
 
 static void circle_mass_data_matches_closed_form(void)
@@ -909,6 +939,8 @@ static const sl_test_case k_cases[] = {
     { "circle_make_rejects_bad_radius", circle_make_rejects_bad_radius },
     { "shape_extent_limit_bounds_derived_data",
       shape_extent_limit_bounds_derived_data },
+    { "far_origin_polygon_is_canonical_and_valid",
+      far_origin_polygon_is_canonical_and_valid },
     { "circle_mass_data_matches_closed_form",
       circle_mass_data_matches_closed_form },
     { "circle_aabb_ignores_rotation", circle_aabb_ignores_rotation },

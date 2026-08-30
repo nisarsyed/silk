@@ -500,6 +500,23 @@ static void apply_force_at_point_adds_cross_product_torque(void)
     SL_EXPECT(sl_world_body_get_torque(&world, h) == 2.0f);
     SL_EXPECT(sl_world_body_get_force(&world, h).y == 4.0f);
 
+    sl_shape circle = sl_shape_none();
+    SL_EXPECT(sl_shape_make_circle(SL_SHAPE_EXTENT_MAX, &circle));
+    sl_body_desc edge = { .position = sl_vec2_make(SL_POSITION_ABS_MAX, 0.0f),
+                          .mass = 1.0f,
+                          .shape = &circle };
+    sl_body_handle boundary = sl_world_body_create(&world, &edge);
+    SL_EXPECT(!sl_body_handle_is_null(boundary));
+
+    /* A valid body's surface reaches one shape extent beyond the legal
+     * center domain. That point remains a valid force application. */
+    const sl_vec2 surface =
+        sl_vec2_make(SL_POSITION_ABS_MAX + SL_SHAPE_EXTENT_MAX, 0.0f);
+    SL_EXPECT(sl_world_body_apply_force_at_point(
+        &world, boundary, sl_vec2_make(0.0f, 1.0f), surface));
+    SL_EXPECT_NEAR(sl_world_body_get_torque(&world, boundary),
+                   SL_SHAPE_EXTENT_MAX, k_eps);
+
     sl_world_destroy(&world);
 }
 
@@ -536,7 +553,7 @@ static void apply_force_at_point_rejects_atomically(void)
 
     SL_EXPECT(!sl_world_body_apply_force_at_point(
         &world, g, sl_vec2_make(1.0f, 0.0f),
-        sl_vec2_make(SL_POSITION_ABS_MAX + 1.0f, 0.0f)));
+        sl_vec2_make(SL_POSITION_ABS_MAX + SL_SHAPE_EXTENT_MAX + 1.0f, 0.0f)));
     SL_EXPECT(sl_world_body_get_force(&world, g).x == 0.0f);
     SL_EXPECT(sl_world_body_get_torque(&world, g) == 0.0f);
 
