@@ -72,9 +72,10 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
-The same three-command flow applies to `release` and `sanitize`. The optional
-`sandbox` and `sandbox-release` presets fetch raylib and build the interactive
-example. See [README.md](README.md) for sandbox requirements and usage.
+The same three-command flow applies to `release`, `sanitize`, and `windows`.
+The optional `sandbox` and `sandbox-release` presets fetch raylib and build the
+interactive example. See [README.md](README.md) for sandbox requirements and
+usage.
 
 The `silk_warnings` CMake target defines the authoritative warning set and
 treats warnings as errors for first-party C targets. Format every touched `.c`

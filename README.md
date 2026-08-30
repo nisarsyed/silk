@@ -32,7 +32,7 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
-The release and sanitizer presets use the same workflow:
+The release, sanitizer, and Windows presets use the same workflow:
 
 ```sh
 cmake --preset release
@@ -42,6 +42,10 @@ ctest --preset release
 cmake --preset sanitize
 cmake --build --preset sanitize
 ctest --preset sanitize
+
+cmake --preset windows
+cmake --build --preset windows
+ctest --preset windows
 ```
 
 Executables are written to `build/<preset>/bin`. The test binary can also be

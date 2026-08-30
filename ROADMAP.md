@@ -11,8 +11,8 @@ commitments. Engineering principles and contribution policy live in
 | Concern | Direction |
 | --- | --- |
 | Language | C17, portable ISO C only (`C_EXTENSIONS OFF`) |
-| Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` / `sandbox` / `sandbox-release` presets |
-| Toolchain | GCC + Clang on Linux CI; Clang on macOS CI; warnings-as-errors on the core |
+| Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` / `windows` / `sandbox` / `sandbox-release` presets |
+| Toolchain | GCC + Clang on Linux CI; Clang on macOS CI; MSVC on Windows CI; warnings-as-errors on the core |
 | Dependencies | None in the core; raylib linked only by the sandbox example |
 | API | `sl_` prefix, snake_case; SoA simulation state; generational body handles |
 | Simulation | Caller-selected fixed timestep (sandbox: 1/60 s), bounded accumulator, semi-implicit Euler, gravity + drag; deterministic for a fixed call sequence |

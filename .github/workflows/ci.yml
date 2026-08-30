@@ -61,6 +61,15 @@ jobs:
       - run: cmake --build --preset debug
       - run: ctest --preset debug
 
+  windows:
+    name: msvc / windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --preset windows
+      - run: cmake --build --preset windows
+      - run: ctest --preset windows
+
   sanitize:
     name: asan+ubsan / ubuntu
     runs-on: ubuntu-latest
