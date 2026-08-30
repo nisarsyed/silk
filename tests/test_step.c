@@ -205,6 +205,66 @@ static void test_step_holds_last_finite_state_on_overflow(void)
     sl_world_destroy(&world);
 }
 
+/* The stepper's domain comparison must stay identical to the one
+ * sl_world_body_create and sl_world_body_set_position apply: exactness is
+ * the property, so these compare bit for bit. */
+static void test_position_domain_boundary_matches_setters(void)
+{
+    sl_world_config config = { .body_capacity = 2u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc lands = {
+        .position = sl_vec2_make(SL_POSITION_ABS_MAX - 1.0f, 0.0f),
+        .velocity = sl_vec2_make(1.0f, 0.0f),
+        .mass = 1.0f,
+    };
+    sl_body_handle h = sl_world_body_create(&world, &lands);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    /* A step that lands exactly on the bound commits, matching create. */
+    sl_world_step(&world, 1.0f);
+    SL_EXPECT(sl_world_body_get_position(&world, h).x == SL_POSITION_ABS_MAX);
+    SL_EXPECT(sl_world_body_get_velocity(&world, h).x == 1.0f);
+
+    /* A kinematic body is driven, not simulated: holding its pose must
+     * not consume the velocity its controller set. */
+    sl_body_desc driven = {
+        .position = sl_vec2_make(SL_POSITION_ABS_MAX, 0.0f),
+        .velocity = sl_vec2_make(1.0f, 0.0f),
+        .type = SL_BODY_KINEMATIC,
+    };
+    sl_body_handle k = sl_world_body_create(&world, &driven);
+    SL_EXPECT(!sl_body_handle_is_null(k));
+
+    sl_world_step(&world, 1.0f);
+    SL_EXPECT(sl_world_body_get_position(&world, k).x == SL_POSITION_ABS_MAX);
+    SL_EXPECT(sl_world_body_get_velocity(&world, k).x == 1.0f);
+
+    sl_world_destroy(&world);
+}
+
+/* Gravity large enough that acceleration alone overflows a legal
+ * velocity. The axis keeps the velocity it arrived with; it must not
+ * fall through to the boundary's zeroing path. */
+static void test_step_holds_velocity_when_candidate_overflows(void)
+{
+    sl_world_config config = { .body_capacity = 1u,
+                               .gravity = sl_vec2_make(3e38f, 0.0f) };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc desc = { .velocity = sl_vec2_make(3e38f, 0.0f), .mass = 1.0f };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    sl_world_step(&world, 1.0f);
+    SL_EXPECT(sl_world_body_get_velocity(&world, h).x == 3e38f);
+    SL_EXPECT(sl_world_body_get_position(&world, h).x == 0.0f);
+
+    sl_world_destroy(&world);
+}
+
 static void test_position_domain_holds_pose_and_allows_recovery(void)
 {
     sl_world_config config = { .body_capacity = 1u,
@@ -1314,6 +1374,10 @@ static const sl_test_case k_cases[] = {
       test_apply_force_rejects_acceleration_overflow },
     { "step_holds_last_finite_state_on_overflow",
       test_step_holds_last_finite_state_on_overflow },
+    { "step_holds_velocity_when_candidate_overflows",
+      test_step_holds_velocity_when_candidate_overflows },
+    { "position_domain_boundary_matches_setters",
+      test_position_domain_boundary_matches_setters },
     { "position_domain_holds_pose_and_allows_recovery",
       test_position_domain_holds_pose_and_allows_recovery },
     { "position_domain_rejects_axes_independently",
