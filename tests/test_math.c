@@ -1,6 +1,7 @@
 #include "silk_test.h"
 #include "suites.h"
 #include <math.h>
+#include <stdint.h>
 
 #include <silk/math.h>
 
@@ -133,6 +134,188 @@ static void test_vec2_distance(void)
     SL_EXPECT_NEAR(d, 5.0f, SL_EPSILON);
 }
 
+static void test_vec2_min_max_componentwise(void)
+{
+    sl_vec2 a = sl_vec2_make(1.0f, -5.0f);
+    sl_vec2 b = sl_vec2_make(-2.0f, 3.0f);
+
+    sl_vec2 lo = sl_vec2_min(a, b);
+    SL_EXPECT(lo.x == -2.0f && lo.y == -5.0f);
+
+    sl_vec2 hi = sl_vec2_max(a, b);
+    SL_EXPECT(hi.x == 1.0f && hi.y == 3.0f);
+
+    /* Equal inputs pass through unchanged. */
+    sl_vec2 same = sl_vec2_max(a, a);
+    SL_EXPECT(same.x == 1.0f && same.y == -5.0f);
+}
+
+static void test_vec2_distance_sq_matches_distance(void)
+{
+    /* Integer 3-4-5 triangle: exact in binary floating point. */
+    sl_vec2 a = sl_vec2_make(0.0f, 0.0f);
+    sl_vec2 b = sl_vec2_make(3.0f, 4.0f);
+    SL_EXPECT(sl_vec2_distance_sq(a, b) == 25.0f);
+    SL_EXPECT(sl_vec2_distance_sq(b, a) == 25.0f);
+    SL_EXPECT(sl_vec2_distance_sq(a, a) == 0.0f);
+
+    const float sq = sl_vec2_distance_sq(a, b);
+    SL_EXPECT_NEAR(sl_vec2_length(sl_vec2_sub(b, a)), sqrtf(sq), SL_EPSILON);
+}
+
+static void test_rotation_identity_is_exact(void)
+{
+    sl_rotation q = sl_rotation_identity();
+    SL_EXPECT(q.c == 1.0f && q.s == 0.0f);
+
+    /* Applying identity reproduces the input bitwise: c*x - s*y with
+     * (c, s) = (1, 0) is x - 0, exact for every finite v. */
+    sl_vec2 v = sl_vec2_make(-13.5f, 4.25f);
+    sl_vec2 r = sl_rotation_apply(q, v);
+    SL_EXPECT(r.x == v.x && r.y == v.y);
+}
+
+/* Both constructors call cosf/sinf on the same argument, so their
+ * coefficients must agree bitwise; anything else means one of them
+ * stopped being the rotation it claims to be. */
+static void test_rotation_make_matches_mat2_rotation(void)
+{
+    const float angles[] = { 0.7f, -2.1f, SL_PI / 2.0f, SL_PI };
+    for (uint32_t i = 0u; i < sizeof(angles) / sizeof(angles[0]); ++i) {
+        sl_rotation q = sl_rotation_make(angles[i]);
+        sl_mat2 m = sl_mat2_rotation(angles[i]);
+        SL_EXPECT(q.c == m.m00 && q.s == m.m10);
+    }
+
+    /* Quarter turn sends +x to +y. */
+    sl_rotation quarter = sl_rotation_make(SL_PI / 2.0f);
+    sl_vec2 r = sl_rotation_apply(quarter, sl_vec2_make(1.0f, 0.0f));
+    SL_EXPECT_NEAR(r.x, 0.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(r.y, 1.0f, SL_TEST_EPS);
+}
+
+static void test_rotation_apply_inverse_roundtrip(void)
+{
+    sl_rotation q = sl_rotation_make(0.7f);
+
+    /* Unit length within rounding, per the type contract. */
+    SL_EXPECT_NEAR(q.c * q.c + q.s * q.s, 1.0f, SL_TEST_EPS);
+
+    sl_vec2 v = sl_vec2_make(3.0f, -2.0f);
+    sl_vec2 back = sl_rotation_apply_inverse(q, sl_rotation_apply(q, v));
+    SL_EXPECT_NEAR(back.x, v.x, SL_TEST_EPS);
+    SL_EXPECT_NEAR(back.y, v.y, SL_TEST_EPS);
+
+    /* The inverse alone acts as the opposite-angle rotation. */
+    sl_vec2 inv_only = sl_rotation_apply_inverse(q, sl_vec2_make(1.0f, 0.0f));
+    sl_rotation negated = sl_rotation_make(-0.7f);
+    SL_EXPECT_NEAR(inv_only.x, negated.c, SL_TEST_EPS);
+    SL_EXPECT_NEAR(inv_only.y, negated.s, SL_TEST_EPS);
+}
+
+/* Operand-order pin for the frame: rotate-then-translate. A
+ * translate-first mistake turns local (1, 0) at position (10, 0) by a
+ * quarter turn into ~(11, 0) instead of the correct ~(10, 1). */
+static void test_transform_apply_rotates_then_translates(void)
+{
+    sl_transform t = sl_transform_make(sl_vec2_make(10.0f, 0.0f),
+                                       sl_rotation_make(SL_PI / 2.0f));
+
+    sl_vec2 world = sl_transform_apply(t, sl_vec2_make(1.0f, 0.0f));
+    SL_EXPECT_NEAR(world.x, 10.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(world.y, 1.0f, SL_TEST_EPS);
+}
+
+static void test_transform_apply_inverse_roundtrip(void)
+{
+    sl_transform t =
+        sl_transform_make(sl_vec2_make(10.0f, -20.0f), sl_rotation_make(0.7f));
+
+    sl_vec2 world = sl_transform_apply(t, sl_vec2_make(3.0f, -2.0f));
+    sl_vec2 local = sl_transform_apply_inverse(t, world);
+    SL_EXPECT_NEAR(local.x, 3.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(local.y, -2.0f, SL_TEST_EPS);
+
+    /* Identity transforms round-trip exactly. */
+    sl_transform id = sl_transform_identity();
+    sl_vec2 v = sl_vec2_make(1.5f, -2.5f);
+    sl_vec2 out = sl_transform_apply(id, v);
+    SL_EXPECT(out.x == v.x && out.y == v.y);
+    sl_vec2 back = sl_transform_apply_inverse(id, v);
+    SL_EXPECT(back.x == v.x && back.y == v.y);
+}
+
+static void test_aabb_contains_point_boundary_inclusive(void)
+{
+    sl_aabb box =
+        sl_aabb_make(sl_vec2_make(0.0f, 0.0f), sl_vec2_make(10.0f, 10.0f));
+
+    /* All four corners and the center lie inside. */
+    SL_EXPECT(sl_aabb_contains_point(box, sl_vec2_make(0.0f, 0.0f)));
+    SL_EXPECT(sl_aabb_contains_point(box, sl_vec2_make(10.0f, 10.0f)));
+    SL_EXPECT(sl_aabb_contains_point(box, sl_vec2_make(0.0f, 10.0f)));
+    SL_EXPECT(sl_aabb_contains_point(box, sl_vec2_make(10.0f, 0.0f)));
+    SL_EXPECT(sl_aabb_contains_point(box, sl_vec2_make(5.0f, 5.0f)));
+
+    /* Just outside each of two edges. */
+    SL_EXPECT(!sl_aabb_contains_point(box, sl_vec2_make(-0.001f, 5.0f)));
+    SL_EXPECT(!sl_aabb_contains_point(box, sl_vec2_make(5.0f, 10.001f)));
+
+    /* NaN components read as outside. */
+    SL_EXPECT(!sl_aabb_contains_point(box, sl_vec2_make(NAN, 5.0f)));
+    SL_EXPECT(!sl_aabb_contains_point(box, sl_vec2_make(5.0f, NAN)));
+}
+
+static void test_aabb_is_valid_rejects_inverted_or_non_finite(void)
+{
+    SL_EXPECT(sl_aabb_is_valid(
+        sl_aabb_make(sl_vec2_make(-1.0f, -2.0f), sl_vec2_make(3.0f, 4.0f))));
+    /* A point is a valid zero-area box. */
+    SL_EXPECT(sl_aabb_is_valid(
+        sl_aabb_make(sl_vec2_make(1.0f, 1.0f), sl_vec2_make(1.0f, 1.0f))));
+
+    /* Inverted on one axis each. */
+    SL_EXPECT(!sl_aabb_is_valid(
+        sl_aabb_make(sl_vec2_make(3.0f, 0.0f), sl_vec2_make(-3.0f, 4.0f))));
+    SL_EXPECT(!sl_aabb_is_valid(
+        sl_aabb_make(sl_vec2_make(0.0f, 4.0f), sl_vec2_make(3.0f, -4.0f))));
+
+    /* Non-finite bounds. */
+    SL_EXPECT(!sl_aabb_is_valid(
+        sl_aabb_make(sl_vec2_make(NAN, 0.0f), sl_vec2_make(3.0f, 4.0f))));
+    SL_EXPECT(!sl_aabb_is_valid(
+        sl_aabb_make(sl_vec2_make(0.0f, 0.0f), sl_vec2_make(INFINITY, 4.0f))));
+}
+
+static void test_angle_wrap_identity_inside_range(void)
+{
+    /* In-range inputs pass through bitwise, both closed ends included:
+     * fmodf returns its first argument whenever |x| < y. */
+    SL_EXPECT(sl_angle_wrap(0.0f) == 0.0f);
+    SL_EXPECT(sl_angle_wrap(0.5f) == 0.5f);
+    SL_EXPECT(sl_angle_wrap(-1.25f) == -1.25f);
+    SL_EXPECT(sl_angle_wrap(SL_PI / 2.0f) == SL_PI / 2.0f);
+    SL_EXPECT(sl_angle_wrap(SL_PI) == SL_PI);
+    SL_EXPECT(sl_angle_wrap(-SL_PI) == -SL_PI);
+}
+
+static void test_angle_wrap_single_turn(void)
+{
+    SL_EXPECT_NEAR(sl_angle_wrap(2.5f * SL_PI), 0.5f * SL_PI, SL_TEST_EPS);
+    SL_EXPECT_NEAR(sl_angle_wrap(-2.5f * SL_PI), -0.5f * SL_PI, SL_TEST_EPS);
+    SL_EXPECT_NEAR(sl_angle_wrap(2.0f * SL_PI), 0.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(sl_angle_wrap(-6.0f * SL_PI), 0.0f, SL_TEST_EPS);
+}
+
+static void test_angle_wrap_many_turns(void)
+{
+    /* Deep in the multi-turn regime fmodf reduces first; by then
+     * 100*pi carries ~1e-4 of representation error from the argument
+     * itself, so the tolerance pins reduction, not trigonometry. */
+    SL_EXPECT_NEAR(sl_angle_wrap(100.0f * SL_PI + 0.5f), 0.5f, 1e-4f);
+    SL_EXPECT_NEAR(sl_angle_wrap(-100.0f * SL_PI + 0.5f), 0.5f, 1e-4f);
+}
+
 static void test_mat2_identity(void)
 {
     sl_mat2 id = sl_mat2_identity();
@@ -210,6 +393,26 @@ static const sl_test_case k_cases[] = {
     { "vec2_perp_is_orthogonal_ccw", test_vec2_perp_is_orthogonal_ccw },
     { "vec2_lerp_endpoints", test_vec2_lerp_endpoints },
     { "vec2_distance", test_vec2_distance },
+    { "vec2_min_max_componentwise", test_vec2_min_max_componentwise },
+    { "vec2_distance_sq_matches_distance",
+      test_vec2_distance_sq_matches_distance },
+    { "rotation_identity_is_exact", test_rotation_identity_is_exact },
+    { "rotation_make_matches_mat2_rotation",
+      test_rotation_make_matches_mat2_rotation },
+    { "rotation_apply_inverse_roundtrip",
+      test_rotation_apply_inverse_roundtrip },
+    { "transform_apply_rotates_then_translates",
+      test_transform_apply_rotates_then_translates },
+    { "transform_apply_inverse_roundtrip",
+      test_transform_apply_inverse_roundtrip },
+    { "aabb_contains_point_boundary_inclusive",
+      test_aabb_contains_point_boundary_inclusive },
+    { "aabb_is_valid_rejects_inverted_or_non_finite",
+      test_aabb_is_valid_rejects_inverted_or_non_finite },
+    { "angle_wrap_identity_inside_range",
+      test_angle_wrap_identity_inside_range },
+    { "angle_wrap_single_turn", test_angle_wrap_single_turn },
+    { "angle_wrap_many_turns", test_angle_wrap_many_turns },
     { "mat2_identity", test_mat2_identity },
     { "mat2_multiply_operand_order", test_mat2_multiply_operand_order },
     { "mat2_rotation_90deg", test_mat2_rotation_90deg },
