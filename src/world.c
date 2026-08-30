@@ -84,6 +84,45 @@ static bool body_type_valid(sl_body_type type)
            type == SL_BODY_STATIC;
 }
 
+/* Validates caller-owned shape data, then rebuilds it from only the live
+ * fields into a zeroed record. Persistent world state therefore never
+ * inherits inactive union bytes or an unused polygon vertex tail. */
+static bool shape_canonicalize(const sl_shape *shape, sl_shape *out)
+{
+    SL_ASSERT(out != NULL);
+
+    if (shape == NULL) {
+        *out = sl_shape_none();
+        return true;
+    }
+    if (!sl_shape_is_valid(shape)) {
+        return false;
+    }
+
+    sl_shape canonical = sl_shape_none();
+    switch (shape->kind) {
+    case SL_SHAPE_NONE:
+        break;
+    case SL_SHAPE_CIRCLE:
+        canonical.kind = SL_SHAPE_CIRCLE;
+        canonical.circle.radius = shape->circle.radius;
+        break;
+    case SL_SHAPE_POLYGON:
+        canonical.kind = SL_SHAPE_POLYGON;
+        canonical.polygon.count = shape->polygon.count;
+        for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+            canonical.polygon.vertices[i] = shape->polygon.vertices[i];
+        }
+        break;
+    default:
+        SL_ASSERT(false);
+        return false;
+    }
+
+    *out = canonical;
+    return true;
+}
+
 /* Inertia about the body origin: finite, non-negative, with a
  * representable inverse unless it is the zero (infinite) encoding. */
 static bool body_inertia_valid(float inertia)
@@ -141,9 +180,6 @@ static bool body_desc_valid(const sl_body_desc *desc)
         return false;
     }
     if (!sl_is_finite(desc->angle) || !sl_is_finite(desc->angular_velocity)) {
-        return false;
-    }
-    if (desc->shape != NULL && !sl_shape_is_valid(desc->shape)) {
         return false;
     }
     return true;
@@ -300,17 +336,20 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
     SL_ASSERT(world != NULL);
     SL_ASSERT(desc != NULL);
 
-    /* Descriptor first: body_inertia_for measures the shape, walking
-     * polygon.count vertices, so the record has to clear
-     * sl_shape_is_valid before it is touched -- a tampered count read
-     * here would run off the end of the vertex array. */
+    /* Descriptor state first, before consuming a slot. */
     if (!body_desc_valid(desc) || world->free_count == 0u) {
+        return sl_body_handle_null();
+    }
+    /* Canonicalization validates before copying active polygon vertices,
+     * so a tampered count cannot read past the fixed vertex array. */
+    sl_shape shape;
+    if (!shape_canonicalize(desc->shape, &shape)) {
         return sl_body_handle_null();
     }
     /* Derived inertia is validated before any slot is consumed, so a
      * rejection here leaves the pool untouched. */
     const float inertia = (desc->type == SL_BODY_DYNAMIC)
-                              ? body_inertia_for(desc->mass, desc->shape)
+                              ? body_inertia_for(desc->mass, &shape)
                               : 0.0f;
     if (!body_inertia_valid(inertia)) {
         return sl_body_handle_null();
@@ -339,8 +378,7 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
     body_write_inertia(world, dense, inertia);
 
     world->types[dense] = (uint8_t)desc->type;
-    world->shapes[dense] =
-        (desc->shape != NULL) ? *desc->shape : sl_shape_none();
+    world->shapes[dense] = shape;
 
     return handle_for(world, dense);
 }
@@ -652,8 +690,8 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
 
-    const sl_shape record = (shape != NULL) ? *shape : sl_shape_none();
-    if (!sl_shape_is_valid(&record)) {
+    sl_shape record;
+    if (!shape_canonicalize(shape, &record)) {
         return false;
     }
 
