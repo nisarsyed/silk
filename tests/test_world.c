@@ -59,8 +59,9 @@ static void test_create_roundtrips_state(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(1.5f, -2.5f),
-                          sl_vec2_make(10.0f, -20.0f), 4.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(1.5f, -2.5f),
+                          .velocity = sl_vec2_make(10.0f, -20.0f),
+                          .mass = 4.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(!sl_body_handle_is_null(h));
     SL_EXPECT(sl_world_body_is_valid(&world, h));
@@ -75,7 +76,39 @@ static void test_create_roundtrips_state(void)
     SL_EXPECT(sl_world_body_get_mass(&world, h) == 4.0f);
     SL_EXPECT_NEAR(sl_world_body_get_inv_mass(&world, h), 0.25f, k_eps);
 
+    /* Appended descriptor fields zero-fill to: dynamic, upright, at
+     * rest, point particle. */
+    SL_EXPECT(sl_world_body_get_type(&world, h) == SL_BODY_DYNAMIC);
+    SL_EXPECT(sl_world_body_get_angle(&world, h) == 0.0f);
+    SL_EXPECT(sl_world_body_get_angular_velocity(&world, h) == 0.0f);
+    SL_EXPECT(sl_world_body_get_inertia(&world, h) == 0.0f);
+    SL_EXPECT(sl_world_body_get_inv_inertia(&world, h) == 0.0f);
+    SL_EXPECT(sl_world_body_get_torque(&world, h) == 0.0f);
+    SL_EXPECT(sl_world_body_get_shape(&world, h)->kind == SL_SHAPE_NONE);
+    const sl_transform tf = sl_world_body_get_transform(&world, h);
+    SL_EXPECT(tf.position.x == 1.5f && tf.position.y == -2.5f);
+    SL_EXPECT(tf.rotation.c == 1.0f && tf.rotation.s == 0.0f);
+
     sl_world_destroy(&world);
+}
+
+/* The world's arena is bounded by contract: at the population cap it
+ * stays inside a 10 MiB budget (141 bytes per body plus slice padding),
+ * and out-of-range capacities report zero bytes rather than guessing. */
+static void test_memory_bytes_at_capacity_max_within_budget(void)
+{
+    const size_t worst = sl_world_memory_bytes(SL_BODY_COUNT_MAX);
+    SL_EXPECT(worst > 0u);
+    SL_EXPECT(worst <= (size_t)10u << 20);
+
+    SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(0u), 0);
+    SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(SL_BODY_COUNT_MAX + 1u), 0);
+
+    /* A tiny world allocates plausibly more than its raw payload but
+     * nothing extravagant. */
+    const size_t small = sl_world_memory_bytes(4u);
+    SL_EXPECT(small >= 4u * 141u);
+    SL_EXPECT(small <= 4u * 141u + 256u);
 }
 
 static void test_create_rejects_non_finite_state(void)
@@ -84,8 +117,9 @@ static void test_create_rejects_non_finite_state(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc base = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          1.0f };
+    sl_body_desc base = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 1.0f };
 
     sl_body_desc nan_x = base;
     nan_x.position.x = NAN;
@@ -115,8 +149,9 @@ static void test_create_rejects_non_positive_mass(void)
 
     const float bad_masses[] = { 0.0f, -1.0f, NAN, INFINITY };
     for (uint32_t i = 0u; i < 4u; ++i) {
-        sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f),
-                              sl_vec2_make(0.0f, 0.0f), bad_masses[i] };
+        sl_body_desc desc = { .position = sl_vec2_make(0.0f, 0.0f),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = bad_masses[i] };
         SL_EXPECT(sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
     }
 
@@ -131,13 +166,15 @@ static void test_create_rejects_inverse_overflow(void)
     SL_EXPECT(sl_world_init(&world, &config));
 
     /* Positive and finite, but 1 / m overflows float: still rejected. */
-    sl_body_desc tiny = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          1e-40f };
+    sl_body_desc tiny = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 1e-40f };
     SL_EXPECT(sl_body_handle_is_null(sl_world_body_create(&world, &tiny)));
 
     /* Small-but-sound masses are accepted. */
-    sl_body_desc small = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                           1e-35f };
+    sl_body_desc small = { .position = sl_vec2_make(0.0f, 0.0f),
+                           .velocity = sl_vec2_make(0.0f, 0.0f),
+                           .mass = 1e-35f };
     sl_body_handle h = sl_world_body_create(&world, &small);
     SL_EXPECT(!sl_body_handle_is_null(h));
 
@@ -151,15 +188,17 @@ static void test_fill_to_capacity(void)
     SL_EXPECT(sl_world_init(&world, &config));
 
     for (uint32_t i = 0u; i < 3u; ++i) {
-        sl_body_desc desc = { sl_vec2_make((float)i, 0.0f),
-                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        sl_body_desc desc = { .position = sl_vec2_make((float)i, 0.0f),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = 1.0f };
         sl_body_handle h = sl_world_body_create(&world, &desc);
         SL_EXPECT(!sl_body_handle_is_null(h));
         SL_EXPECT_INT_EQ(sl_world_body_count(&world), i + 1u);
     }
 
-    sl_body_desc extra = { sl_vec2_make(99.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                           1.0f };
+    sl_body_desc extra = { .position = sl_vec2_make(99.0f, 0.0f),
+                           .velocity = sl_vec2_make(0.0f, 0.0f),
+                           .mass = 1.0f };
     SL_EXPECT(sl_body_handle_is_null(sl_world_body_create(&world, &extra)));
     SL_EXPECT_INT_EQ(sl_world_body_count(&world), 3);
 
@@ -172,8 +211,9 @@ static void test_destroy_invalidates_handle(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          1.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 1.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(sl_world_body_is_valid(&world, h));
 
@@ -190,8 +230,9 @@ static void test_destroy_tolerates_bad_handles(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          1.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 1.0f };
 
     /* Null, malformed, and unknown-slot handles: silent no-ops. */
     sl_world_body_destroy(&world, sl_body_handle_null());
@@ -222,8 +263,9 @@ static void test_slot_reuse_bumps_generation(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          1.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 1.0f };
 
     sl_body_handle first = sl_world_body_create(&world, &desc);
     SL_EXPECT_INT_EQ(first.generation, 1u);
@@ -247,8 +289,9 @@ static void test_arrays_stay_packed_on_middle_destroy(void)
 
     sl_body_handle handles[4];
     for (uint32_t i = 0u; i < 4u; ++i) {
-        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
-                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        sl_body_desc desc = { .position = sl_vec2_make((float)(i + 1u), 0.0f),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = 1.0f };
         handles[i] = sl_world_body_create(&world, &desc);
         SL_EXPECT(!sl_body_handle_is_null(handles[i]));
     }
@@ -284,8 +327,9 @@ static void test_traversal_visits_each_body_once(void)
     SL_EXPECT(sl_body_handle_is_null(sl_world_body_first(&world)));
 
     for (uint32_t i = 0u; i < 8u; ++i) {
-        sl_body_desc desc = { sl_vec2_make((float)i, (float)-i),
-                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        sl_body_desc desc = { .position = sl_vec2_make((float)i, (float)-i),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = 1.0f };
         SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
     }
 
@@ -314,8 +358,9 @@ static void test_destroy_during_traversal_visits_each_once(void)
     SL_EXPECT(sl_world_init(&world, &config));
 
     for (uint32_t i = 0u; i < 4u; ++i) {
-        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
-                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        sl_body_desc desc = { .position = sl_vec2_make((float)(i + 1u), 0.0f),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = 1.0f };
         SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
     }
 
@@ -349,8 +394,9 @@ static void test_partial_cull_during_traversal(void)
     SL_EXPECT(sl_world_init(&world, &config));
 
     for (uint32_t i = 0u; i < 4u; ++i) {
-        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
-                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        sl_body_desc desc = { .position = sl_vec2_make((float)(i + 1u), 0.0f),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = 1.0f };
         SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
     }
 
@@ -387,8 +433,9 @@ static void test_at_matches_handle_traversal(void)
     SL_EXPECT(sl_world_init(&world, &config));
 
     for (uint32_t i = 0u; i < 6u; ++i) {
-        sl_body_desc desc = { sl_vec2_make((float)(i + 1u), 0.0f),
-                              sl_vec2_make(0.0f, 0.0f), 1.0f };
+        sl_body_desc desc = { .position = sl_vec2_make((float)(i + 1u), 0.0f),
+                              .velocity = sl_vec2_make(0.0f, 0.0f),
+                              .mass = 1.0f };
         SL_EXPECT(!sl_body_handle_is_null(sl_world_body_create(&world, &desc)));
     }
     /* Remove one mid-pack so the two APIs must agree across a swap. */
@@ -423,8 +470,9 @@ static void test_reset_invalidates_and_refills(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          1.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 1.0f };
     sl_body_handle before[4];
     for (uint32_t i = 0u; i < 4u; ++i) {
         before[i] = sl_world_body_create(&world, &desc);
@@ -453,8 +501,9 @@ static void test_set_mass_updates_inv_mass(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(0.0f, 0.0f), sl_vec2_make(0.0f, 0.0f),
-                          2.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(0.0f, 0.0f),
+                          .velocity = sl_vec2_make(0.0f, 0.0f),
+                          .mass = 2.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
 
     SL_EXPECT(sl_world_body_set_mass(&world, h, 5.0f));
@@ -478,8 +527,9 @@ static void test_setters_roundtrip(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(1.0f, 2.0f), sl_vec2_make(3.0f, 4.0f),
-                          1.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(1.0f, 2.0f),
+                          .velocity = sl_vec2_make(3.0f, 4.0f),
+                          .mass = 1.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
 
     SL_EXPECT(
@@ -502,8 +552,9 @@ static void test_setters_report_rejected_values(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    sl_body_desc desc = { sl_vec2_make(1.0f, 2.0f), sl_vec2_make(3.0f, 4.0f),
-                          1.0f };
+    sl_body_desc desc = { .position = sl_vec2_make(1.0f, 2.0f),
+                          .velocity = sl_vec2_make(3.0f, 4.0f),
+                          .mass = 1.0f };
     sl_body_handle h = sl_world_body_create(&world, &desc);
 
     SL_EXPECT(!sl_world_body_set_position(&world, h, sl_vec2_make(NAN, 0.0f)));
@@ -578,9 +629,10 @@ static void test_churn_stress_matches_model(void)
         } else if (roll <= 11u) {
             /* Create: outcome must agree with the model's occupancy. The
              * payload carries its ordinal for later verification. */
-            sl_body_desc desc = { sl_vec2_make((float)next_tag,
-                                               (float)(-next_tag)),
-                                  sl_vec2_make(0.0f, 0.0f), 1.0f };
+            sl_body_desc desc = { .position = sl_vec2_make((float)next_tag,
+                                                           (float)(-next_tag)),
+                                  .velocity = sl_vec2_make(0.0f, 0.0f),
+                                  .mass = 1.0f };
             sl_body_handle h = sl_world_body_create(&world, &desc);
             if (live == CHURN_CAPACITY) {
                 counts_match = counts_match && sl_body_handle_is_null(h);
@@ -647,6 +699,8 @@ static const sl_test_case k_cases[] = {
     { "init_destroy_roundtrip", test_init_destroy_roundtrip },
     { "init_rejects_bad_capacity", test_init_rejects_bad_capacity },
     { "create_roundtrips_state", test_create_roundtrips_state },
+    { "memory_bytes_at_capacity_max_within_budget",
+      test_memory_bytes_at_capacity_max_within_budget },
     { "create_rejects_non_finite_state", test_create_rejects_non_finite_state },
     { "create_rejects_non_positive_mass",
       test_create_rejects_non_positive_mass },

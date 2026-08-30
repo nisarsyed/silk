@@ -34,7 +34,7 @@ and rotational integration — everything Phase 3 collision consumes.
 
 - [x] Math: rotation, transform, AABB primitives, angle wrap
 - [x] 2D shapes & geometry: circle + convex polygon shapes, mass properties, point/ray queries
-- [ ] Rigid-body state: body types (static/kinematic), angular state, shape attachment, rotational integration
+- [x] Rigid-body state: body types (static/kinematic), angular state, shape attachment, rotational integration
 - [ ] Sandbox: shaped bodies, static ground, engine picking
 
 ## Phase Progression

@@ -17,16 +17,30 @@ extern "C" {
 
 /* Advances the simulation by exactly one fixed step of dt seconds:
  *
- *     v <- (v + (gravity + f/m) * dt) / (1 + dt * linear_drag)
- *     p <- p + v * dt
+ *     dynamic:    v <- (v + (gravity + f/m) * dt) / (1 + dt * linear_drag)
+ *                 w <- (w + t/I * dt)           / (1 + dt * angular_drag)
+ *     kinematic:  v, w unchanged
+ *     static:     v, w are zero and stay zero
+ *     all:        p <- p + v * dt
+ *                 a <- wrap(a + w * dt)          (a stored in [-pi, pi])
+ *                 f <- 0, t <- 0
  *
- * Semi-implicit Euler — position uses the post-drag velocity. The drag
- * form divides instead of subtracting, so any drag >= 0 stays stable.
- * Integration neither clamps nor saturates: force, velocity, and
- * gravity magnitudes must stay within float range across a step, or
- * state overflows. dt is THE fixed timestep and must be identical
- * across the calls of a run; timing policy lives above this function.
- * Consumed forces clear. */
+ * Semi-implicit Euler -- position uses the post-drag velocity. The drag
+ * forms divide instead of subtracting, so any drag >= 0 stays stable.
+ * Body type gates gravity and both drags only; the remaining
+ * differences are world invariants (non-dynamic rows carry
+ * inv_mass = inv_inertia = 0 and empty accumulators, static rows carry
+ * zero velocities), which integration neither reads nor disturbs.
+ * Angular drag gates on body type, not inertia: a dynamic body with
+ * infinite rotational inertia still damps toward zero spin.
+ * Integration neither clamps nor saturates: force, torque, velocity,
+ * angular velocity, and gravity magnitudes are expected to stay within
+ * float range across a step. A row whose integration overflows anyway
+ * is not committed -- the body holds its previous velocity, spin,
+ * position and angle -- because the alternative is storing infinity, or
+ * a NaN angle once wrapping an infinite one, as ordinary state. dt is THE fixed
+ * timestep and must be identical across the calls of a run; timing policy lives
+ * above this function. Consumed forces and torques clear. */
 void sl_world_step(sl_world *world, float dt);
 
 typedef struct sl_stepper {
@@ -39,7 +53,7 @@ typedef struct sl_stepper {
 bool sl_stepper_init(sl_stepper *stepper, float timestep);
 
 /* Accumulates frame_time seconds and runs floor((remainder +
- * frame_time) / timestep) fixed steps, capped at SL_STEP_COUNT_MAX —
+ * frame_time) / timestep) fixed steps, capped at SL_STEP_COUNT_MAX --
  * leftover beyond the cap is dropped, never carried. stepper must come
  * from sl_stepper_init first. Non-finite or negative frame_time reads
  * as 0. Returns the number of steps executed.

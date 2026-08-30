@@ -6,6 +6,7 @@
 int sl_core_suite(void);
 int sl_math_suite(void);
 int sl_shape_suite(void);
+int sl_body_suite(void);
 int sl_world_suite(void);
 int sl_step_suite(void);
 
