@@ -1,12 +1,13 @@
 /* silk sandbox -- interactive debug playground.
  *
- * World space == screen space: pixels, origin top-left, +y down.
- * Gravity is +y. 100 px = 1 m, so gravity is 981 px/s^2. In this frame
- * a math-CCW polygon draws clockwise and positive angles turn clockwise
- * on screen; the engine is frame-agnostic, and sl_shape_make_box
- * produces canonical CCW input so hand-ordered points are never needed.
- * raylib culls back faces and calls counter-clockwise front, so filled
- * polygons are emitted in reverse -- see sb_polygon_points.
+ * Simulation lengths are metres; rendering scales them at 100 px/m.
+ * The simulation and screen both use origin top-left and +y down, so
+ * gravity is +9.81 m/s^2. In this frame a math-CCW polygon draws clockwise
+ * and positive angles turn clockwise on screen; the engine is frame-
+ * agnostic, and sl_shape_make_box produces canonical CCW input so hand-
+ * ordered points are never needed. raylib culls back faces and calls
+ * counter-clockwise front, so filled polygons are emitted in reverse --
+ * see sb_polygon_points.
  *
  * Controls:
  *   left-drag on empty space   spawn a body, release to launch
@@ -51,8 +52,10 @@
 /* Committed PRNG seed; identical default scene on every launch. */
 #define SB_RNG_SEED 0x9E3779B9u
 
-/* Gravity in screen space: 9.81 m/s^2 at 100 px per metre. */
-static const sl_vec2 k_sb_gravity = { 0.0f, 981.0f };
+/* Simulation values stay near unity for float resolution and future
+ * contact tolerances; pixels exist only at the input/render boundary. */
+static const float k_sb_pixels_per_metre = 100.0f;
+static const sl_vec2 k_sb_gravity = { 0.0f, 9.81f }; /* metres / second^2 */
 
 static const float k_sb_timestep = 1.0f / 60.0f; /* seconds */
 
@@ -62,13 +65,14 @@ static const float k_sb_timestep = 1.0f / 60.0f; /* seconds */
 static const float k_sb_linear_drag = 0.1f;  /* 1 / seconds */
 static const float k_sb_angular_drag = 0.1f; /* 1 / seconds */
 
-/* Areal density: 1 kg of anything spreads over the area of an 18 px
+/* Areal density: 1 kg of anything spreads over the area of a 0.18 m
  * circle, preserving the historical visual scale across shapes --
- * rho = 1 / (pi * 18^2) kg/px^2. Circle radius r = sqrt(m/(rho*pi)),
+ * rho = 1 / (pi * 0.18^2) kg/m^2. Circle radius r = sqrt(m/(rho*pi)),
  * box side s = sqrt(m/rho): equal areas, s ~= 1.772 * r. Default
- * masses span [1, 5] kg: circles span [18, 40] px, boxes [32, 71]. */
+ * masses span [1, 5] kg: circle radii span [0.18, 0.40] m and box sides
+ * span [0.32, 0.71] m. */
 static const float k_sb_areal_density =
-    1.0f / (SL_PI * 18.0f * 18.0f); /* kilograms / px^2 */
+    1.0f / (SL_PI * 0.18f * 0.18f); /* kilograms / metre^2 */
 
 static float sb_spawn_radius(float mass)
 {
@@ -81,22 +85,22 @@ static float sb_spawn_half_side(float mass)
 }
 
 /* Tether spring, applied once per executed step: at the default-scene
- * mean mass near 3 kg, a ~200 px offset yields ~1000 px/s^2, one
- * gravity-equivalent, which tracks the cursor without whipping at
- * 60 Hz alongside the drag above. Applied through
+ * mean mass near 3 kg, a ~2 m offset yields ~10 m/s^2, one gravity-
+ * equivalent, which tracks the cursor without whipping at 60 Hz
+ * alongside the drag above. Applied through
  * sl_world_body_apply_force_at_point at the stored grab point, so
  * off-center holds visibly torque the body. */
-static const float k_sb_tether_gain = 15.0f; /* N per px of offset */
+static const float k_sb_tether_gain = 15.0f; /* N per metre of offset */
 
-/* Slingshot: 1 px of drag buys 6 px/s of launch speed, capped so a
+/* Slingshot: 1 m of drag buys 6 m/s of launch speed, capped so a
  * full-window fling stays well inside float-safe integration bounds. */
-static const float k_sb_launch_gain = 6.0f;         /* (px/s) per px */
-static const float k_sb_launch_speed_max = 1500.0f; /* px/s */
+static const float k_sb_launch_gain = 6.0f;       /* (m/s) per metre */
+static const float k_sb_launch_speed_max = 15.0f; /* metres / second */
 
 /* Grab radius around the body origin, for probes the shape test cannot
  * catch: shapeless point particles, and pointer slop on a body smaller
  * than the cursor is precise. */
-static const float k_sb_pick_slack = 12.0f; /* px */
+static const float k_sb_pick_slack = 0.12f; /* metres */
 
 typedef enum sb_spawn_kind { SB_SPAWN_CIRCLE = 0, SB_SPAWN_BOX } sb_spawn_kind;
 
@@ -112,13 +116,13 @@ typedef struct sb_app {
                                  * frozen at press so the pull follows
                                  * the rotating body */
     bool sling_armed;
-    sl_vec2 press_point; /* slingshot origin, px */
+    sl_vec2 press_point; /* slingshot origin, metres */
     float sling_mass;    /* kilograms, rolled at press so the ghost
                           * preview draws the real launch size */
 
     sb_spawn_kind spawn_kind;
 
-    sl_vec2 cursor;       /* mouse position, px */
+    sl_vec2 cursor;       /* mouse position, metres */
     sl_vec2 tether_force; /* most recent applied force, for the arrow */
 
     bool paused;
@@ -151,8 +155,19 @@ static float sb_rng_range(float lo, float hi)
 
 static Vector2 sb_to_raylib(sl_vec2 v)
 {
-    Vector2 out = { v.x, v.y };
+    Vector2 out = { v.x * k_sb_pixels_per_metre, v.y * k_sb_pixels_per_metre };
     return out;
+}
+
+static sl_vec2 sb_from_raylib(Vector2 v)
+{
+    return sl_vec2_make(v.x / k_sb_pixels_per_metre,
+                        v.y / k_sb_pixels_per_metre);
+}
+
+static float sb_length_to_pixels(float length)
+{
+    return length * k_sb_pixels_per_metre;
 }
 
 static bool sb_handle_eq(sl_body_handle a, sl_body_handle b)
@@ -182,10 +197,10 @@ static void sb_spawn_default_scene(sl_world *world)
 {
     for (uint32_t i = 0u; i < 32u; ++i) {
         sl_body_desc desc = { 0 };
-        desc.position.x = sb_rng_range(96.0f, 1184.0f);
-        desc.position.y = sb_rng_range(64.0f, 320.0f);
-        desc.velocity.x = sb_rng_range(-90.0f, 90.0f);
-        desc.velocity.y = sb_rng_range(-30.0f, 60.0f);
+        desc.position.x = sb_rng_range(0.96f, 11.84f);
+        desc.position.y = sb_rng_range(0.64f, 3.2f);
+        desc.velocity.x = sb_rng_range(-0.9f, 0.9f);
+        desc.velocity.y = sb_rng_range(-0.3f, 0.6f);
         desc.mass = sb_rng_range(1.0f, 5.0f);
         desc.angle = sb_rng_range(-SL_PI, SL_PI);
         desc.angular_velocity = sb_rng_range(-3.0f, 3.0f);
@@ -204,15 +219,15 @@ static void sb_spawn_default_scene(sl_world *world)
 
 static void sb_spawn_ground(sl_world *world)
 {
-    /* Static preview floor: spans the window, top edge at y = 680, so
+    /* Static preview floor: spans the window, top edge at y = 6.8 m, so
      * falling bodies visibly pass through it until collision lands. */
     sl_shape slab = sl_shape_none();
-    const bool made = sl_shape_make_box(640.0f, 20.0f, &slab);
+    const bool made = sl_shape_make_box(6.4f, 0.2f, &slab);
     SL_ASSERT(made);
     (void)made;
 
     sl_body_desc desc = { 0 };
-    desc.position = sl_vec2_make(640.0f, 700.0f);
+    desc.position = sl_vec2_make(6.4f, 7.0f);
     desc.mass = 0.0f;
     desc.type = SL_BODY_STATIC;
     desc.shape = &slab;
@@ -303,7 +318,7 @@ static void sb_apply_tether_for_step(sb_app *app);
 static void sb_handle_input(sb_app *app)
 {
     const Vector2 mouse = GetMousePosition();
-    app->cursor = sl_vec2_make(mouse.x, mouse.y);
+    app->cursor = sb_from_raylib(mouse);
 
     if (IsKeyPressed(KEY_SPACE)) {
         app->paused = !app->paused;
@@ -418,7 +433,7 @@ static void sb_cull_fallen(sb_app *app)
 {
     /* Margin below the view edge: bodies despawn only after fully
      * leaving sight. */
-    const float kill_y = (float)SB_SCREEN_HEIGHT + 64.0f; /* px */
+    const float kill_y = 7.84f; /* metres: view height plus 0.64 m */
 
     for (uint32_t row = 0u; row < sl_world_body_count(&app->world);) {
         const sl_body_handle body = sl_world_body_at(&app->world, row);
@@ -487,9 +502,9 @@ static void sb_draw_bodies(const sb_app *app)
         }
 
         if (shape->kind == SL_SHAPE_CIRCLE) {
-            DrawCircleV(sb_to_raylib(pos), shape->circle.radius, fill);
-            DrawCircleLinesV(sb_to_raylib(pos), shape->circle.radius,
-                             DARKBROWN);
+            const float radius = sb_length_to_pixels(shape->circle.radius);
+            DrawCircleV(sb_to_raylib(pos), radius, fill);
+            DrawCircleLinesV(sb_to_raylib(pos), radius, DARKBROWN);
             /* Radius tick makes spin visible on a rotation-invariant
              * circle. */
             const sl_vec2 tip = sl_vec2_add(
@@ -519,9 +534,9 @@ static void sb_draw_forces(const sb_app *app)
     const sl_transform tf =
         sl_world_body_get_transform(&app->world, app->tether_body);
     const sl_vec2 grab_world = sl_transform_apply(tf, app->grab_local);
-    /* Arrow length: 0.03 px per N, capped so extreme tethers stay
+    /* Arrow length: 0.03 m per N, capped at 1.4 m so extreme tethers stay
      * readable. Drawn from the grab point, where the force lands. */
-    const float length = sl_min(magnitude * 0.03f, 140.0f);
+    const float length = sl_min(magnitude * 0.03f, 1.4f);
     const sl_vec2 tip = sl_vec2_add(
         grab_world,
         sl_vec2_scale(sl_vec2_normalize(app->tether_force), length));
@@ -543,7 +558,7 @@ static void sb_draw_interactions(const sb_app *app)
         sb_make_spawn_shape(app->spawn_kind, app->sling_mass, &ghost);
         if (ghost.kind == SL_SHAPE_CIRCLE) {
             DrawCircleLinesV(sb_to_raylib(app->press_point),
-                             ghost.circle.radius, GRAY);
+                             sb_length_to_pixels(ghost.circle.radius), GRAY);
         } else {
             Vector2 points[SL_POLYGON_VERTEX_COUNT_MAX + 1u];
             const sl_transform at_press =
