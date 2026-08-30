@@ -30,6 +30,13 @@
             }
         },
         {
+            "name": "windows",
+            "displayName": "Windows (MSVC)",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/windows"
+        },
+        {
             "name": "sandbox",
             "displayName": "Raylib Sandbox",
             "inherits": "debug",
@@ -62,6 +69,11 @@
             "configurePreset": "sanitize"
         },
         {
+            "name": "windows",
+            "configurePreset": "windows",
+            "configuration": "Debug"
+        },
+        {
             "name": "sandbox",
             "configurePreset": "sandbox"
         },
@@ -88,6 +100,14 @@
         {
             "name": "sanitize",
             "configurePreset": "sanitize",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "windows",
+            "configurePreset": "windows",
+            "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
             }

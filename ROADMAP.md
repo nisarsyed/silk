@@ -1,6 +1,8 @@
 # Silk — Roadmap
 
-Living document, updated as milestones land. It records direction, not dates or commitments. Design principles and coding law live in [AGENTS.md](AGENTS.md).
+Living document, updated as milestones land. It records direction, not dates or
+commitments. Engineering principles and contribution policy live in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Status:** Phase 3 · 2D rigid-body physics (next)
 
@@ -9,11 +11,11 @@ Living document, updated as milestones land. It records direction, not dates or 
 | Concern | Direction |
 | --- | --- |
 | Language | C17, portable ISO C only (`C_EXTENSIONS OFF`) |
-| Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` / `sandbox` presets |
-| Toolchain | Clang + GCC on Linux/macOS CI; warnings-as-errors on the core |
+| Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` / `windows` / `sandbox` / `sandbox-release` presets |
+| Toolchain | GCC + Clang on Linux CI; Clang on macOS CI; MSVC on Windows CI; warnings-as-errors on the core |
 | Dependencies | None in the core; raylib linked only by the sandbox example |
 | API | `sl_` prefix, snake_case; SoA simulation state; generational body handles |
-| Simulation | Fixed-timestep accumulator (default 1/60 s), semi-implicit Euler, gravity + drag; deterministic fixed timestep |
+| Simulation | Caller-selected fixed timestep (sandbox: 1/60 s), bounded accumulator, semi-implicit Euler, gravity + drag; deterministic for a fixed call sequence |
 | Tests | Hand-rolled framework (`tests/silk_test.h`), CTest-integrated; seeded deterministic PRNGs only |
 | License | MIT |
 
@@ -44,8 +46,8 @@ Condensed from the technical specification. Near-term phases stay itemized; late
 | Phase | Theme | Scope |
 | --- | --- | --- |
 | 1 | Foundation | Milestone 1 above |
-| 2 | Basic simulation *(current)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
-| 3 | 2D rigid-body physics | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
+| 2 | Basic simulation *(complete)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
+| 3 | 2D rigid-body physics *(next)* | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
 | 4 | 2D engine maturity | Determinism hardening; memory & data-oriented optimization; debug rendering; profiling & benchmarking; public engine API |
 | 5 | WebAssembly | WASM build target; C ↔ JavaScript API boundary; browser demo infrastructure & web debug visualization |
 | 6 | GPU foundation | GPU buffer/memory model; compute pipeline abstraction; GPU particle simulation as the first workload |

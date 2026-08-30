@@ -3,11 +3,27 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* All array slices are cut at multiples of 8 bytes -- the largest member
- * alignment in the world (pointers, sl_vec2, sl_body_slot) -- so carving
- * needs no per-type padding math and malloc's max_align_t guarantee
- * covers every slice. */
+/* malloc aligns the base for every fundamental type. Every carved type's
+ * alignment must divide 8, so advancing by 8-byte multiples preserves that
+ * alignment without per-type padding math. The gates below make this arena
+ * assumption fail at compile time on an incompatible ABI. */
 #define SL_CARVE_ALIGN ((size_t)8)
+
+#define SL_CARVE_ALIGNMENT_ASSERT(type)                                        \
+    _Static_assert(_Alignof(type) <= SL_CARVE_ALIGN &&                         \
+                       SL_CARVE_ALIGN % _Alignof(type) == 0u,                  \
+                   #type " alignment violates the arena contract")
+
+_Static_assert((SL_CARVE_ALIGN & (SL_CARVE_ALIGN - 1u)) == 0u,
+               "arena alignment must be a power of two");
+SL_CARVE_ALIGNMENT_ASSERT(sl_body_slot);
+SL_CARVE_ALIGNMENT_ASSERT(uint32_t);
+SL_CARVE_ALIGNMENT_ASSERT(sl_vec2);
+SL_CARVE_ALIGNMENT_ASSERT(float);
+SL_CARVE_ALIGNMENT_ASSERT(uint8_t);
+SL_CARVE_ALIGNMENT_ASSERT(sl_shape);
+
+#undef SL_CARVE_ALIGNMENT_ASSERT
 
 static size_t align_up(size_t bytes)
 {

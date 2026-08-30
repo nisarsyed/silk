@@ -456,9 +456,10 @@ static void set_mass_rejects_inertia_inverse_overflow(void)
 
     /* Sanity for the window itself: the mass stays representable while
      * its derived inertia's inverse overflows. */
-    SL_EXPECT(1.0f / 1e-38f < FLT_MAX);
-    SL_EXPECT(1.0f / (1e-38f / 6.0f) > FLT_MAX);
-    SL_EXPECT(!sl_world_body_set_mass(&world, h, 1e-38f));
+    volatile float tiny_mass = 1e-38f;
+    SL_EXPECT(1.0f / tiny_mass < FLT_MAX);
+    SL_EXPECT(1.0f / (tiny_mass / 6.0f) > FLT_MAX);
+    SL_EXPECT(!sl_world_body_set_mass(&world, h, tiny_mass));
     SL_EXPECT(sl_world_body_get_mass(&world, h) == old_mass);
     SL_EXPECT(sl_world_body_get_inertia(&world, h) == old_inertia);
     SL_EXPECT(sl_world_body_get_inv_inertia(&world, h) == old_inv_inertia);

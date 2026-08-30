@@ -1,63 +1,112 @@
 # AGENTS.md
 
-Agent guidance for `silk`: a portable, data-oriented physics/simulation engine in pure C17. Coding law: [TigerStyle](https://tigerstyle.dev/) (safety, performance, experience; spirit of NASA's Power of Ten).
+Operational instructions for agents modifying `silk`. The human-facing
+engineering and workflow policy lives in [CONTRIBUTING.md](CONTRIBUTING.md);
+this file repeats the constraints that must be available before any change.
+Project direction and non-goals live in [ROADMAP.md](ROADMAP.md).
 
-## Layout
+## Repository map
 
-`include/silk/` public headers · `src/` implementation · `tests/` self-contained test framework · `examples/sandbox/` demo app. Single static library target `silk::silk`, wired from the root `CMakeLists.txt`.
+`include/silk/` contains public headers, `src/` the implementation, `tests/`
+the self-contained test framework and suites, and `examples/sandbox/` the
+optional raylib demo. The root `CMakeLists.txt` defines the static library
+target `silk::silk`.
 
-## Build & test
+## Non-negotiable engine constraints
+
+- Use portable ISO C17 with `C_EXTENSIONS OFF`. Core engine code has no
+  third-party dependencies and must not use POSIX, GNU, or MSVC extensions;
+  build tooling and examples are exempt from the dependency rule.
+- Keep simulation deterministic and fixed-timestep. Never introduce wall-clock
+  time, uninitialized reads, or iteration-order-dependent floating-point work
+  into simulation results. Expect bitwise determinism only per platform and
+  build; use explicit tolerances for cross-platform numerical equivalence.
+- Never store NaN or infinity as ordinary simulation state. Validate external
+  floats before mutation. Use `sl_feq` or `SL_EXPECT_NEAR` for approximate
+  comparisons; use exact float equality only when exactness is the property
+  under test.
+- Keep bulk entity state SoA. AoS is acceptable for transient structures such
+  as contact manifolds when the whole record is consumed together.
+- Allocate runtime memory during initialization and keep simulation steps
+  allocation-free. Bound loops, counts, pools, queues, and work per step;
+  avoid recursion.
+- Preserve a path to SIMD, threading, GPU, and WASM, but do not add speculative
+  backends, rendering abstractions, generic containers, or dispatch layers.
+
+## Coding rules
+
+Apply [TigerStyle](https://tigerstyle.dev/) through these repository rules:
+
+- Keep interfaces small and deterministic. Prefer explicit data flow and a
+  plain success/failure result over unnecessary indirection or rich status
+  types. Use fixed-width integers for stored state and bounded counts.
+- In hot paths, avoid needless copies, keep access cache-friendly, and record
+  the expected memory/compute cost when a change materially affects layout or
+  complexity.
+- Prefix public APIs with `sl_` and use `snake_case`. Use established domain
+  abbreviations only (`vec2`, `mat2`). Give related names equal-length words
+  where practical so they align. Use big-endian naming:
+  `connection_count_max`, `vec2_length_sq`, and `SL_BODY_COUNT_MAX`.
+- Comments document contracts the type system cannot express: units, frames,
+  sign conventions, valid ranges, NaN behavior, lifetimes, and invariants.
+  Tuned constants need a derivation, source, or test that pins them.
+- Use `SL_ASSERT` for programmer errors and internal invariants. Validate
+  recoverable external input and return failure without partial mutation.
+  Assertion expressions must have no side effects, and code must remain
+  correct and warning-clean when `NDEBUG` removes them.
+- Treat the `silk_warnings` target in `CMakeLists.txt` as authoritative for the
+  warning set. Keep every first-party C target warning-clean; never weaken or
+  suppress a warning merely to pass CI.
+- When changing the version, update both `project(silk VERSION ...)` in
+  `CMakeLists.txt` and `SL_VERSION_{MAJOR,MINOR,PATCH}` in
+  `include/silk/silk.h`.
+
+## Build and verification
+
+The default local check is:
 
 ```sh
-cmake --preset debug         # configure (presets: debug, release, sanitize, sandbox); needs CMake >= 3.28
-cmake --build --preset debug # builds lib + tests; the sandbox builds under the sandbox preset
-ctest --preset debug         # or run ./build/debug/bin/sl_tests directly
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
 ```
 
-Formatting is clang-format (`.clang-format`, LLVM-based, 4-space indent); run `clang-format -i` on every touched C file before committing — CI checks formatting with a pinned clang-format version (22.1.3), so unformatted code fails the `format` job. Warning-clean compilation (below) is the quality gate, enforced by CI (GitHub Actions: gcc + clang on Linux, macOS, and an ASan+UBSan sanitizer job).
+Apply `clang-format` 22.1.3 to every touched `.c` and `.h` file. CI checks all
+first-party C sources and headers using the pinned version.
 
-## Hard constraints
+Run checks in proportion to the change:
 
-- **C17 with `C_EXTENSIONS OFF`**: portable ISO C only. No POSIX, no GNU/MSVC extensions, no third-party libraries — the core `silk` library has zero dependencies; build tooling and examples are exempt.
-- The `silk` library compiles with `-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Werror` (MSVC `/W4 /WX`). Only the lib target enforces this, but all engine code must stay warning-clean.
-- The version is duplicated: `project(silk VERSION ...)` in `CMakeLists.txt` and `SL_VERSION_{MAJOR,MINOR,PATCH}` in `include/silk/silk.h`. Bump both together.
-- Simulation must stay **deterministic, fixed-timestep**. Bulk entity state is SoA (struct-of-arrays); transient solver structures (e.g., contact manifolds) may be AoS when that is the natural fit. Never introduce wall-clock time, uninitialized reads, or iteration-order-dependent floating point into simulation results. Bitwise determinism holds per platform and build; cross-platform or future GPU results are held to numerical equivalence within explicit tolerances, not bit-identical floats.
-- Simulation state must remain **finite and numerically sound**: never store NaN or infinity as ordinary state, validate externally supplied floats, compare with explicit tolerances (`sl_feq`, `SL_EXPECT_NEAR`) — no exact float equality unless exactness is the property under test.
-- Design data layouts and APIs so future SIMD, threading, GPU, and WASM ports stay possible, but never introduce GPU or rendering abstractions speculatively — CPU correctness first.
+- Engine or test changes: run the debug build and tests.
+- Assertion-sensitive or `NDEBUG`-dependent changes: also run the release
+  build and tests.
+- Memory, arena, pointer, geometry, or numerical changes: also run the
+  `sanitize` preset.
+- Sandbox changes, or public-header changes that affect it: build both
+  `sandbox` and `sandbox-release`. The sandbox requires network access while
+  configuring raylib and is compile-checked rather than executed in CI.
 
-## Testing
+Never weaken assertions, tests, warnings, tolerances, or explicit limits to
+make a change pass. If a check is wrong, fix it explicitly and explain why.
 
-The test runner is a hand-rolled header (`tests/silk_test.h`), not an external framework. There is no per-test filter; assertions are `SL_EXPECT`, `SL_EXPECT_INT_EQ`, `SL_EXPECT_NEAR`. Randomized/property tests must use seeded deterministic PRNGs with the seed committed to source — never seed from wall-clock time (`rand()`, `time()`), or failures stop being reproducible.
+## Tests
 
-Adding a suite requires touching four files — missing any of the last two means the suite silently never runs:
+The test runner is `tests/silk_test.h`; it has no per-test filter. Use
+`SL_EXPECT`, `SL_EXPECT_INT_EQ`, and `SL_EXPECT_NEAR`. Randomized and property
+tests must use a deterministic PRNG with a seed committed to source; never use
+wall-clock seeding, `rand()`, or `time()`.
 
-1. New `tests/test_<name>.c`: static case functions, a `k_cases[]` array, and `int sl_<name>_suite(void)` returning the failure count.
-2. Add the file to the `sl_tests` executable in `tests/CMakeLists.txt`. ctest registration stays a single `add_test(NAME all COMMAND sl_tests)` — the runner executes every suite, so per-suite entries would re-run the whole binary.
+Adding a suite requires all four steps:
+
+1. Add `tests/test_<name>.c` with static cases, a `k_cases[]` table, and an
+   `int sl_<name>_suite(void)` runner returning the failure count.
+2. Add the source to `sl_tests` in `tests/CMakeLists.txt`. Keep the single CTest
+   registration; per-suite registrations would rerun the whole binary.
 3. Declare the runner in `tests/suites.h`.
 4. Call the runner from `main()` in `tests/sl_tests.c` and sum its failures.
 
-## TigerStyle rules for this codebase
+## Repository workflow
 
-Safety:
-- Put an explicit limit on everything: bound loops, queues, and counts; avoid recursion. Detect runaway execution instead of trusting it.
-- Allocate all memory up front (pools/arenas) in the simulation runtime; never allocate during simulation. Non-runtime tooling and examples may allocate freely. Prefer fixed-width types (`uint32_t`) over `int`/`long`.
-- Use assertions for arguments, returns, and invariants — check both the expected and the unexpected. Fail loudly rather than continue corruptly.
-- Keep interfaces small and deterministic: minimize surface area, simplify signatures (a plain success/failure beats rich return values), push control flow up and data flow down.
-- No abstraction without a demonstrated need: no interfaces, dispatch layers, generic containers, or indirection until a concrete requirement justifies them — a single `sl_solver_step(...)` beats an `ISolver` hierarchy.
-
-Performance:
-- Sketch costs before building (memory vs compute, bandwidth vs latency). Performance is decided in the design phase, not after profiling.
-- Zero-copy and cache-friendly in hot paths: avoid needless copying, align structs to their largest field, batch work into large units.
-
-Experience/naming:
-- Public API prefix `sl_`; `snake_case`; no abbreviations except established domain terms (`vec2`, `mat2`); related names use equal-length words so they align.
-- Big-endian naming — most significant word first: `connection_count_max`, not `max_connection_count`; `vec2_length_sq`, not `sq_length`. Capacity macros follow suit: `SL_BODY_COUNT_MAX`, never `SL_MAX_BODIES`.
-- Comments state contracts the code can't express — units, frames, sign conventions, valid ranges, NaN behavior, invariants — never structure, narration, or what the signature already says.
-- Tuned constants carry a trail: derivation, source, or the test that pins them (`beta = 0.2f` at 60 Hz, bounded by tests/stacking). A bare magic number is debt.
-- No technical debt: do it right the first time. Prefer simple, elegant structures over clever ones.
-
-## Workflow
-
-Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`), optionally scoped by subsystem (`feat(math): ...`, `fix(collision): ...`); short-lived `feat/*` branches PR'd into `main`. Pull requests follow `.github/PULL_REQUEST_TEMPLATE.md`; issues go through the forms under `.github/ISSUE_TEMPLATE/`.
-
-Run the relevant tests after every change. Never weaken assertions, tests, warnings, or limits to make a change pass; if a check is wrong, fix the code or the check explicitly and say why.
+Do not create branches, commits, issues, or pull requests unless explicitly
+requested. When requested, follow [CONTRIBUTING.md](CONTRIBUTING.md): use
+Conventional Commits, a short-lived `<type>/<topic>` branch, the pull request
+template, and the issue forms.

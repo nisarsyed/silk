@@ -51,8 +51,11 @@ typedef struct sl_polygon {
 
 /* Tagged record stored by value in the world's per-body array. The
  * world rebuilds validated input from its active fields so inactive
- * payload bytes stay normalized. Consumers always want the whole shape,
- * so a per-row record is the natural granularity. Renderers: circle ->
+ * payload bytes stay normalized. Supported ABIs must lay this public record
+ * out in exactly 72 bytes; shape.c deliberately rejects any other size at
+ * compile time because layout drift changes both the by-value ABI and the
+ * world's fixed memory budget. Consumers always want the whole shape, so a
+ * per-row record is the natural granularity. Renderers: circle ->
  * transform.position +- circle.radius; polygon ->
  * sl_transform_apply(transform, vertices[i]). */
 typedef struct sl_shape {

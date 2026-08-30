@@ -3,9 +3,10 @@
 #include <math.h>
 #include <stddef.h>
 
-/* enum (4 B) + union { circle 4 B, polygon 4 + 8*8 = 68 B }: the record
- * the world's per-body array is sized against; a drift here changes the
- * engine's memory budget. */
+/* enum (4 B) + union { circle 4 B, polygon 4 + 8*8 = 68 B }. This is an
+ * intentional public-ABI and world-budget gate, not an incidental platform
+ * observation: a target with different enum, float, or padding rules is
+ * rejected until its layout is explicitly supported. */
 _Static_assert(sizeof(sl_shape) == 72u, "sl_shape layout drifted");
 
 static bool circle_radius_valid(float radius)

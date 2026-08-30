@@ -35,6 +35,23 @@ jobs:
       - run: cmake --build --preset debug
       - run: ctest --preset debug
 
+  linux-release:
+    name: ${{ matrix.cc }} / release / ubuntu
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v7
+      # Execute the tests with NDEBUG; compiling the release sandbox alone
+      # does not exercise release behavior.
+      - run: cmake --preset release
+      - run: cmake --build --preset release
+      - run: ctest --preset release
+
   macos:
     name: clang / macos
     runs-on: macos-latest
@@ -43,6 +60,15 @@ jobs:
       - run: cmake --preset debug
       - run: cmake --build --preset debug
       - run: ctest --preset debug
+
+  windows:
+    name: msvc / windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --preset windows
+      - run: cmake --build --preset windows
+      - run: ctest --preset windows
 
   sanitize:
     name: asan+ubsan / ubuntu

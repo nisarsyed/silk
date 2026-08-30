@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 option(SL_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(SL_BUILD_TESTS "Build the silk test suite" ${PROJECT_IS_TOP_LEVEL})
 if(SL_SANITIZERS)
     if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
         add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
@@ -15,7 +16,9 @@ if(SL_SANITIZERS)
     endif()
 endif()
 
-enable_testing()
+if(SL_BUILD_TESTS)
+    enable_testing()
+endif()
 
 # Strict warning set shared by every target that compiles engine code,
 # so public headers are exercised under -Werror everywhere.
@@ -33,6 +36,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
         -Wundef
         -Wmissing-prototypes
         -Wstrict-prototypes
+        -Wvla
         -Werror
     )
 elseif(MSVC)
@@ -44,7 +48,9 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(src)
-add_subdirectory(tests)
+if(SL_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
 
 # Interactive raylib sandbox: an off-by-default dev tool, not a tested
 # artifact — enabling it fetches raylib at configure time and needs a
