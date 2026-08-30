@@ -2,7 +2,7 @@
 
 Living document, updated as milestones land. It records direction, not dates or commitments. Design principles and coding law live in [AGENTS.md](AGENTS.md).
 
-**Status:** Phase 2 · Basic simulation (in progress)
+**Status:** Phase 3 · 2D rigid-body physics (next)
 
 ## Baseline
 
@@ -35,7 +35,7 @@ and rotational integration — everything Phase 3 collision consumes.
 - [x] Math: rotation, transform, AABB primitives, angle wrap
 - [x] 2D shapes & geometry: circle + convex polygon shapes, mass properties, point/ray queries
 - [x] Rigid-body state: body types (static/kinematic), angular state, shape attachment, rotational integration
-- [ ] Sandbox: shaped bodies, static ground, engine picking
+- [x] Sandbox: shaped bodies, static ground, engine picking
 
 ## Phase Progression
 
