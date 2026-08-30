@@ -32,8 +32,8 @@ Living document, updated as milestones land. It records direction, not dates or 
 Phase 2 delivery: transforms, shape geometry, mass properties, body types,
 and rotational integration — everything Phase 3 collision consumes.
 
-- [ ] Math: rotation, transform, AABB primitives, angle wrap
-- [ ] 2D shapes & geometry: circle + convex polygon shapes, mass properties, point/ray queries
+- [x] Math: rotation, transform, AABB primitives, angle wrap
+- [x] 2D shapes & geometry: circle + convex polygon shapes, mass properties, point/ray queries
 - [ ] Rigid-body state: body types (static/kinematic), angular state, shape attachment, rotational integration
 - [ ] Sandbox: shaped bodies, static ground, engine picking
 
