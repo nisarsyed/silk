@@ -2,16 +2,14 @@
 
 #include <string.h>
 
-/* A dynamic body meets the position domain as an inelastic boundary:
- * its rejected outward velocity is consumed instead of accumulating.
- * Kinematic velocity remains controller-owned when its pose is held. */
+/* Commits one linear axis. A held dynamic axis drops to zero velocity so
+ * outward acceleration cannot bank indefinitely: the body halts at the
+ * last in-domain position, up to velocity * dt inside the bound rather
+ * than against it. Kinematic velocity stays controller-owned. */
 static inline void position_axis_commit(float velocity, float dt, bool dynamic,
                                         float *position_stored,
                                         float *velocity_stored)
 {
-    SL_ASSERT(position_stored != NULL);
-    SL_ASSERT(velocity_stored != NULL);
-
     if (!sl_is_finite(velocity)) {
         return;
     }
@@ -67,9 +65,7 @@ void sl_world_step(sl_world *world, float dt)
                 spin = spin * angular_drag_scale;
             }
             /* Axes commit independently so one boundary cannot freeze
-             * motion along the other. A rejected dynamic axis stops at
-             * zero velocity, preventing persistent outward acceleration
-             * while leaving the next inward acceleration free to move. */
+             * motion along the other. */
             position_axis_commit(velocity.x, dt, dynamic,
                                  &world->positions[i].x,
                                  &world->velocities[i].x);
