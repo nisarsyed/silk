@@ -40,10 +40,12 @@ typedef struct sl_polygon {
     sl_vec2 vertices[SL_POLYGON_VERTEX_COUNT_MAX];
 } sl_polygon;
 
-/* Tagged record copied by value into the world's per-body array:
- * consumers always want the whole shape, so a per-row record is the
- * natural granularity. Renderers: circle -> transform.position +-
- * circle.radius; polygon -> sl_transform_apply(transform, vertices[i]). */
+/* Tagged record stored by value in the world's per-body array. The
+ * world rebuilds validated input from its active fields so inactive
+ * payload bytes stay normalized. Consumers always want the whole shape,
+ * so a per-row record is the natural granularity. Renderers: circle ->
+ * transform.position +- circle.radius; polygon ->
+ * sl_transform_apply(transform, vertices[i]). */
 typedef struct sl_shape {
     sl_shape_kind kind;
     union {
@@ -79,11 +81,11 @@ typedef struct sl_ray_hit {
 } sl_ray_hit;
 
 /* The shapeless shape: kind NONE with the payload zeroed. Every byte,
- * not just the live union member -- the record is copied verbatim into
- * the world's per-body array, and an indeterminate union tail would
- * make any byte-wise comparison, hash, or serialization of world state
- * differ run to run. sl_shape has no padding (see the layout assert in
- * shape.c), so the initializer covers the whole record. */
+ * not just the live union member, so byte-wise comparison, hashing, and
+ * serialization of shape records stay deterministic. The world uses
+ * this same representation for point particles. sl_shape has no padding
+ * (see the layout assert in shape.c), so the initializer covers the
+ * whole record. */
 static inline sl_shape sl_shape_none(void)
 {
     sl_shape s = { 0 };

@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <silk/world.h>
 
@@ -28,6 +30,40 @@ static void test_init_destroy_roundtrip(void)
     /* Destroy is idempotent on an already-zeroed world. */
     sl_world_destroy(&world);
     SL_EXPECT(world.memory == NULL);
+}
+
+static void test_init_zeroes_complete_arena(void)
+{
+    sl_world_config config = { .body_capacity = 3u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    const size_t bytes = sl_world_memory_bytes(config.body_capacity);
+    unsigned char *expected = calloc(bytes, 1u);
+    SL_EXPECT(expected != NULL);
+    if (expected != NULL) {
+        const unsigned char *base = world.memory;
+        const size_t slots_offset =
+            (size_t)((const unsigned char *)world.slots - base);
+        const size_t slot_of_offset =
+            (size_t)((const unsigned char *)world.slot_of - base);
+        const size_t free_indices_offset =
+            (size_t)((const unsigned char *)world.free_indices - base);
+
+        /* Init writes only pool metadata after clearing the arena. Copy
+         * those intentional values into an otherwise-zero oracle; the
+         * final comparison covers inactive body rows and slice padding. */
+        memcpy(expected + slots_offset, world.slots,
+               (size_t)world.body_capacity * sizeof(world.slots[0]));
+        memcpy(expected + slot_of_offset, world.slot_of,
+               (size_t)world.body_capacity * sizeof(world.slot_of[0]));
+        memcpy(expected + free_indices_offset, world.free_indices,
+               (size_t)world.body_capacity * sizeof(world.free_indices[0]));
+        SL_EXPECT(memcmp(world.memory, expected, bytes) == 0);
+    }
+
+    free(expected);
+    sl_world_destroy(&world);
 }
 
 static void test_init_rejects_bad_capacity(void)
@@ -697,6 +733,7 @@ static void test_churn_stress_matches_model(void)
 
 static const sl_test_case k_cases[] = {
     { "init_destroy_roundtrip", test_init_destroy_roundtrip },
+    { "init_zeroes_complete_arena", test_init_zeroes_complete_arena },
     { "init_rejects_bad_capacity", test_init_rejects_bad_capacity },
     { "create_roundtrips_state", test_create_roundtrips_state },
     { "memory_bytes_at_capacity_max_within_budget",

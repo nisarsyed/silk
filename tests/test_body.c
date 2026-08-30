@@ -4,6 +4,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -170,10 +171,9 @@ static void create_rejects_tampered_shape_before_measuring_it(void)
     sl_shape box = sl_shape_none();
     SL_EXPECT(sl_shape_make_box(1.0f, 1.0f, &box));
 
-    /* A count past the vertex cap. sl_shape_is_valid rejects it, but
-     * only the descriptor check reaches that: deriving inertia first
-     * walks polygon.count vertices off the end of an 8-element array,
-     * so the order create validates in is the whole defence. */
+    /* The complete descriptor is rejected before inertia measurement;
+     * otherwise that measurement would trust count while walking the
+     * fixed vertex array. */
     sl_shape tampered = box;
     tampered.polygon.count = 4000000u;
     SL_EXPECT(!sl_shape_is_valid(&tampered));
@@ -186,17 +186,18 @@ static void create_rejects_tampered_shape_before_measuring_it(void)
     sl_world_destroy(&world);
 }
 
-static void create_and_set_shape_canonicalize_unused_payload(void)
+static void create_normalizes_circle_payload(void)
 {
     sl_world world = make_world(0.0f, 0.0f, 0.0f);
 
     sl_shape circle = sl_shape_none();
     SL_EXPECT(sl_shape_make_circle(2.0f, &circle));
-    sl_shape dirty_circle;
-    memset(&dirty_circle, 0xAB, sizeof(dirty_circle));
-    dirty_circle.kind = SL_SHAPE_CIRCLE;
-    dirty_circle.circle.radius = circle.circle.radius;
+    sl_shape dirty_circle = circle;
+    const size_t tail = offsetof(sl_shape, circle) + sizeof(sl_circle);
+    memset((unsigned char *)&dirty_circle + tail, 0xAB,
+           sizeof(dirty_circle) - tail);
     SL_EXPECT(sl_shape_is_valid(&dirty_circle));
+    SL_EXPECT(memcmp(&dirty_circle, &circle, sizeof(circle)) != 0);
 
     sl_body_desc desc = { .mass = 1.0f, .shape = &dirty_circle };
     sl_body_handle h = sl_world_body_create(&world, &desc);
@@ -204,26 +205,47 @@ static void create_and_set_shape_canonicalize_unused_payload(void)
     SL_EXPECT(memcmp(sl_world_body_get_shape(&world, h), &circle,
                      sizeof(circle)) == 0);
 
+    sl_world_destroy(&world);
+}
+
+static void create_normalizes_polygon_vertex_tail(void)
+{
+    sl_world world = make_world(0.0f, 0.0f, 0.0f);
+
     sl_shape box = sl_shape_none();
     SL_EXPECT(sl_shape_make_box(1.0f, 0.5f, &box));
-    sl_shape dirty_box;
-    memset(&dirty_box, 0xCD, sizeof(dirty_box));
-    dirty_box.kind = SL_SHAPE_POLYGON;
-    dirty_box.polygon.count = box.polygon.count;
-    for (uint32_t i = 0u; i < box.polygon.count; ++i) {
-        dirty_box.polygon.vertices[i] = box.polygon.vertices[i];
-    }
+    sl_shape dirty_box = box;
+    const size_t tail = offsetof(sl_shape, polygon.vertices) +
+                        (size_t)box.polygon.count * sizeof(sl_vec2);
+    memset((unsigned char *)&dirty_box + tail, 0xCD, sizeof(dirty_box) - tail);
     SL_EXPECT(sl_shape_is_valid(&dirty_box));
-    SL_EXPECT(sl_world_body_set_shape(&world, h, &dirty_box));
+    SL_EXPECT(memcmp(&dirty_box, &box, sizeof(box)) != 0);
+
+    sl_body_desc desc = { .mass = 1.0f, .shape = &dirty_box };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    SL_EXPECT(!sl_body_handle_is_null(h));
     SL_EXPECT(memcmp(sl_world_body_get_shape(&world, h), &box, sizeof(box)) ==
               0);
 
-    sl_shape dirty_none;
-    memset(&dirty_none, 0xEF, sizeof(dirty_none));
-    dirty_none.kind = SL_SHAPE_NONE;
+    sl_world_destroy(&world);
+}
+
+static void set_shape_normalizes_none_payload(void)
+{
+    sl_world world = make_world(0.0f, 0.0f, 0.0f);
+
+    sl_body_desc desc = { .mass = 1.0f };
+    sl_body_handle h = sl_world_body_create(&world, &desc);
+    SL_EXPECT(!sl_body_handle_is_null(h));
+
+    sl_shape dirty_none = sl_shape_none();
+    const size_t payload = offsetof(sl_shape, circle);
+    memset((unsigned char *)&dirty_none + payload, 0xEF,
+           sizeof(dirty_none) - payload);
     SL_EXPECT(sl_shape_is_valid(&dirty_none));
-    SL_EXPECT(sl_world_body_set_shape(&world, h, &dirty_none));
     const sl_shape none = sl_shape_none();
+    SL_EXPECT(memcmp(&dirty_none, &none, sizeof(none)) != 0);
+    SL_EXPECT(sl_world_body_set_shape(&world, h, &dirty_none));
     SL_EXPECT(memcmp(sl_world_body_get_shape(&world, h), &none, sizeof(none)) ==
               0);
 
@@ -711,8 +733,10 @@ static const sl_test_case k_cases[] = {
     { "create_with_shape_derives_inertia", create_with_shape_derives_inertia },
     { "create_rejects_tampered_shape_before_measuring_it",
       create_rejects_tampered_shape_before_measuring_it },
-    { "create_and_set_shape_canonicalize_unused_payload",
-      create_and_set_shape_canonicalize_unused_payload },
+    { "create_normalizes_circle_payload", create_normalizes_circle_payload },
+    { "create_normalizes_polygon_vertex_tail",
+      create_normalizes_polygon_vertex_tail },
+    { "set_shape_normalizes_none_payload", set_shape_normalizes_none_payload },
     { "set_mass_rejects_when_banked_force_would_overflow",
       set_mass_rejects_when_banked_force_would_overflow },
     { "set_shape_rejects_when_banked_torque_would_overflow",

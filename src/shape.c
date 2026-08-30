@@ -154,8 +154,8 @@ bool sl_shape_make_circle(float radius, sl_shape *out)
     if (out == NULL || !circle_radius_valid(radius)) {
         return false;
     }
-    /* Whole-record init: the unused polygon tail of the union must
-     * not carry indeterminate bytes into world state. */
+    /* Whole-record init: the unused polygon tail of the union must not
+     * carry indeterminate bytes into comparisons or serialization. */
     sl_shape s = { 0 };
     s.kind = SL_SHAPE_CIRCLE;
     s.circle.radius = radius;

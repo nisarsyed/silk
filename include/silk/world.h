@@ -64,8 +64,9 @@ typedef struct sl_body_desc {
     float angle;
     /* Radians / second; must be 0 for static. */
     float angular_velocity;
-    /* NULL or kind SL_SHAPE_NONE means a point particle. Copied at
-     * create; the record is not retained. */
+    /* NULL or kind SL_SHAPE_NONE means a point particle. Rebuilt from
+     * its active fields into a zero-filled record at create; the pointer
+     * and inactive payload bytes are not retained. */
     const sl_shape *shape;
 } sl_body_desc;
 
@@ -132,7 +133,9 @@ size_t sl_world_memory_bytes(uint32_t body_capacity);
  * Returns false, leaving *world zeroed, when body_capacity is outside
  * [1, SL_BODY_COUNT_MAX], gravity is non-finite, linear_drag or
  * angular_drag is non-finite or negative, or allocation fails.
- * Everything is allocated here; nothing allocates during simulation. */
+ * The full arena, including inactive rows and alignment gaps, starts
+ * zeroed. Everything is allocated here; nothing allocates during
+ * simulation. */
 bool sl_world_init(sl_world *world, const sl_world_config *config);
 
 /* Frees all engine-owned memory and zeroes *world; safe to repeat. */
@@ -242,9 +245,11 @@ bool sl_world_body_set_angular_velocity(sl_world *world, sl_body_handle handle,
  * inverses, and lowering an inverse's denominator must not smuggle
  * infinity past the guard they enforced. */
 bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass);
-/* Copies *shape (NULL or kind SL_SHAPE_NONE detaches, restoring a point
- * particle) and re-derives inertia. Any body may carry a shape; only
- * dynamic bodies gain inertia from it. False -- unchanged -- for shapes
+/* Rebuilds shape from its active fields into a zero-filled record (NULL
+ * or kind SL_SHAPE_NONE detaches, restoring a point particle) and
+ * re-derives inertia. Inactive union bytes and polygon vertices past
+ * count are not copied. Any body may carry a shape; only dynamic bodies
+ * gain inertia from it. False -- unchanged -- for shapes
  * sl_shape_is_valid rejects, an inertia with no finite inverse, or a
  * new inertia that would make the banked torque overflow (see
  * sl_world_body_set_mass). */
