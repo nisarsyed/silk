@@ -53,7 +53,8 @@
 #define SB_RNG_SEED 0x9E3779B9u
 
 /* Simulation values stay near unity for float resolution and future
- * contact tolerances; pixels exist only at the input/render boundary. */
+ * contact tolerances. Screen-defined lengths cross this scale at the
+ * input, rendering, and window-layout boundaries. */
 static const float k_sb_pixels_per_metre = 100.0f;
 static const sl_vec2 k_sb_gravity = { 0.0f, 9.81f }; /* metres / second^2 */
 
@@ -92,15 +93,19 @@ static float sb_spawn_half_side(float mass)
  * off-center holds visibly torque the body. */
 static const float k_sb_tether_gain = 15.0f; /* N per metre of offset */
 
-/* Slingshot: 1 m of drag buys 6 m/s of launch speed, capped so a
- * full-window fling stays well inside float-safe integration bounds. */
+/* Slingshot: 1 m of drag buys 6 m/s of launch speed. The 15 m/s cap
+ * limits travel to 0.25 m per 60 Hz step, keeping fast launches easy
+ * to follow in the debug view. */
 static const float k_sb_launch_gain = 6.0f;       /* (m/s) per metre */
 static const float k_sb_launch_speed_max = 15.0f; /* metres / second */
 
 /* Grab radius around the body origin, for probes the shape test cannot
  * catch: shapeless point particles, and pointer slop on a body smaller
  * than the cursor is precise. */
-static const float k_sb_pick_slack = 0.12f; /* metres */
+static const float k_sb_pick_slack_pixels = 12.0f;
+
+/* One-metre cells expose the simulation scale directly. */
+static const float k_sb_grid_spacing = 1.0f; /* metres */
 
 typedef enum sb_spawn_kind { SB_SPAWN_CIRCLE = 0, SB_SPAWN_BOX } sb_spawn_kind;
 
@@ -153,21 +158,25 @@ static float sb_rng_range(float lo, float hi)
     return lo + (hi - lo) * sb_rng_unit();
 }
 
+static float sb_length_to_pixels(float length)
+{
+    return length * k_sb_pixels_per_metre;
+}
+
+static float sb_length_from_pixels(float length)
+{
+    return length / k_sb_pixels_per_metre;
+}
+
 static Vector2 sb_to_raylib(sl_vec2 v)
 {
-    Vector2 out = { v.x * k_sb_pixels_per_metre, v.y * k_sb_pixels_per_metre };
+    Vector2 out = { sb_length_to_pixels(v.x), sb_length_to_pixels(v.y) };
     return out;
 }
 
 static sl_vec2 sb_from_raylib(Vector2 v)
 {
-    return sl_vec2_make(v.x / k_sb_pixels_per_metre,
-                        v.y / k_sb_pixels_per_metre);
-}
-
-static float sb_length_to_pixels(float length)
-{
-    return length * k_sb_pixels_per_metre;
+    return sl_vec2_make(sb_length_from_pixels(v.x), sb_length_from_pixels(v.y));
 }
 
 static bool sb_handle_eq(sl_body_handle a, sl_body_handle b)
@@ -195,10 +204,23 @@ static void sb_make_spawn_shape(sb_spawn_kind kind, float mass, sl_shape *out)
 
 static void sb_spawn_default_scene(sl_world *world)
 {
+    /* Preserve the screen composition across render scales: centers stay
+     * 96 px from either side and between 64 px from the top and 400 px
+     * from the bottom. */
+    const float screen_width_metres =
+        sb_length_from_pixels((float)SB_SCREEN_WIDTH);
+    const float screen_height_metres =
+        sb_length_from_pixels((float)SB_SCREEN_HEIGHT);
+    const float margin_side_metres = sb_length_from_pixels(96.0f);
+    const float margin_top_metres = sb_length_from_pixels(64.0f);
+    const float margin_bottom_metres = sb_length_from_pixels(400.0f);
+
     for (uint32_t i = 0u; i < 32u; ++i) {
         sl_body_desc desc = { 0 };
-        desc.position.x = sb_rng_range(0.96f, 11.84f);
-        desc.position.y = sb_rng_range(0.64f, 3.2f);
+        desc.position.x = sb_rng_range(
+            margin_side_metres, screen_width_metres - margin_side_metres);
+        desc.position.y = sb_rng_range(
+            margin_top_metres, screen_height_metres - margin_bottom_metres);
         desc.velocity.x = sb_rng_range(-0.9f, 0.9f);
         desc.velocity.y = sb_rng_range(-0.3f, 0.6f);
         desc.mass = sb_rng_range(1.0f, 5.0f);
@@ -219,15 +241,26 @@ static void sb_spawn_default_scene(sl_world *world)
 
 static void sb_spawn_ground(sl_world *world)
 {
-    /* Static preview floor: spans the window, top edge at y = 6.8 m, so
-     * falling bodies visibly pass through it until collision lands. */
+    const float screen_width_metres =
+        sb_length_from_pixels((float)SB_SCREEN_WIDTH);
+    const float screen_height_metres =
+        sb_length_from_pixels((float)SB_SCREEN_HEIGHT);
+    const float ground_half_width_metres = 0.5f * screen_width_metres;
+    const float ground_half_height_metres = 0.2f;
+
+    /* Static preview floor: spans the window with its top edge 0.4 m
+     * above the bottom, so falling bodies visibly pass through it until
+     * collision lands. */
     sl_shape slab = sl_shape_none();
-    const bool made = sl_shape_make_box(6.4f, 0.2f, &slab);
+    const bool made = sl_shape_make_box(ground_half_width_metres,
+                                        ground_half_height_metres, &slab);
     SL_ASSERT(made);
     (void)made;
 
     sl_body_desc desc = { 0 };
-    desc.position = sl_vec2_make(6.4f, 7.0f);
+    desc.position =
+        sl_vec2_make(ground_half_width_metres,
+                     screen_height_metres - ground_half_height_metres);
     desc.mass = 0.0f;
     desc.type = SL_BODY_STATIC;
     desc.shape = &slab;
@@ -260,6 +293,8 @@ static sl_body_handle sb_pick_body(const sb_app *app, sl_vec2 point)
 {
     sl_body_handle best = sl_body_handle_null();
     float best_dist = FLT_MAX;
+    const float pick_slack_metres =
+        sb_length_from_pixels(k_sb_pick_slack_pixels);
 
     for (sl_body_handle it = sl_world_body_first(&app->world);
          !sl_body_handle_is_null(it);
@@ -275,7 +310,7 @@ static sl_body_handle sb_pick_body(const sb_app *app, sl_vec2 point)
          * instead would make the test dead weight -- containment
          * already implies dist <= reach for a centroid-centered convex
          * shape, so OR-ing the two could never change the answer. */
-        const bool covered = dist <= k_sb_pick_slack ||
+        const bool covered = dist <= pick_slack_metres ||
                              sl_shape_contains_point(shape, tf, point);
         if (covered && dist < best_dist) {
             best_dist = dist;
@@ -433,13 +468,14 @@ static void sb_cull_fallen(sb_app *app)
 {
     /* Margin below the view edge: bodies despawn only after fully
      * leaving sight. */
-    const float kill_y = 7.84f; /* metres: view height plus 0.64 m */
+    const float kill_y_metres = sb_length_from_pixels(
+        (float)SB_SCREEN_HEIGHT + 64.0f); /* 64 px below the view */
 
     for (uint32_t row = 0u; row < sl_world_body_count(&app->world);) {
         const sl_body_handle body = sl_world_body_at(&app->world, row);
         const sl_vec2 pos = sl_world_body_get_position(&app->world, body);
         const bool held = sb_handle_eq(body, app->tether_body);
-        if (pos.y > kill_y && !held) {
+        if (pos.y > kill_y_metres && !held) {
             sl_world_body_destroy(&app->world, body);
         } else {
             row++;
@@ -449,11 +485,20 @@ static void sb_cull_fallen(sb_app *app)
 
 static void sb_draw_grid(void)
 {
-    for (int x = 0; x <= SB_SCREEN_WIDTH; x += 64) {
-        DrawLine(x, 0, x, SB_SCREEN_HEIGHT, Fade(DARKGRAY, 0.25f));
+    const float screen_width_metres =
+        sb_length_from_pixels((float)SB_SCREEN_WIDTH);
+    const float screen_height_metres =
+        sb_length_from_pixels((float)SB_SCREEN_HEIGHT);
+
+    for (float x = 0.0f; x <= screen_width_metres; x += k_sb_grid_spacing) {
+        DrawLineV(sb_to_raylib(sl_vec2_make(x, 0.0f)),
+                  sb_to_raylib(sl_vec2_make(x, screen_height_metres)),
+                  Fade(DARKGRAY, 0.25f));
     }
-    for (int y = 0; y <= SB_SCREEN_HEIGHT; y += 64) {
-        DrawLine(0, y, SB_SCREEN_WIDTH, y, Fade(DARKGRAY, 0.25f));
+    for (float y = 0.0f; y <= screen_height_metres; y += k_sb_grid_spacing) {
+        DrawLineV(sb_to_raylib(sl_vec2_make(0.0f, y)),
+                  sb_to_raylib(sl_vec2_make(screen_width_metres, y)),
+                  Fade(DARKGRAY, 0.25f));
     }
 }
 
@@ -502,9 +547,10 @@ static void sb_draw_bodies(const sb_app *app)
         }
 
         if (shape->kind == SL_SHAPE_CIRCLE) {
-            const float radius = sb_length_to_pixels(shape->circle.radius);
-            DrawCircleV(sb_to_raylib(pos), radius, fill);
-            DrawCircleLinesV(sb_to_raylib(pos), radius, DARKBROWN);
+            const float radius_pixels =
+                sb_length_to_pixels(shape->circle.radius);
+            DrawCircleV(sb_to_raylib(pos), radius_pixels, fill);
+            DrawCircleLinesV(sb_to_raylib(pos), radius_pixels, DARKBROWN);
             /* Radius tick makes spin visible on a rotation-invariant
              * circle. */
             const sl_vec2 tip = sl_vec2_add(
