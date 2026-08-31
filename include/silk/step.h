@@ -15,39 +15,40 @@ extern "C" {
  * tests/test_step.c. */
 #define SL_STEP_COUNT_MAX 8u
 
-/* Advances the simulation by exactly one fixed step of dt seconds:
+/* Advances the simulation by exactly one fixed step of dt seconds, divided
+ * into the world's configured n substeps with h = dt / n:
  *
- *     dynamic:    v <- (v + (gravity + f/m) * dt) / (1 + dt * linear_drag)
- *                 w <- (w + t/I * dt)           / (1 + dt * angular_drag)
- *     kinematic:  v, w unchanged
+ *     dynamic:    v <- (v + (gravity + f/m) * h) / (1 + h * linear_drag)
+ *                 w <- (w + t/I * h)             / (1 + h * angular_drag)
+ *     kinematic:  v, w ignore acceleration and drag
  *     static:     v, w are zero and stay zero
- *     all:        p <- p + v * dt
- *                 q <- normalize(q + w * dt * perp(q))
+ *     moving:     v <- linear_cap(v), w <- angular_cap(w, dt)
+ *     moving:     dp <- dp + v * h
+ *                 dq <- normalize(dq + w * h * perp(dq))
+ *     finalize:   p <- p + dp, q <- normalize(dq * q)
  *                 f <- 0, t <- 0
  *
- * Semi-implicit Euler -- position uses the post-drag velocity. The drag
- * forms divide instead of subtracting, so any drag >= 0 stays stable.
+ * Semi-implicit Euler -- each delta uses the post-drag velocity. The drag
+ * forms divide instead of subtracting, so any drag >= 0 stays stable; force
+ * and torque remain active for all substeps and clear once at finalization.
  * Body type gates gravity and both drags only; the remaining
  * differences are world invariants (non-dynamic rows carry
  * inv_mass = inv_inertia = 0 and empty accumulators, static rows carry
  * zero velocities), which integration neither reads nor disturbs.
- * Angular drag gates on body type, not inertia: a dynamic body with
- * infinite rotational inertia still damps toward zero spin.
- * Integration neither clamps nor saturates: force, torque, velocity,
- * angular velocity, and gravity magnitudes are expected to stay within
- * float range across a step. Linear axes commit independently: a
- * non-finite candidate velocity leaves that axis unchanged; a position
- * inside SL_POSITION_ABS_MAX commits with its finite velocity; and a
- * position outside the domain holds. On that last case a dynamic velocity
- * component is zeroed, preventing unbounded outward accumulation and
- * allowing inward acceleration to recover on the next step, so the body
- * halts up to velocity * dt inside the bound rather than against it;
- * kinematic velocity remains controller-owned. Spin commits when finite;
- * rotation advances by atan(w * dt), and holds when the delta or normalized
- * candidate would be non-finite. dt is the caller-selected fixed timestep;
- * Silk supplies no default. It must be identical across the calls of a run,
- * and timing policy lives above this function. Consumed forces and torques
- * always clear. */
+ * Angular drag gates on body type, not inertia: a dynamic body with infinite
+ * rotational inertia still damps toward zero spin. Before integration and
+ * future constraint work, every dynamic and kinematic linear velocity is
+ * capped to linear_speed_max and angular velocity to
+ * SL_ROTATION_PER_STEP_MAX / dt. A future constraint solver must guard its
+ * own impulse candidates and may add a final post-solve cap policy.
+ *
+ * Linear axes test base position plus candidate accumulated delta on every
+ * substep. An out-of-domain dynamic axis holds and zeroes its velocity;
+ * kinematic motion holds while controller velocity remains. Rotation advances
+ * by atan(w * h) per substep. Non-finite velocity candidates retain the prior
+ * finite state before the cap. Invalid dt or derived h/inverse terms assert in
+ * debug and return without mutation in release. dt must be identical across
+ * calls of a run; timing policy lives above this function. */
 void sl_world_step(sl_world *world, float dt);
 
 typedef struct sl_stepper {
