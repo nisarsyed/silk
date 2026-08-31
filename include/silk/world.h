@@ -12,11 +12,20 @@
 extern "C" {
 #endif
 
-/* Bounds worst-case world allocation: 145 bytes per body (ten packed
- * scalar/vector/rotation arrays, two index arrays, one slot array, one
- * type byte, and a 72-byte shape record) lands at ~9.1 MiB at this cap.
+/* Bounds worst-case body-only world allocation: 169 bytes per body
+ * (material and integration-delta columns included) lands at ~10.6 MiB at
+ * this cap. Broad-phase and contact arenas join the budget in later PRs.
  * Raise only on profiling evidence, together with the budget test. */
 #define SL_BODY_COUNT_MAX 65536u
+
+/* Soft Step defaults to four substeps; callers can explicitly choose one
+ * through eight. Linear motion is capped before it feeds integration or a
+ * later constraint stage. Angular motion is capped to a quarter turn over
+ * the complete world step, independent of the substep count. */
+#define SL_SUBSTEP_COUNT_DEFAULT 4u
+#define SL_SUBSTEP_COUNT_MAX 8u
+#define SL_LINEAR_SPEED_MAX_DEFAULT 400.0f
+#define SL_ROTATION_PER_STEP_MAX (0.25f * SL_PI)
 
 /* Maximum absolute body-center coordinate. IEEE-754 binary32 spacing at
  * 8192 is 0.0009765625; a shape adds at most SL_SHAPE_EXTENT_MAX, and the
@@ -78,6 +87,10 @@ typedef struct sl_body_desc {
      * its active fields into a zero-filled record at create; the pointer
      * and inactive payload bytes are not retained. */
     const sl_shape *shape;
+    /* Coulomb coefficient, finite >= 0; zero-fill is frictionless. */
+    float friction;
+    /* Bounce coefficient, finite in [0, 1]; zero-fill is inelastic. */
+    float restitution;
 } sl_body_desc;
 
 typedef struct sl_world_config {
@@ -85,6 +98,10 @@ typedef struct sl_world_config {
     sl_vec2 gravity;        /* world units / second^2; default {0, 0} */
     float linear_drag;      /* 1 / seconds, >= 0; default 0 */
     float angular_drag;     /* 1 / seconds, >= 0; default 0 */
+    /* 0 selects SL_SUBSTEP_COUNT_DEFAULT; otherwise [1, 8]. */
+    uint32_t substep_count;
+    /* World units / second; 0 selects SL_LINEAR_SPEED_MAX_DEFAULT. */
+    float linear_speed_max;
 } sl_world_config;
 
 typedef struct sl_body_slot {
@@ -100,9 +117,11 @@ typedef struct sl_world {
     uint32_t body_capacity; /* slot count, fixed at init */
     uint32_t free_count;
 
-    sl_vec2 gravity;    /* world units / second^2 */
-    float linear_drag;  /* 1 / seconds, >= 0 */
-    float angular_drag; /* 1 / seconds, >= 0 */
+    sl_vec2 gravity;        /* world units / second^2 */
+    float linear_drag;      /* 1 / seconds, >= 0 */
+    float angular_drag;     /* 1 / seconds, >= 0 */
+    float linear_speed_max; /* world units / second, finite > 0 */
+    uint32_t substep_count; /* in [1, SL_SUBSTEP_COUNT_MAX] */
 
     /* Dual indexing: slots[handle.index] -> packed row, slot_of[row] ->
      * owning slot. Swap-remove repairs exactly one slot_of entry. */
@@ -117,8 +136,12 @@ typedef struct sl_world {
     float *inv_masses;   /* 1 / mass or 0 */
     sl_vec2 *forces;     /* kilograms * world units / second^2; the
                           * stepper clears them every step */
+    /* Solver/integration scratch, cleared after every valid step. */
+    sl_vec2 *delta_positions;
 
-    sl_rotation *rotations;    /* unit (cos, sin), body to world */
+    sl_rotation *rotations; /* unit (cos, sin), body to world */
+    /* Relative rotation, identity between steps. */
+    sl_rotation *delta_rotations;
     float *angular_velocities; /* radians / second */
     float *torques;            /* force units * length; the stepper
                                 * clears them every step */
@@ -127,6 +150,8 @@ typedef struct sl_world {
     float *inertias;
     float *inv_inertias; /* 1 / inertia or 0; create / set_mass /
                           * set_shape are its only writers */
+    float *frictions;    /* finite >= 0 */
+    float *restitutions; /* finite in [0, 1] */
     uint8_t *types;      /* holds sl_body_type */
     /* Whole-record per-body array: consumers (mass data, bounds,
      * containment, later contacts) always want the complete shape, so
@@ -145,7 +170,9 @@ size_t sl_world_memory_bytes(uint32_t body_capacity);
  * a live world leaks its arena, so the assert fires in debug builds.
  * Returns false, leaving *world zeroed, when body_capacity is outside
  * [1, SL_BODY_COUNT_MAX], gravity is non-finite, linear_drag or
- * angular_drag is non-finite or negative, or allocation fails.
+ * angular_drag is non-finite or negative, substep_count is above its cap,
+ * linear_speed_max is non-finite or negative, or allocation fails. Zero
+ * substep_count and linear_speed_max select their documented defaults.
  * The full arena, including inactive rows and alignment gaps, starts
  * zeroed. Everything is allocated here; nothing allocates during
  * simulation. */
@@ -163,7 +190,8 @@ void sl_world_reset(sl_world *world);
  * non-finite, unknown type,
  * a mass violating its type's rule (positive with representable inverse
  * for dynamic, exactly 0 for static and kinematic), a static carrying
- * velocity or spin, a non-finite angle or angular velocity, a shape
+ * velocity or spin, a non-finite angle or angular velocity, friction outside
+ * finite [0, infinity), restitution outside finite [0, 1], a shape
  * sl_shape_is_valid rejects, or a derived inertia whose inverse would
  * overflow; also when the world is full. */
 sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc);
@@ -182,6 +210,8 @@ uint32_t sl_world_body_capacity(const sl_world *world);
 sl_vec2 sl_world_get_gravity(const sl_world *world);
 float sl_world_get_linear_drag(const sl_world *world);
 float sl_world_get_angular_drag(const sl_world *world);
+uint32_t sl_world_get_substep_count(const sl_world *world);
+float sl_world_get_linear_speed_max(const sl_world *world);
 
 /* Read-only walks visit live bodies in packed order: deterministic for
  * a given operation sequence, not creation order across destroys. Both
@@ -228,6 +258,9 @@ float sl_world_body_get_inertia(const sl_world *world, sl_body_handle handle);
 float sl_world_body_get_inv_inertia(const sl_world *world,
                                     sl_body_handle handle);
 float sl_world_body_get_torque(const sl_world *world, sl_body_handle handle);
+float sl_world_body_get_friction(const sl_world *world, sl_body_handle handle);
+float sl_world_body_get_restitution(const sl_world *world,
+                                    sl_body_handle handle);
 
 /* Points into packed storage: valid until the next create / destroy /
  * reset / set_shape. Never NULL; kind SL_SHAPE_NONE marks a point
@@ -251,6 +284,12 @@ bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
 /* A static body accepts only zero. */
 bool sl_world_body_set_angular_velocity(sl_world *world, sl_body_handle handle,
                                         float angular_velocity);
+/* Material mutation is atomic: friction must be finite >= 0 and restitution
+ * finite in [0, 1]. All body types may carry materials. */
+bool sl_world_body_set_friction(sl_world *world, sl_body_handle handle,
+                                float friction);
+bool sl_world_body_set_restitution(sl_world *world, sl_body_handle handle,
+                                   float restitution);
 /* Dynamic bodies only; re-derives inertia from the attached shape.
  * Also false -- unchanged -- when the new mass or inertia would turn an
  * already-banked force or torque into an infinite acceleration: both
@@ -275,8 +314,8 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
  * the accumulator unchanged -- for non-dynamic bodies, non-finite
  * force, an accumulation that would overflow to infinity, or an
  * accumulated acceleration that overflows at the body's current mass.
- * Rejection happens at application time; integration itself neither
- * clamps nor saturates (see step.h). */
+ * Rejection happens at application time; the step then applies its configured
+ * velocity cap before motion or future constraints consume the result. */
 bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
                                sl_vec2 force);
 sl_vec2 sl_world_body_get_force(const sl_world *world, sl_body_handle handle);

@@ -45,6 +45,73 @@ static void desc_defaults_are_dynamic_point_particle(void)
     SL_EXPECT(sl_world_body_get_inertia(&world, h) == 0.0f);
     SL_EXPECT(sl_world_body_get_inv_inertia(&world, h) == 0.0f);
     SL_EXPECT(sl_world_body_get_shape(&world, h)->kind == SL_SHAPE_NONE);
+    SL_EXPECT(sl_world_body_get_friction(&world, h) == 0.0f);
+    SL_EXPECT(sl_world_body_get_restitution(&world, h) == 0.0f);
+
+    sl_world_destroy(&world);
+}
+
+static void materials_validate_pack_and_reset(void)
+{
+    sl_world world = make_world(0.0f, 0.0f, 0.0f);
+    sl_body_desc first = { .mass = 1.0f, .friction = 0.25f };
+    sl_body_desc middle = { .mass = 2.0f,
+                            .friction = 0.5f,
+                            .restitution = 0.4f };
+    sl_body_desc last = { .mass = 3.0f,
+                          .friction = 0.75f,
+                          .restitution = 1.0f };
+    const sl_body_handle first_handle = sl_world_body_create(&world, &first);
+    const sl_body_handle middle_handle = sl_world_body_create(&world, &middle);
+    const sl_body_handle last_handle = sl_world_body_create(&world, &last);
+    SL_EXPECT(!sl_body_handle_is_null(first_handle));
+    SL_EXPECT(!sl_body_handle_is_null(middle_handle));
+    SL_EXPECT(!sl_body_handle_is_null(last_handle));
+
+    SL_EXPECT(sl_world_body_set_friction(&world, middle_handle, 0.6f));
+    SL_EXPECT(sl_world_body_set_restitution(&world, middle_handle, 0.8f));
+    SL_EXPECT(sl_world_body_get_friction(&world, middle_handle) == 0.6f);
+    SL_EXPECT(sl_world_body_get_restitution(&world, middle_handle) == 0.8f);
+
+    const float bad_friction[] = { -1.0f, NAN, INFINITY, -INFINITY };
+    for (uint32_t i = 0u; i < sizeof(bad_friction) / sizeof(bad_friction[0]);
+         ++i) {
+        SL_EXPECT(!sl_world_body_set_friction(&world, middle_handle,
+                                              bad_friction[i]));
+        SL_EXPECT(sl_world_body_get_friction(&world, middle_handle) == 0.6f);
+        sl_body_desc bad = { .mass = 1.0f, .friction = bad_friction[i] };
+        SL_EXPECT(sl_body_handle_is_null(sl_world_body_create(&world, &bad)));
+    }
+
+    const float bad_restitution[] = { -0.1f, 1.1f, NAN, INFINITY };
+    for (uint32_t i = 0u;
+         i < sizeof(bad_restitution) / sizeof(bad_restitution[0]); ++i) {
+        SL_EXPECT(!sl_world_body_set_restitution(&world, middle_handle,
+                                                 bad_restitution[i]));
+        SL_EXPECT(sl_world_body_get_restitution(&world, middle_handle) == 0.8f);
+        sl_body_desc bad = { .mass = 1.0f, .restitution = bad_restitution[i] };
+        SL_EXPECT(sl_body_handle_is_null(sl_world_body_create(&world, &bad)));
+    }
+    SL_EXPECT_INT_EQ(sl_world_body_count(&world), 3u);
+
+    /* Swap-removing the first row moves the last row and every material
+     * column together. */
+    sl_world_body_destroy(&world, first_handle);
+    SL_EXPECT(sl_world_body_get_friction(&world, last_handle) == 0.75f);
+    SL_EXPECT(sl_world_body_get_restitution(&world, last_handle) == 1.0f);
+
+    sl_world_reset(&world);
+    SL_EXPECT(!sl_world_body_is_valid(&world, middle_handle));
+    sl_body_desc zero_material = { .mass = 1.0f };
+    const sl_body_handle reset_handle =
+        sl_world_body_create(&world, &zero_material);
+    SL_EXPECT(sl_world_body_get_friction(&world, reset_handle) == 0.0f);
+    SL_EXPECT(sl_world_body_get_restitution(&world, reset_handle) == 0.0f);
+    const uint32_t dense = world.slots[reset_handle.index].dense;
+    SL_EXPECT(world.delta_positions[dense].x == 0.0f &&
+              world.delta_positions[dense].y == 0.0f);
+    SL_EXPECT(world.delta_rotations[dense].c == 1.0f &&
+              world.delta_rotations[dense].s == 0.0f);
 
     sl_world_destroy(&world);
 }
@@ -754,6 +821,7 @@ static void destroy_swap_moves_angular_and_shape_rows(void)
 static const sl_test_case k_cases[] = {
     { "desc_defaults_are_dynamic_point_particle",
       desc_defaults_are_dynamic_point_particle },
+    { "materials_validate_pack_and_reset", materials_validate_pack_and_reset },
     { "create_static_stores_infinite_mass_as_zero",
       create_static_stores_infinite_mass_as_zero },
     { "create_rejects_static_or_kinematic_with_mass",

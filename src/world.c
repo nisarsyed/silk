@@ -46,15 +46,15 @@ static unsigned char *carve(unsigned char *base, size_t *offset,
 }
 
 /* Single source for init's allocation and the public budget query:
- * one slot array, two index arrays, three vec2 arrays, one rotation
- * array, six float arrays, one type byte, and one shape record per body. */
+ * one slot array, two index arrays, four vec2 arrays, two rotation arrays,
+ * eight float arrays, one type byte, and one shape record per body. */
 static size_t world_memory_bytes_for(size_t capacity)
 {
     return slice_bytes(capacity, sizeof(sl_body_slot)) +
            2u * slice_bytes(capacity, sizeof(uint32_t)) +
-           3u * slice_bytes(capacity, sizeof(sl_vec2)) +
-           slice_bytes(capacity, sizeof(sl_rotation)) +
-           6u * slice_bytes(capacity, sizeof(float)) +
+           4u * slice_bytes(capacity, sizeof(sl_vec2)) +
+           2u * slice_bytes(capacity, sizeof(sl_rotation)) +
+           8u * slice_bytes(capacity, sizeof(float)) +
            slice_bytes(capacity, sizeof(uint8_t)) +
            slice_bytes(capacity, sizeof(sl_shape));
 }
@@ -218,6 +218,11 @@ static bool body_desc_valid(const sl_body_desc *desc)
     if (!sl_is_finite(desc->angle) || !sl_is_finite(desc->angular_velocity)) {
         return false;
     }
+    if (!sl_is_finite(desc->friction) || desc->friction < 0.0f ||
+        !sl_is_finite(desc->restitution) || desc->restitution < 0.0f ||
+        desc->restitution > 1.0f) {
+        return false;
+    }
     if (desc->shape != NULL && !sl_shape_is_valid(desc->shape)) {
         return false;
     }
@@ -286,9 +291,19 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     }
     if (!sl_vec2_is_finite(config->gravity) ||
         !sl_is_finite(config->linear_drag) || config->linear_drag < 0.0f ||
-        !sl_is_finite(config->angular_drag) || config->angular_drag < 0.0f) {
+        !sl_is_finite(config->angular_drag) || config->angular_drag < 0.0f ||
+        config->substep_count > SL_SUBSTEP_COUNT_MAX ||
+        !sl_is_finite(config->linear_speed_max) ||
+        config->linear_speed_max < 0.0f) {
         return false;
     }
+
+    const uint32_t substep_count = (config->substep_count == 0u)
+                                       ? SL_SUBSTEP_COUNT_DEFAULT
+                                       : config->substep_count;
+    const float linear_speed_max = (config->linear_speed_max == 0.0f)
+                                       ? SL_LINEAR_SPEED_MAX_DEFAULT
+                                       : config->linear_speed_max;
 
     const size_t capacity = (size_t)config->body_capacity;
     const size_t total_bytes = world_memory_bytes_for(capacity);
@@ -318,13 +333,20 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->masses = (float *)carve(base, &offset, capacity, sizeof(float));
     world->inv_masses = (float *)carve(base, &offset, capacity, sizeof(float));
     world->forces = (sl_vec2 *)carve(base, &offset, capacity, sizeof(sl_vec2));
+    world->delta_positions =
+        (sl_vec2 *)carve(base, &offset, capacity, sizeof(sl_vec2));
     world->rotations =
+        (sl_rotation *)carve(base, &offset, capacity, sizeof(sl_rotation));
+    world->delta_rotations =
         (sl_rotation *)carve(base, &offset, capacity, sizeof(sl_rotation));
     world->angular_velocities =
         (float *)carve(base, &offset, capacity, sizeof(float));
     world->torques = (float *)carve(base, &offset, capacity, sizeof(float));
     world->inertias = (float *)carve(base, &offset, capacity, sizeof(float));
     world->inv_inertias =
+        (float *)carve(base, &offset, capacity, sizeof(float));
+    world->frictions = (float *)carve(base, &offset, capacity, sizeof(float));
+    world->restitutions =
         (float *)carve(base, &offset, capacity, sizeof(float));
     world->types = (uint8_t *)carve(base, &offset, capacity, sizeof(uint8_t));
     world->shapes =
@@ -338,6 +360,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->gravity = config->gravity;
     world->linear_drag = config->linear_drag;
     world->angular_drag = config->angular_drag;
+    world->substep_count = substep_count;
+    world->linear_speed_max = linear_speed_max;
 
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
         /* Descending push => LIFO pops hand out slots 0,1,2,... */
@@ -409,13 +433,17 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
      * the encoding falls out of inverse_or_zero without a type test. */
     world->inv_masses[dense] = inverse_or_zero(desc->mass);
     world->forces[dense] = sl_vec2_make(0.0f, 0.0f);
+    world->delta_positions[dense] = sl_vec2_make(0.0f, 0.0f);
 
     world->rotations[dense] = sl_rotation_make(sl_angle_wrap(desc->angle));
+    world->delta_rotations[dense] = sl_rotation_identity();
     world->angular_velocities[dense] = desc->angular_velocity;
     world->torques[dense] = 0.0f;
     body_write_inertia(world, dense, inertia);
 
     world->types[dense] = (uint8_t)desc->type;
+    world->frictions[dense] = desc->friction;
+    world->restitutions[dense] = desc->restitution;
     if (desc->shape == NULL) {
         world->shapes[dense] = sl_shape_none();
     } else {
@@ -452,11 +480,15 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
         world->masses[dense] = world->masses[last];
         world->inv_masses[dense] = world->inv_masses[last];
         world->forces[dense] = world->forces[last];
+        world->delta_positions[dense] = world->delta_positions[last];
         world->rotations[dense] = world->rotations[last];
+        world->delta_rotations[dense] = world->delta_rotations[last];
         world->angular_velocities[dense] = world->angular_velocities[last];
         world->torques[dense] = world->torques[last];
         world->inertias[dense] = world->inertias[last];
         world->inv_inertias[dense] = world->inv_inertias[last];
+        world->frictions[dense] = world->frictions[last];
+        world->restitutions[dense] = world->restitutions[last];
         world->types[dense] = world->types[last];
         world->shapes[dense] = world->shapes[last];
 
@@ -513,6 +545,18 @@ float sl_world_get_angular_drag(const sl_world *world)
 {
     SL_ASSERT(world != NULL);
     return world->angular_drag;
+}
+
+uint32_t sl_world_get_substep_count(const sl_world *world)
+{
+    SL_ASSERT(world != NULL);
+    return world->substep_count;
+}
+
+float sl_world_get_linear_speed_max(const sl_world *world)
+{
+    SL_ASSERT(world != NULL);
+    return world->linear_speed_max;
 }
 
 sl_body_handle sl_world_body_first(const sl_world *world)
@@ -618,6 +662,21 @@ float sl_world_body_get_torque(const sl_world *world, sl_body_handle handle)
     return world->torques[world->slots[handle.index].dense];
 }
 
+float sl_world_body_get_friction(const sl_world *world, sl_body_handle handle)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    return world->frictions[world->slots[handle.index].dense];
+}
+
+float sl_world_body_get_restitution(const sl_world *world,
+                                    sl_body_handle handle)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    return world->restitutions[world->slots[handle.index].dense];
+}
+
 const sl_shape *sl_world_body_get_shape(const sl_world *world,
                                         sl_body_handle handle)
 {
@@ -693,6 +752,31 @@ bool sl_world_body_set_angular_velocity(sl_world *world, sl_body_handle handle,
         return false;
     }
     world->angular_velocities[dense] = angular_velocity;
+    return true;
+}
+
+bool sl_world_body_set_friction(sl_world *world, sl_body_handle handle,
+                                float friction)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    if (!sl_is_finite(friction) || friction < 0.0f) {
+        return false;
+    }
+    world->frictions[world->slots[handle.index].dense] = friction;
+    return true;
+}
+
+bool sl_world_body_set_restitution(sl_world *world, sl_body_handle handle,
+                                   float restitution)
+{
+    SL_ASSERT(world != NULL);
+    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    if (!sl_is_finite(restitution) || restitution < 0.0f ||
+        restitution > 1.0f) {
+        return false;
+    }
+    world->restitutions[world->slots[handle.index].dense] = restitution;
     return true;
 }
 

@@ -2,21 +2,51 @@
 
 #include <string.h>
 
-/* Commits one linear axis. A held dynamic axis drops to zero velocity so
- * outward acceleration cannot bank indefinitely: the body halts at the
- * last in-domain position, up to velocity * dt inside the bound rather
- * than against it. Kinematic velocity stays controller-owned. */
-static inline void position_axis_commit(float velocity, float dt, bool dynamic,
-                                        float *position_stored,
-                                        float *velocity_stored)
+/* Scale-safe Euclidean cap. Dividing by the largest component before the
+ * length avoids overflow for any finite externally supplied velocity. */
+static sl_vec2 linear_velocity_cap(sl_vec2 velocity, float speed_max)
 {
-    if (!sl_is_finite(velocity)) {
-        return;
+    const float component_max = sl_max(sl_abs(velocity.x), sl_abs(velocity.y));
+    if (component_max == 0.0f) {
+        return velocity;
     }
-    *velocity_stored = velocity;
-    const float position = *position_stored + velocity * dt;
-    if (sl_abs(position) <= SL_POSITION_ABS_MAX) {
-        *position_stored = position;
+    const sl_vec2 scaled = sl_vec2_scale(velocity, 1.0f / component_max);
+    const float scaled_length = sl_vec2_length(scaled);
+    if (component_max <= speed_max / scaled_length) {
+        return velocity;
+    }
+    const float factor = (speed_max / component_max) / scaled_length;
+    return sl_vec2_scale(velocity, factor);
+}
+
+static float angular_velocity_cap(float velocity, float speed_max)
+{
+    return sl_clamp(velocity, -speed_max, speed_max);
+}
+
+/* Invalid arithmetic retains the previous finite velocity. Valid world state
+ * makes this exceptional (an extreme dt is the usual cause), and the speed
+ * policy still caps the retained state before it feeds integration. */
+static float velocity_integrate(float velocity, float acceleration, float h,
+                                float drag_scale)
+{
+    const float candidate = (velocity + acceleration * h) * drag_scale;
+    return sl_is_finite(candidate) ? candidate : velocity;
+}
+
+/* Advances one accumulated linear delta. A held dynamic axis drops to zero
+ * velocity so outward acceleration cannot bank indefinitely. Kinematic
+ * velocity remains controller-owned while its delta stays at the last valid
+ * value. */
+static void position_delta_integrate(float base_position, float velocity,
+                                     float h, bool dynamic, float *delta,
+                                     float *velocity_stored)
+{
+    const float candidate_delta = *delta + velocity * h;
+    const float candidate_position = base_position + candidate_delta;
+    if (sl_is_finite(candidate_delta) &&
+        sl_abs(candidate_position) <= SL_POSITION_ABS_MAX) {
+        *delta = candidate_delta;
     } else if (dynamic) {
         *velocity_stored = 0.0f;
     }
@@ -25,63 +55,108 @@ static inline void position_axis_commit(float velocity, float dt, bool dynamic,
 void sl_world_step(sl_world *world, float dt)
 {
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_is_finite(dt));
-    SL_ASSERT(dt > 0.0f);
+    if (world == NULL) {
+        return;
+    }
+    const bool world_valid = world->substep_count >= 1u &&
+                             world->substep_count <= SL_SUBSTEP_COUNT_MAX &&
+                             sl_is_finite(world->linear_speed_max) &&
+                             world->linear_speed_max > 0.0f;
+    SL_ASSERT(world_valid);
+    if (!world_valid) {
+        return;
+    }
+    const bool dt_valid = sl_is_finite(dt) && dt > 0.0f;
+    SL_ASSERT(dt_valid);
+    if (!dt_valid) {
+        return;
+    }
 
-    /* (1 + dt * drag) >= 1 for every accepted world, so each scale is
-     * in (0, 1] and can never reverse a velocity. */
-    const float drag_scale = 1.0f / (1.0f + dt * world->linear_drag);
-    const float angular_drag_scale = 1.0f / (1.0f + dt * world->angular_drag);
+    const float h = dt / (float)world->substep_count;
+    const float inverse_dt = 1.0f / dt;
+    const float inverse_h = 1.0f / h;
+    const bool derived_valid = sl_is_finite(h) && h > 0.0f &&
+                               sl_is_finite(inverse_dt) && inverse_dt > 0.0f &&
+                               sl_is_finite(inverse_h) && inverse_h > 0.0f;
+    SL_ASSERT(derived_valid);
+    if (!derived_valid) {
+        return;
+    }
 
+    /* Each divisor is >= 1 for an initialized world. Overflow produces a
+     * scale of exact zero, still a stable and finite drag result. */
+    const float linear_drag_scale = 1.0f / (1.0f + h * world->linear_drag);
+    const float angular_drag_scale = 1.0f / (1.0f + h * world->angular_drag);
+    const float angular_speed_max = SL_ROTATION_PER_STEP_MAX * inverse_dt;
+
+    /* Deltas retain precision while the base transforms remain fixed for all
+     * substeps and, later, for every solver iteration. */
     for (uint32_t i = 0u; i < world->body_count; ++i) {
-        const uint8_t type = world->types[i];
-        const bool dynamic = (type == (uint8_t)SL_BODY_DYNAMIC);
-        const bool moving = dynamic || (type == (uint8_t)SL_BODY_KINEMATIC);
-        /* The type gates only gravity and the two drags; everything
-         * else is an invariant create and the setters maintain. */
-        SL_ASSERT(dynamic || world->inv_masses[i] == 0.0f);
-        SL_ASSERT(dynamic || world->inv_inertias[i] == 0.0f);
-        SL_ASSERT(moving || (world->velocities[i].x == 0.0f &&
-                             world->velocities[i].y == 0.0f &&
-                             world->angular_velocities[i] == 0.0f));
+        world->delta_positions[i] = sl_vec2_make(0.0f, 0.0f);
+        world->delta_rotations[i] = sl_rotation_identity();
+    }
 
-        const sl_vec2 gravity =
-            dynamic ? world->gravity : sl_vec2_make(0.0f, 0.0f);
-        const sl_vec2 force =
-            dynamic ? world->forces[i] : sl_vec2_make(0.0f, 0.0f);
-        const float torque = dynamic ? world->torques[i] : 0.0f;
+    for (uint32_t substep = 0u; substep < world->substep_count; ++substep) {
+        for (uint32_t i = 0u; i < world->body_count; ++i) {
+            const uint8_t type = world->types[i];
+            const bool dynamic = type == (uint8_t)SL_BODY_DYNAMIC;
+            const bool moving = dynamic || type == (uint8_t)SL_BODY_KINEMATIC;
+            SL_ASSERT(dynamic || world->inv_masses[i] == 0.0f);
+            SL_ASSERT(dynamic || world->inv_inertias[i] == 0.0f);
+            SL_ASSERT(moving || (world->velocities[i].x == 0.0f &&
+                                 world->velocities[i].y == 0.0f &&
+                                 world->angular_velocities[i] == 0.0f));
+            if (!moving) {
+                continue;
+            }
 
-        const sl_vec2 acceleration =
-            sl_vec2_add(gravity, sl_vec2_scale(force, world->inv_masses[i]));
-        const float angular_acceleration = torque * world->inv_inertias[i];
-
-        if (moving) {
-            sl_vec2 velocity = sl_vec2_add(world->velocities[i],
-                                           sl_vec2_scale(acceleration, dt));
-            float spin =
-                world->angular_velocities[i] + angular_acceleration * dt;
+            sl_vec2 velocity = world->velocities[i];
+            float angular_velocity = world->angular_velocities[i];
             if (dynamic) {
-                velocity = sl_vec2_scale(velocity, drag_scale);
-                spin = spin * angular_drag_scale;
+                const sl_vec2 acceleration = sl_vec2_add(
+                    world->gravity,
+                    sl_vec2_scale(world->forces[i], world->inv_masses[i]));
+                const float angular_acceleration =
+                    world->torques[i] * world->inv_inertias[i];
+                velocity.x = velocity_integrate(velocity.x, acceleration.x, h,
+                                                linear_drag_scale);
+                velocity.y = velocity_integrate(velocity.y, acceleration.y, h,
+                                                linear_drag_scale);
+                angular_velocity =
+                    velocity_integrate(angular_velocity, angular_acceleration,
+                                       h, angular_drag_scale);
             }
-            /* Axes commit independently so one boundary cannot freeze
-             * motion along the other. */
-            position_axis_commit(velocity.x, dt, dynamic,
-                                 &world->positions[i].x,
-                                 &world->velocities[i].x);
-            position_axis_commit(velocity.y, dt, dynamic,
-                                 &world->positions[i].y,
-                                 &world->velocities[i].y);
-            if (sl_is_finite(spin)) {
-                world->angular_velocities[i] = spin;
-                world->rotations[i] =
-                    sl_rotation_integrate(world->rotations[i], spin * dt);
-            }
+            world->velocities[i] =
+                linear_velocity_cap(velocity, world->linear_speed_max);
+            world->angular_velocities[i] =
+                angular_velocity_cap(angular_velocity, angular_speed_max);
         }
 
-        /* Accumulators are consumed whether or not their body moved:
-         * non-dynamic rows carry zeros, and zero-clearing is bitwise
-         * stable. */
+        for (uint32_t i = 0u; i < world->body_count; ++i) {
+            const uint8_t type = world->types[i];
+            const bool dynamic = type == (uint8_t)SL_BODY_DYNAMIC;
+            const bool moving = dynamic || type == (uint8_t)SL_BODY_KINEMATIC;
+            if (!moving) {
+                continue;
+            }
+            position_delta_integrate(
+                world->positions[i].x, world->velocities[i].x, h, dynamic,
+                &world->delta_positions[i].x, &world->velocities[i].x);
+            position_delta_integrate(
+                world->positions[i].y, world->velocities[i].y, h, dynamic,
+                &world->delta_positions[i].y, &world->velocities[i].y);
+            world->delta_rotations[i] = sl_rotation_integrate(
+                world->delta_rotations[i], world->angular_velocities[i] * h);
+        }
+    }
+
+    for (uint32_t i = 0u; i < world->body_count; ++i) {
+        world->positions[i] =
+            sl_vec2_add(world->positions[i], world->delta_positions[i]);
+        world->rotations[i] = sl_rotation_normalize(
+            sl_rotation_mul(world->delta_rotations[i], world->rotations[i]));
+        world->delta_positions[i] = sl_vec2_make(0.0f, 0.0f);
+        world->delta_rotations[i] = sl_rotation_identity();
         world->forces[i] = sl_vec2_make(0.0f, 0.0f);
         world->torques[i] = 0.0f;
     }

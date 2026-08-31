@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <silk/step.h>
@@ -33,6 +34,7 @@ static void test_stepper_init_rejects_bad_timestep(void)
 static void test_step_moves_body_under_gravity(void)
 {
     sl_world_config config = { .body_capacity = 2u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, -10.0f),
                                .linear_drag = 0.0f };
     sl_world world = { 0 };
@@ -58,9 +60,183 @@ static void test_step_moves_body_under_gravity(void)
     sl_world_destroy(&world);
 }
 
+static void test_default_substeps_pin_gravity_trajectory(void)
+{
+    sl_world_config config = { .body_capacity = 1u,
+                               .gravity = sl_vec2_make(0.0f, -10.0f) };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+    SL_EXPECT_INT_EQ(world.substep_count, 4u);
+
+    sl_body_desc desc = { .mass = 1.0f };
+    const sl_body_handle handle = sl_world_body_create(&world, &desc);
+    sl_world_step(&world, k_dt);
+
+    /* h = 0.025: p = g*h^2*n(n+1)/2 = -0.0625, v = g*dt = -1. */
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&world, handle).y, -1.0f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_position(&world, handle).y, -0.0625f,
+                   k_eps);
+    const uint32_t dense = world.slots[handle.index].dense;
+    SL_EXPECT(world.delta_positions[dense].x == 0.0f &&
+              world.delta_positions[dense].y == 0.0f);
+    SL_EXPECT(world.delta_rotations[dense].c == 1.0f &&
+              world.delta_rotations[dense].s == 0.0f);
+    sl_world_destroy(&world);
+}
+
+static void test_substep_drag_and_force_equations(void)
+{
+    sl_world_config drag_config = { .body_capacity = 1u,
+                                    .substep_count = 4u,
+                                    .linear_drag = 10.0f };
+    sl_world drag_world = { 0 };
+    SL_EXPECT(sl_world_init(&drag_world, &drag_config));
+    sl_body_desc moving = { .velocity = sl_vec2_make(1.0f, 0.0f),
+                            .mass = 1.0f };
+    const sl_body_handle moving_handle =
+        sl_world_body_create(&drag_world, &moving);
+    sl_world_step(&drag_world, k_dt);
+    /* Four recurrences v <- v / 1.25 produce 0.4096; the four post-drag
+     * velocities integrate to 0.05904. */
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&drag_world, moving_handle).x,
+                   0.4096f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_position(&drag_world, moving_handle).x,
+                   0.05904f, k_eps);
+    sl_world_destroy(&drag_world);
+
+    sl_world_config force_config = { .body_capacity = 1u, .substep_count = 4u };
+    sl_world force_world = { 0 };
+    SL_EXPECT(sl_world_init(&force_world, &force_config));
+    sl_body_desc forced = { .mass = 2.0f };
+    const sl_body_handle forced_handle =
+        sl_world_body_create(&force_world, &forced);
+    SL_EXPECT(sl_world_body_apply_force(&force_world, forced_handle,
+                                        sl_vec2_make(4.0f, 0.0f)));
+    sl_world_step(&force_world, k_dt);
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&force_world, forced_handle).x,
+                   0.2f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_position(&force_world, forced_handle).x,
+                   0.0125f, k_eps);
+    const sl_vec2 cleared =
+        sl_world_body_get_force(&force_world, forced_handle);
+    SL_EXPECT(cleared.x == 0.0f && cleared.y == 0.0f);
+    sl_world_destroy(&force_world);
+}
+
+static void test_moving_body_speed_caps(void)
+{
+    sl_world_config config = { .body_capacity = 2u,
+                               .substep_count = 4u,
+                               .linear_speed_max = 10.0f };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+
+    sl_body_desc dynamic = { .velocity = sl_vec2_make(30.0f, 40.0f),
+                             .mass = 1.0f,
+                             .angular_velocity = 100.0f };
+    sl_body_desc kinematic = { .velocity = sl_vec2_make(-30.0f, -40.0f),
+                               .type = SL_BODY_KINEMATIC,
+                               .angular_velocity = -100.0f };
+    const sl_body_handle dynamic_handle =
+        sl_world_body_create(&world, &dynamic);
+    const sl_body_handle kinematic_handle =
+        sl_world_body_create(&world, &kinematic);
+    sl_world_step(&world, 1.0f);
+
+    const sl_vec2 dynamic_velocity =
+        sl_world_body_get_velocity(&world, dynamic_handle);
+    const sl_vec2 kinematic_velocity =
+        sl_world_body_get_velocity(&world, kinematic_handle);
+    SL_EXPECT_NEAR(dynamic_velocity.x, 6.0f, k_eps);
+    SL_EXPECT_NEAR(dynamic_velocity.y, 8.0f, k_eps);
+    SL_EXPECT_NEAR(kinematic_velocity.x, -6.0f, k_eps);
+    SL_EXPECT_NEAR(kinematic_velocity.y, -8.0f, k_eps);
+    const sl_vec2 dynamic_position =
+        sl_world_body_get_position(&world, dynamic_handle);
+    const sl_vec2 kinematic_position =
+        sl_world_body_get_position(&world, kinematic_handle);
+    SL_EXPECT_NEAR(dynamic_position.x, 6.0f, k_eps);
+    SL_EXPECT_NEAR(dynamic_position.y, 8.0f, k_eps);
+    SL_EXPECT_NEAR(kinematic_position.x, -6.0f, k_eps);
+    SL_EXPECT_NEAR(kinematic_position.y, -8.0f, k_eps);
+
+    SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, dynamic_handle),
+                   SL_ROTATION_PER_STEP_MAX, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, kinematic_handle),
+                   -SL_ROTATION_PER_STEP_MAX, k_eps);
+    const float angular_advance = 4.0f * atanf(SL_ROTATION_PER_STEP_MAX / 4.0f);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, dynamic_handle),
+                   angular_advance, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, kinematic_handle),
+                   -angular_advance, k_eps);
+    sl_world_destroy(&world);
+}
+
+static void test_mid_substep_domain_hold_by_body_type(void)
+{
+    sl_world_config config = { .body_capacity = 2u, .substep_count = 4u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+    const float start = SL_POSITION_ABS_MAX - 0.6f;
+    sl_body_desc dynamic = { .position = sl_vec2_make(start, 0.0f),
+                             .velocity = sl_vec2_make(1.0f, 0.0f),
+                             .mass = 1.0f };
+    sl_body_desc kinematic = { .position = sl_vec2_make(start, 1.0f),
+                               .velocity = sl_vec2_make(1.0f, 0.0f),
+                               .type = SL_BODY_KINEMATIC };
+    const sl_body_handle dynamic_handle =
+        sl_world_body_create(&world, &dynamic);
+    const sl_body_handle kinematic_handle =
+        sl_world_body_create(&world, &kinematic);
+    sl_world_step(&world, 1.0f);
+
+    /* Two 0.25-unit deltas fit; the third is held. The dynamic axis stops,
+     * while the kinematic controller retains its requested velocity. */
+    SL_EXPECT_NEAR(sl_world_body_get_position(&world, dynamic_handle).x,
+                   start + 0.5f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_position(&world, kinematic_handle).x,
+                   start + 0.5f, k_eps);
+    SL_EXPECT(sl_world_body_get_velocity(&world, dynamic_handle).x == 0.0f);
+    SL_EXPECT(sl_world_body_get_velocity(&world, kinematic_handle).x == 1.0f);
+    sl_world_destroy(&world);
+}
+
+static void test_invalid_step_is_release_safe_and_atomic(void)
+{
+#ifdef NDEBUG
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 4u };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+    sl_body_desc desc = { .velocity = sl_vec2_make(2.0f, -3.0f),
+                          .mass = 1.0f,
+                          .angular_velocity = 4.0f };
+    const sl_body_handle handle = sl_world_body_create(&world, &desc);
+    SL_EXPECT(
+        sl_world_body_apply_force(&world, handle, sl_vec2_make(5.0f, 6.0f)));
+    const size_t bytes = sl_world_memory_bytes(1u);
+    void *snapshot = malloc(bytes);
+    SL_EXPECT(snapshot != NULL);
+    if (snapshot != NULL) {
+        memcpy(snapshot, world.memory, bytes);
+        const float invalid_dt[] = { NAN, INFINITY, 0.0f, -1.0f, FLT_MIN };
+        for (uint32_t i = 0u; i < sizeof(invalid_dt) / sizeof(invalid_dt[0]);
+             ++i) {
+            sl_world_step(&world, invalid_dt[i]);
+            SL_EXPECT(memcmp(snapshot, world.memory, bytes) == 0);
+        }
+        free(snapshot);
+    }
+    sl_world_destroy(&world);
+#else
+    /* Invalid inputs intentionally assert in debug; release executes the
+     * no-mutation guards above. */
+    SL_EXPECT(true);
+#endif
+}
+
 static void test_step_applies_force_via_inv_mass(void)
 {
-    sl_world_config config = { .body_capacity = 2u };
+    sl_world_config config = { .body_capacity = 2u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -87,7 +263,7 @@ static void test_step_applies_force_via_inv_mass(void)
 
 static void test_force_clears_after_step(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -118,7 +294,7 @@ static void test_force_clears_after_step(void)
 
 static void test_apply_force_rejects_non_finite(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -139,7 +315,7 @@ static void test_apply_force_rejects_non_finite(void)
 
 static void test_apply_force_rejects_overflowing_sum(void)
 {
-    sl_world_config config = { .body_capacity = 2u };
+    sl_world_config config = { .body_capacity = 2u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -176,7 +352,7 @@ static void test_apply_force_rejects_overflowing_sum(void)
 
 static void test_step_holds_last_finite_state_on_overflow(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -184,10 +360,8 @@ static void test_step_holds_last_finite_state_on_overflow(void)
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(!sl_body_handle_is_null(h));
 
-    /* Each value is legal state; their product with dt is not. The
-     * angular side is the sharper one: wrapping an infinite angle
-     * yields NaN, which would leave the documented [-pi, pi] range and
-     * trip the finite-transform assert in every later shape query. */
+    /* Extreme finite state is normalized by the integration-stage policies
+     * before it can overflow a position or rotation candidate. */
     SL_EXPECT(sl_world_body_set_velocity(&world, h, sl_vec2_make(3e38f, 0.0f)));
     SL_EXPECT(sl_world_body_set_angular_velocity(&world, h, 3e38f));
     sl_world_step(&world, 2.0f);
@@ -197,12 +371,14 @@ static void test_step_holds_last_finite_state_on_overflow(void)
     const sl_rotation rotation = world.rotations[world.slots[h.index].dense];
     SL_EXPECT(sl_vec2_is_finite(position));
     SL_EXPECT(sl_is_finite(angle));
-    /* Uncommitted, not clamped: the row keeps the pose it arrived with. */
-    SL_EXPECT(position.x == 0.0f && position.y == 0.0f);
-    SL_EXPECT(angle == 0.0f);
-    SL_EXPECT(rotation.c == 1.0f && rotation.s == 0.0f);
-    SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_velocity(&world, h)));
-    SL_EXPECT(sl_is_finite(sl_world_body_get_angular_velocity(&world, h)));
+    SL_EXPECT_NEAR(position.x, 800.0f, k_eps);
+    SL_EXPECT(position.y == 0.0f);
+    SL_EXPECT_NEAR(angle, atanf(SL_ROTATION_PER_STEP_MAX), k_eps);
+    SL_EXPECT(sl_rotation_is_finite(rotation));
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&world, h).x,
+                   SL_LINEAR_SPEED_MAX_DEFAULT, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, h),
+                   SL_ROTATION_PER_STEP_MAX / 2.0f, k_eps);
 
     sl_world_destroy(&world);
 }
@@ -212,7 +388,7 @@ static void test_step_holds_last_finite_state_on_overflow(void)
  * the property, so these compare bit for bit. */
 static void test_position_domain_boundary_matches_setters(void)
 {
-    sl_world_config config = { .body_capacity = 2u };
+    sl_world_config config = { .body_capacity = 2u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -246,12 +422,12 @@ static void test_position_domain_boundary_matches_setters(void)
     sl_world_destroy(&world);
 }
 
-/* Gravity large enough that acceleration alone overflows a legal
- * velocity. The axis keeps the velocity it arrived with; it must not
- * fall through to the boundary's zeroing path. */
+/* Gravity large enough that acceleration overflows first retains the prior
+ * finite velocity, then subjects it to the same integration-stage cap. */
 static void test_step_holds_velocity_when_candidate_overflows(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(3e38f, 0.0f) };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
@@ -261,8 +437,10 @@ static void test_step_holds_velocity_when_candidate_overflows(void)
     SL_EXPECT(!sl_body_handle_is_null(h));
 
     sl_world_step(&world, 1.0f);
-    SL_EXPECT(sl_world_body_get_velocity(&world, h).x == 3e38f);
-    SL_EXPECT(sl_world_body_get_position(&world, h).x == 0.0f);
+    SL_EXPECT_NEAR(sl_world_body_get_velocity(&world, h).x,
+                   SL_LINEAR_SPEED_MAX_DEFAULT, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_position(&world, h).x,
+                   SL_LINEAR_SPEED_MAX_DEFAULT, k_eps);
 
     sl_world_destroy(&world);
 }
@@ -270,6 +448,7 @@ static void test_step_holds_velocity_when_candidate_overflows(void)
 static void test_position_domain_holds_pose_and_allows_recovery(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(1.0f, 0.0f) };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
@@ -305,6 +484,7 @@ static void test_position_domain_holds_pose_and_allows_recovery(void)
 static void test_position_domain_rejects_axes_independently(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, -1.0f) };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
@@ -333,7 +513,7 @@ static void test_position_domain_rejects_axes_independently(void)
 
 static void test_apply_force_rejects_acceleration_overflow(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -361,6 +541,7 @@ static void test_apply_force_rejects_acceleration_overflow(void)
 static void test_drag_halves_velocity_per_step(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, 0.0f),
                                .linear_drag = 10.0f };
     sl_world world = { 0 };
@@ -388,6 +569,7 @@ static void test_drag_halves_velocity_per_step(void)
 static void test_drag_extreme_coefficient_stable(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, 0.0f),
                                .linear_drag = 1e30f };
     sl_world world = { 0 };
@@ -410,6 +592,7 @@ static void test_drag_extreme_coefficient_stable(void)
 static void test_advance_runs_steps_and_carries_remainder(void)
 {
     sl_world_config config = { .body_capacity = 2u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, -10.0f),
                                .linear_drag = 0.0f };
     sl_world world = { 0 };
@@ -443,7 +626,7 @@ static void test_advance_runs_steps_and_carries_remainder(void)
 
 static void test_advance_drops_debt_at_cap(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -463,7 +646,7 @@ static void test_advance_drops_debt_at_cap(void)
 
 static void test_advance_ignores_garbage_frame_time(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -506,12 +689,18 @@ static bool twin_worlds_in_sync(const sl_world *a, const sl_world *b)
             a->forces[i].x == b->forces[i].x &&
             a->forces[i].y == b->forces[i].y && a->masses[i] == b->masses[i] &&
             a->inv_masses[i] == b->inv_masses[i] &&
+            a->delta_positions[i].x == b->delta_positions[i].x &&
+            a->delta_positions[i].y == b->delta_positions[i].y &&
             a->rotations[i].c == b->rotations[i].c &&
             a->rotations[i].s == b->rotations[i].s &&
+            a->delta_rotations[i].c == b->delta_rotations[i].c &&
+            a->delta_rotations[i].s == b->delta_rotations[i].s &&
             a->angular_velocities[i] == b->angular_velocities[i] &&
             a->torques[i] == b->torques[i] &&
             a->inertias[i] == b->inertias[i] &&
             a->inv_inertias[i] == b->inv_inertias[i] &&
+            a->frictions[i] == b->frictions[i] &&
+            a->restitutions[i] == b->restitutions[i] &&
             a->types[i] == b->types[i] &&
             shapes_match(&a->shapes[i], &b->shapes[i]);
         if (!rows_match) {
@@ -524,6 +713,7 @@ static bool twin_worlds_in_sync(const sl_world *a, const sl_world *b)
 static void test_determinism_identical_sequences_bitwise(void)
 {
     sl_world_config config = { .body_capacity = 8u,
+                               .substep_count = 4u,
                                .gravity = sl_vec2_make(0.5f, -10.0f),
                                .linear_drag = 2.0f };
     sl_world a = { 0 };
@@ -649,6 +839,7 @@ static void test_results_independent_of_packed_layout(void)
     };
 
     const sl_world_config config = { .body_capacity = 8u,
+                                     .substep_count = 1u,
                                      .gravity = sl_vec2_make(0.0f, -10.0f),
                                      .linear_drag = 3.0f };
 
@@ -709,45 +900,69 @@ static void test_results_independent_of_packed_layout(void)
     sl_world_destroy(&b);
 }
 
-static void test_config_rejects_bad_gravity_or_drag(void)
+static void test_config_validation_and_defaults(void)
 {
     sl_world world = { 0 };
 
     sl_world_config nan_gravity = { .body_capacity = 4u,
+                                    .substep_count = 1u,
                                     .gravity = sl_vec2_make(NAN, 0.0f),
                                     .linear_drag = 0.0f };
     SL_EXPECT(!sl_world_init(&world, &nan_gravity));
     SL_EXPECT(world.memory == NULL && world.body_capacity == 0u);
 
     sl_world_config inf_gravity = { .body_capacity = 4u,
+                                    .substep_count = 1u,
                                     .gravity = sl_vec2_make(0.0f, INFINITY),
                                     .linear_drag = 0.0f };
     SL_EXPECT(!sl_world_init(&world, &inf_gravity));
     SL_EXPECT(world.memory == NULL);
 
-    sl_world_config neg_drag = { .body_capacity = 4u };
+    sl_world_config neg_drag = { .body_capacity = 4u, .substep_count = 1u };
     neg_drag.linear_drag = -1.0f;
     SL_EXPECT(!sl_world_init(&world, &neg_drag));
 
-    sl_world_config nan_drag = { .body_capacity = 4u };
+    sl_world_config nan_drag = { .body_capacity = 4u, .substep_count = 1u };
     nan_drag.linear_drag = NAN;
     SL_EXPECT(!sl_world_init(&world, &nan_drag));
 
-    sl_world_config inf_drag = { .body_capacity = 4u };
+    sl_world_config inf_drag = { .body_capacity = 4u, .substep_count = 1u };
     inf_drag.linear_drag = INFINITY;
     SL_EXPECT(!sl_world_init(&world, &inf_drag));
 
-    sl_world_config neg_angular = { .body_capacity = 4u };
+    sl_world_config neg_angular = { .body_capacity = 4u, .substep_count = 1u };
     neg_angular.angular_drag = -0.5f;
     SL_EXPECT(!sl_world_init(&world, &neg_angular));
 
-    sl_world_config nan_angular = { .body_capacity = 4u };
+    sl_world_config nan_angular = { .body_capacity = 4u, .substep_count = 1u };
     nan_angular.angular_drag = NAN;
     SL_EXPECT(!sl_world_init(&world, &nan_angular));
 
-    sl_world_config inf_angular = { .body_capacity = 4u };
+    sl_world_config inf_angular = { .body_capacity = 4u, .substep_count = 1u };
     inf_angular.angular_drag = INFINITY;
     SL_EXPECT(!sl_world_init(&world, &inf_angular));
+
+    sl_world_config too_many_substeps = { .body_capacity = 4u,
+                                          .substep_count =
+                                              SL_SUBSTEP_COUNT_MAX + 1u };
+    SL_EXPECT(!sl_world_init(&world, &too_many_substeps));
+
+    sl_world_config bad_speed = { .body_capacity = 4u,
+                                  .substep_count = 1u,
+                                  .linear_speed_max = -1.0f };
+    SL_EXPECT(!sl_world_init(&world, &bad_speed));
+    bad_speed.linear_speed_max = NAN;
+    SL_EXPECT(!sl_world_init(&world, &bad_speed));
+    bad_speed.linear_speed_max = INFINITY;
+    SL_EXPECT(!sl_world_init(&world, &bad_speed));
+
+    sl_world_config explicit_limits = { .body_capacity = 2u,
+                                        .substep_count = SL_SUBSTEP_COUNT_MAX,
+                                        .linear_speed_max = 12.5f };
+    SL_EXPECT(sl_world_init(&world, &explicit_limits));
+    SL_EXPECT_INT_EQ(sl_world_get_substep_count(&world), SL_SUBSTEP_COUNT_MAX);
+    SL_EXPECT(sl_world_get_linear_speed_max(&world) == 12.5f);
+    sl_world_destroy(&world);
 
     /* Zeroed trailing fields are the documented defaults. */
     sl_world_config defaults = { .body_capacity = 2u };
@@ -756,6 +971,10 @@ static void test_config_rejects_bad_gravity_or_drag(void)
     SL_EXPECT(gravity.x == 0.0f && gravity.y == 0.0f);
     SL_EXPECT(sl_world_get_linear_drag(&world) == 0.0f);
     SL_EXPECT(sl_world_get_angular_drag(&world) == 0.0f);
+    SL_EXPECT_INT_EQ(sl_world_get_substep_count(&world),
+                     SL_SUBSTEP_COUNT_DEFAULT);
+    SL_EXPECT(sl_world_get_linear_speed_max(&world) ==
+              SL_LINEAR_SPEED_MAX_DEFAULT);
 
     /* Defaults coast: pure linear motion, exactly one timestep of arc. */
     sl_body_desc desc = { .position = sl_vec2_make(1.0f, 1.0f),
@@ -796,6 +1015,7 @@ static uint32_t model_generation_bump(uint32_t generation)
 static void test_churn_step_stress_matches_model(void)
 {
     sl_world_config config = { .body_capacity = CHURN_CAPACITY,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.2f, -9.8f),
                                .linear_drag = 1.5f };
     sl_world world = { 0 };
@@ -961,7 +1181,7 @@ static void test_churn_step_stress_matches_model(void)
  * small-angle rotation advances by atan(omega * dt), not omega * dt. */
 static void test_torque_integrates_angular_velocity_by_inv_inertia(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -989,7 +1209,7 @@ static void test_torque_integrates_angular_velocity_by_inv_inertia(void)
 
 static void test_torque_clears_after_step(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -1017,6 +1237,7 @@ static void test_torque_clears_after_step(void)
 static void test_angular_drag_halves_spin_per_step(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .linear_drag = 0.0f,
                                .angular_drag = 10.0f };
     sl_world world = { 0 };
@@ -1040,12 +1261,12 @@ static void test_angular_drag_halves_spin_per_step(void)
 
 static void test_angle_stays_principal_after_many_rotations(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    /* Five half-turns per second at dt = 0.1. Each small-angle update
-     * advances by atan(0.5*pi), crossing +-pi repeatedly over 100 steps. */
+    /* Input exceeds the per-step angular policy. Each step caps its delta to
+     * a quarter turn before the normalized small-angle update. */
     sl_body_desc desc = { .mass = 1.0f, .angular_velocity = 5.0f * SL_PI };
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(!sl_body_handle_is_null(h));
@@ -1055,27 +1276,30 @@ static void test_angle_stays_principal_after_many_rotations(void)
         const float angle = sl_world_body_get_angle(&world, h);
         SL_EXPECT(angle <= SL_PI + k_eps && angle >= -SL_PI - k_eps);
     }
-    const float expected = sl_angle_wrap(100.0f * atanf(0.5f * SL_PI));
+    const float expected =
+        sl_angle_wrap(100.0f * atanf(SL_ROTATION_PER_STEP_MAX));
     SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), expected, 1e-4f);
 
     sl_world_destroy(&world);
 }
 
-static void test_large_rotation_uses_small_angle_advance(void)
+static void test_large_rotation_is_capped_per_full_step(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    /* One large finite delta stays unit length and advances by
-     * atan(delta), approaching but not reaching a quarter turn. */
+    /* One large finite input is capped so the full-step delta never exceeds
+     * SL_ROTATION_PER_STEP_MAX, independent of its initial magnitude. */
     sl_body_desc desc = { .mass = 1.0f, .angular_velocity = 65.0f * SL_PI };
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(!sl_body_handle_is_null(h));
 
     sl_world_step(&world, k_dt);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), atanf(6.5f * SL_PI),
-                   1e-4f);
+    SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, h),
+                   SL_ROTATION_PER_STEP_MAX / k_dt, 1e-4f);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h),
+                   atanf(SL_ROTATION_PER_STEP_MAX), 1e-4f);
 
     sl_world_destroy(&world);
 }
@@ -1083,6 +1307,7 @@ static void test_large_rotation_uses_small_angle_advance(void)
 static void test_static_body_ignores_gravity_and_force(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, -10.0f),
                                .linear_drag = 5.0f };
     sl_world world = { 0 };
@@ -1115,6 +1340,7 @@ static void test_static_body_ignores_gravity_and_force(void)
 static void test_kinematic_moves_without_drag_or_gravity(void)
 {
     sl_world_config config = { .body_capacity = 1u,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.0f, -10.0f),
                                .linear_drag = 10.0f,
                                .angular_drag = 10.0f };
@@ -1148,7 +1374,7 @@ static void test_kinematic_moves_without_drag_or_gravity(void)
  * drag is off here so the spin survives bitwise. */
 static void test_shapeless_dynamic_spins_kinematically(void)
 {
-    sl_world_config config = { .body_capacity = 1u };
+    sl_world_config config = { .body_capacity = 1u, .substep_count = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
@@ -1177,6 +1403,7 @@ static void test_shapeless_dynamic_spins_kinematically(void)
 static void test_churn_mixed_types_stress_matches_model(void)
 {
     sl_world_config config = { .body_capacity = MIXED_CAPACITY,
+                               .substep_count = 1u,
                                .gravity = sl_vec2_make(0.2f, -9.8f),
                                .linear_drag = 1.5f,
                                .angular_drag = 0.7f };
@@ -1377,6 +1604,15 @@ static const sl_test_case k_cases[] = {
     { "stepper_init_rejects_bad_timestep",
       test_stepper_init_rejects_bad_timestep },
     { "step_moves_body_under_gravity", test_step_moves_body_under_gravity },
+    { "default_substeps_pin_gravity_trajectory",
+      test_default_substeps_pin_gravity_trajectory },
+    { "substep_drag_and_force_equations",
+      test_substep_drag_and_force_equations },
+    { "moving_body_speed_caps", test_moving_body_speed_caps },
+    { "mid_substep_domain_hold_by_body_type",
+      test_mid_substep_domain_hold_by_body_type },
+    { "invalid_step_is_release_safe_and_atomic",
+      test_invalid_step_is_release_safe_and_atomic },
     { "step_applies_force_via_inv_mass", test_step_applies_force_via_inv_mass },
     { "force_clears_after_step", test_force_clears_after_step },
     { "apply_force_rejects_non_finite", test_apply_force_rejects_non_finite },
@@ -1405,8 +1641,7 @@ static const sl_test_case k_cases[] = {
       test_determinism_identical_sequences_bitwise },
     { "results_independent_of_packed_layout",
       test_results_independent_of_packed_layout },
-    { "config_rejects_bad_gravity_or_drag",
-      test_config_rejects_bad_gravity_or_drag },
+    { "config_validation_and_defaults", test_config_validation_and_defaults },
     { "torque_integrates_angular_velocity_by_inv_inertia",
       test_torque_integrates_angular_velocity_by_inv_inertia },
     { "torque_clears_after_step", test_torque_clears_after_step },
@@ -1414,8 +1649,8 @@ static const sl_test_case k_cases[] = {
       test_angular_drag_halves_spin_per_step },
     { "angle_stays_principal_after_many_rotations",
       test_angle_stays_principal_after_many_rotations },
-    { "large_rotation_uses_small_angle_advance",
-      test_large_rotation_uses_small_angle_advance },
+    { "large_rotation_is_capped_per_full_step",
+      test_large_rotation_is_capped_per_full_step },
     { "static_body_ignores_gravity_and_force",
       test_static_body_ignores_gravity_and_force },
     { "kinematic_moves_without_drag_or_gravity",
