@@ -19,6 +19,7 @@ _Static_assert((SL_CARVE_ALIGN & (SL_CARVE_ALIGN - 1u)) == 0u,
 SL_CARVE_ALIGNMENT_ASSERT(sl_body_slot);
 SL_CARVE_ALIGNMENT_ASSERT(uint32_t);
 SL_CARVE_ALIGNMENT_ASSERT(sl_vec2);
+SL_CARVE_ALIGNMENT_ASSERT(sl_rotation);
 SL_CARVE_ALIGNMENT_ASSERT(float);
 SL_CARVE_ALIGNMENT_ASSERT(uint8_t);
 SL_CARVE_ALIGNMENT_ASSERT(sl_shape);
@@ -45,14 +46,15 @@ static unsigned char *carve(unsigned char *base, size_t *offset,
 }
 
 /* Single source for init's allocation and the public budget query:
- * one slot array, two index arrays, three vec2 arrays, seven float
- * arrays, one type byte per body, and one shape record per body. */
+ * one slot array, two index arrays, three vec2 arrays, one rotation
+ * array, six float arrays, one type byte, and one shape record per body. */
 static size_t world_memory_bytes_for(size_t capacity)
 {
     return slice_bytes(capacity, sizeof(sl_body_slot)) +
            2u * slice_bytes(capacity, sizeof(uint32_t)) +
            3u * slice_bytes(capacity, sizeof(sl_vec2)) +
-           7u * slice_bytes(capacity, sizeof(float)) +
+           slice_bytes(capacity, sizeof(sl_rotation)) +
+           6u * slice_bytes(capacity, sizeof(float)) +
            slice_bytes(capacity, sizeof(uint8_t)) +
            slice_bytes(capacity, sizeof(sl_shape));
 }
@@ -316,7 +318,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->masses = (float *)carve(base, &offset, capacity, sizeof(float));
     world->inv_masses = (float *)carve(base, &offset, capacity, sizeof(float));
     world->forces = (sl_vec2 *)carve(base, &offset, capacity, sizeof(sl_vec2));
-    world->angles = (float *)carve(base, &offset, capacity, sizeof(float));
+    world->rotations =
+        (sl_rotation *)carve(base, &offset, capacity, sizeof(sl_rotation));
     world->angular_velocities =
         (float *)carve(base, &offset, capacity, sizeof(float));
     world->torques = (float *)carve(base, &offset, capacity, sizeof(float));
@@ -407,7 +410,7 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
     world->inv_masses[dense] = inverse_or_zero(desc->mass);
     world->forces[dense] = sl_vec2_make(0.0f, 0.0f);
 
-    world->angles[dense] = sl_angle_wrap(desc->angle);
+    world->rotations[dense] = sl_rotation_make(sl_angle_wrap(desc->angle));
     world->angular_velocities[dense] = desc->angular_velocity;
     world->torques[dense] = 0.0f;
     body_write_inertia(world, dense, inertia);
@@ -449,7 +452,7 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
         world->masses[dense] = world->masses[last];
         world->inv_masses[dense] = world->inv_masses[last];
         world->forces[dense] = world->forces[last];
-        world->angles[dense] = world->angles[last];
+        world->rotations[dense] = world->rotations[last];
         world->angular_velocities[dense] = world->angular_velocities[last];
         world->torques[dense] = world->torques[last];
         world->inertias[dense] = world->inertias[last];
@@ -581,7 +584,8 @@ float sl_world_body_get_angle(const sl_world *world, sl_body_handle handle)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
-    return world->angles[world->slots[handle.index].dense];
+    return sl_rotation_angle(
+        world->rotations[world->slots[handle.index].dense]);
 }
 
 float sl_world_body_get_angular_velocity(const sl_world *world,
@@ -628,8 +632,7 @@ sl_transform sl_world_body_get_transform(const sl_world *world,
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_world_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
-    return sl_transform_make(world->positions[dense],
-                             sl_rotation_make(world->angles[dense]));
+    return sl_transform_make(world->positions[dense], world->rotations[dense]);
 }
 
 bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
@@ -671,7 +674,8 @@ bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
     if (!sl_is_finite(angle)) {
         return false;
     }
-    world->angles[world->slots[handle.index].dense] = sl_angle_wrap(angle);
+    world->rotations[world->slots[handle.index].dense] =
+        sl_rotation_make(sl_angle_wrap(angle));
     return true;
 }
 

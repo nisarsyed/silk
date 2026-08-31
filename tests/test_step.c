@@ -194,11 +194,13 @@ static void test_step_holds_last_finite_state_on_overflow(void)
 
     const sl_vec2 position = sl_world_body_get_position(&world, h);
     const float angle = sl_world_body_get_angle(&world, h);
+    const sl_rotation rotation = world.rotations[world.slots[h.index].dense];
     SL_EXPECT(sl_vec2_is_finite(position));
     SL_EXPECT(sl_is_finite(angle));
     /* Uncommitted, not clamped: the row keeps the pose it arrived with. */
     SL_EXPECT(position.x == 0.0f && position.y == 0.0f);
     SL_EXPECT(angle == 0.0f);
+    SL_EXPECT(rotation.c == 1.0f && rotation.s == 0.0f);
     SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_velocity(&world, h)));
     SL_EXPECT(sl_is_finite(sl_world_body_get_angular_velocity(&world, h)));
 
@@ -504,7 +506,8 @@ static bool twin_worlds_in_sync(const sl_world *a, const sl_world *b)
             a->forces[i].x == b->forces[i].x &&
             a->forces[i].y == b->forces[i].y && a->masses[i] == b->masses[i] &&
             a->inv_masses[i] == b->inv_masses[i] &&
-            a->angles[i] == b->angles[i] &&
+            a->rotations[i].c == b->rotations[i].c &&
+            a->rotations[i].s == b->rotations[i].s &&
             a->angular_velocities[i] == b->angular_velocities[i] &&
             a->torques[i] == b->torques[i] &&
             a->inertias[i] == b->inertias[i] &&
@@ -954,7 +957,8 @@ static void test_churn_step_stress_matches_model(void)
 }
 
 /* Circle r = 2, m = 2: I = m*r^2/2 = 4; tau = 8 drives alpha =
- * tau/I = 2 rad/s^2, so dt = 0.1 yields omega = 0.2, theta = 0.02. */
+ * tau/I = 2 rad/s^2, so dt = 0.1 yields omega = 0.2. The stored
+ * small-angle rotation advances by atan(omega * dt), not omega * dt. */
 static void test_torque_integrates_angular_velocity_by_inv_inertia(void)
 {
     sl_world_config config = { .body_capacity = 1u };
@@ -978,7 +982,7 @@ static void test_torque_integrates_angular_velocity_by_inv_inertia(void)
 
     sl_world_step(&world, k_dt);
     SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, h), 0.2f, k_eps);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.02f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), atanf(0.02f), k_eps);
 
     sl_world_destroy(&world);
 }
@@ -1008,8 +1012,8 @@ static void test_torque_clears_after_step(void)
 }
 
 /* Mirror of the linear drag test: divisor (1 + dt * angular_drag) = 2
- * at dt = 0.1, drag 10 halves spin every step; theta accumulates the
- * post-drag arc 0.05 then 0.075. */
+ * at dt = 0.1, drag 10 halves spin every step. Stored rotation advances
+ * by atan(0.05), then by atan(0.025). */
 static void test_angular_drag_halves_spin_per_step(void)
 {
     sl_world_config config = { .body_capacity = 1u,
@@ -1024,23 +1028,24 @@ static void test_angular_drag_halves_spin_per_step(void)
 
     sl_world_step(&world, k_dt);
     SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, h), 0.5f, k_eps);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.05f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), atanf(0.05f), k_eps);
 
     sl_world_step(&world, k_dt);
     SL_EXPECT_NEAR(sl_world_body_get_angular_velocity(&world, h), 0.25f, k_eps);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.075f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h),
+                   atanf(0.05f) + atanf(0.025f), k_eps);
 
     sl_world_destroy(&world);
 }
 
-static void test_angle_wraps_after_full_turn(void)
+static void test_angle_stays_principal_after_many_rotations(void)
 {
     sl_world_config config = { .body_capacity = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    /* Five half-turns per second at dt = 0.1: a quarter-turn arc per
-     * step, crossing +-pi repeatedly over 100 steps (~8 turns). */
+    /* Five half-turns per second at dt = 0.1. Each small-angle update
+     * advances by atan(0.5*pi), crossing +-pi repeatedly over 100 steps. */
     sl_body_desc desc = { .mass = 1.0f, .angular_velocity = 5.0f * SL_PI };
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(!sl_body_handle_is_null(h));
@@ -1050,25 +1055,27 @@ static void test_angle_wraps_after_full_turn(void)
         const float angle = sl_world_body_get_angle(&world, h);
         SL_EXPECT(angle <= SL_PI + k_eps && angle >= -SL_PI - k_eps);
     }
-    /* Four quarter-arc steps land within one arc of a full turn. */
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.0f, 0.5f);
+    const float expected = sl_angle_wrap(100.0f * atanf(0.5f * SL_PI));
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), expected, 1e-4f);
 
     sl_world_destroy(&world);
 }
 
-static void test_angle_stays_bounded_under_large_step_rotation(void)
+static void test_large_rotation_uses_small_angle_advance(void)
 {
     sl_world_config config = { .body_capacity = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    /* One step rotating 6.5*pi: the fmodf reduction path. */
+    /* One large finite delta stays unit length and advances by
+     * atan(delta), approaching but not reaching a quarter turn. */
     sl_body_desc desc = { .mass = 1.0f, .angular_velocity = 65.0f * SL_PI };
     sl_body_handle h = sl_world_body_create(&world, &desc);
     SL_EXPECT(!sl_body_handle_is_null(h));
 
     sl_world_step(&world, k_dt);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.5f * SL_PI, 1e-4f);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), atanf(6.5f * SL_PI),
+                   1e-4f);
 
     sl_world_destroy(&world);
 }
@@ -1130,7 +1137,7 @@ static void test_kinematic_moves_without_drag_or_gravity(void)
     SL_EXPECT(position.y == 0.0f);
     const sl_vec2 velocity = sl_world_body_get_velocity(&world, h);
     SL_EXPECT(velocity.x == 2.0f && velocity.y == 0.0f);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.1f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), atanf(0.1f), k_eps);
     SL_EXPECT(sl_world_body_get_angular_velocity(&world, h) == 1.0f);
 
     sl_world_destroy(&world);
@@ -1153,7 +1160,7 @@ static void test_shapeless_dynamic_spins_kinematically(void)
     SL_EXPECT(sl_world_body_apply_torque(&world, h, 100.0f));
     sl_world_step(&world, k_dt);
     SL_EXPECT(sl_world_body_get_angular_velocity(&world, h) == 3.0f);
-    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.3f, k_eps);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), atanf(0.3f), k_eps);
     SL_EXPECT(sl_world_body_get_torque(&world, h) == 0.0f);
 
     sl_world_destroy(&world);
@@ -1331,9 +1338,14 @@ static void test_churn_mixed_types_stress_matches_model(void)
                 continue;
             }
             const sl_vec2 position = sl_world_body_get_position(&world, probe);
+            const uint32_t dense = world.slots[probe.index].dense;
+            const sl_rotation rotation = world.rotations[dense];
             payloads_finite =
                 payloads_finite && sl_vec2_is_finite(position) &&
                 sl_vec2_is_finite(sl_world_body_get_velocity(&world, probe)) &&
+                sl_rotation_is_finite(rotation) &&
+                sl_feq(rotation.c * rotation.c + rotation.s * rotation.s, 1.0f,
+                       2.0f * SL_EPSILON) &&
                 sl_is_finite(sl_world_body_get_angle(&world, probe)) &&
                 sl_is_finite(sl_world_body_get_angular_velocity(&world, probe));
             /* Statics are pinned by contract, not by luck: they never
@@ -1400,9 +1412,10 @@ static const sl_test_case k_cases[] = {
     { "torque_clears_after_step", test_torque_clears_after_step },
     { "angular_drag_halves_spin_per_step",
       test_angular_drag_halves_spin_per_step },
-    { "angle_wraps_after_full_turn", test_angle_wraps_after_full_turn },
-    { "angle_stays_bounded_under_large_step_rotation",
-      test_angle_stays_bounded_under_large_step_rotation },
+    { "angle_stays_principal_after_many_rotations",
+      test_angle_stays_principal_after_many_rotations },
+    { "large_rotation_uses_small_angle_advance",
+      test_large_rotation_uses_small_angle_advance },
     { "static_body_ignores_gravity_and_force",
       test_static_body_ignores_gravity_and_force },
     { "kinematic_moves_without_drag_or_gravity",

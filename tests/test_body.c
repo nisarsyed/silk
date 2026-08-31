@@ -140,9 +140,16 @@ static void create_wraps_angle(void)
     SL_EXPECT(!sl_body_handle_is_null(h));
     SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 0.5f * SL_PI, k_eps);
 
-    /* The wrap is bitwise stable for in-range input. */
+    /* Construction wraps before sin/cos; recovery pays atan2 and is
+     * therefore a tolerance comparison rather than stored scalar identity. */
     SL_EXPECT(sl_world_body_set_angle(&world, h, 1.234f));
-    SL_EXPECT(sl_world_body_get_angle(&world, h) == 1.234f);
+    SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 1.234f, k_eps);
+
+    const uint32_t dense = world.slots[h.index].dense;
+    const sl_rotation before = world.rotations[dense];
+    SL_EXPECT(!sl_world_body_set_angle(&world, h, NAN));
+    SL_EXPECT(world.rotations[dense].c == before.c &&
+              world.rotations[dense].s == before.s);
 
     sl_world_destroy(&world);
 }
@@ -669,6 +676,9 @@ static void get_transform_matches_position_and_angle(void)
     SL_EXPECT(tf.position.x == 7.0f && tf.position.y == -3.0f);
     SL_EXPECT_NEAR(tf.rotation.c, 0.0f, k_eps);
     SL_EXPECT_NEAR(tf.rotation.s, 1.0f, k_eps);
+    const uint32_t dense = world.slots[h.index].dense;
+    SL_EXPECT(tf.rotation.c == world.rotations[dense].c);
+    SL_EXPECT(tf.rotation.s == world.rotations[dense].s);
 
     /* Local +x maps to world +y under this frame. */
     const sl_vec2 local_x = sl_transform_apply(tf, sl_vec2_make(1.0f, 0.0f));

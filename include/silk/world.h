@@ -12,10 +12,10 @@
 extern "C" {
 #endif
 
-/* Bounds worst-case world allocation: 141 bytes per body (seven packed
- * scalar/vec2 arrays, two index arrays, one slot array, one type byte,
- * and a 72-byte shape record) lands at ~8.8 MiB at this cap. Raise only
- * on profiling evidence, together with the budget test. */
+/* Bounds worst-case world allocation: 145 bytes per body (ten packed
+ * scalar/vector/rotation arrays, two index arrays, one slot array, one
+ * type byte, and a 72-byte shape record) lands at ~9.1 MiB at this cap.
+ * Raise only on profiling evidence, together with the budget test. */
 #define SL_BODY_COUNT_MAX 65536u
 
 /* Maximum absolute body-center coordinate. IEEE-754 binary32 spacing at
@@ -69,8 +69,8 @@ typedef struct sl_body_desc {
     /* Fields below zero-fill to: dynamic, upright, at rest, point
      * particle. */
     sl_body_type type;
-    /* Radians, CCW positive; any finite value is accepted and stored
-     * wrapped to [-pi, pi]. */
+    /* Radians, CCW positive; any finite value is wrapped to [-pi, pi]
+     * before constructing the stored rotation. */
     float angle;
     /* Radians / second; must be 0 for static. */
     float angular_velocity;
@@ -118,7 +118,7 @@ typedef struct sl_world {
     sl_vec2 *forces;     /* kilograms * world units / second^2; the
                           * stepper clears them every step */
 
-    float *angles;             /* radians, wrapped to [-pi, pi] */
+    sl_rotation *rotations;    /* unit (cos, sin), body to world */
     float *angular_velocities; /* radians / second */
     float *torques;            /* force units * length; the stepper
                                 * clears them every step */
@@ -235,9 +235,8 @@ float sl_world_body_get_torque(const sl_world *world, sl_body_handle handle);
 const sl_shape *sl_world_body_get_shape(const sl_world *world,
                                         sl_body_handle handle);
 
-/* sl_transform_make(position, sl_rotation_make(angle)): pays libm trig
- * per call, so renderers rotate cheaply while stored state stays
- * trig-free. */
+/* Body-to-world transform copied directly from stored position and
+ * rotation; no trigonometry. */
 sl_transform sl_world_body_get_transform(const sl_world *world,
                                          sl_body_handle handle);
 
@@ -246,7 +245,7 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
 /* A static body accepts only the zero velocity. */
 bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
                                 sl_vec2 velocity);
-/* Any finite angle; stored wrapped to [-pi, pi]. */
+/* Any finite angle; wrapped before constructing the stored rotation. */
 bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
                              float angle);
 /* A static body accepts only zero. */
