@@ -39,6 +39,21 @@ and rotational integration — everything Phase 3 collision consumes.
 - [x] Rigid-body state: body types (static/kinematic), angular state, shape attachment, rotational integration
 - [x] Sandbox: shaped bodies, static ground, engine picking
 
+## Milestone 3 — 2D rigid-body physics
+
+Phase 3 delivery: collision detection and response, materials, broad-phase,
+the first joints, and a deterministic performance baseline, on a Soft Step
+substepped solver laid out for later SIMD and threading work.
+
+- [ ] Math: robust rotation integration and composition, 2x2 solve, AABB set operations, and segment distance ([#28](https://github.com/nisarsyed/silk/issues/28))
+- [ ] Rigid-body state: stored rotations, substepped integration, per-body friction and restitution, and bounded speed controls ([#29](https://github.com/nisarsyed/silk/issues/29), [#32](https://github.com/nisarsyed/silk/issues/32))
+- [ ] Collision detection: circle and polygon manifolds with stable feature ids and speculative distance; dynamic AABB-tree broad phase; persistent contact pool and pair set ([#30](https://github.com/nisarsyed/silk/issues/30), [#31](https://github.com/nisarsyed/silk/issues/31), [#33](https://github.com/nisarsyed/silk/issues/33))
+- [ ] Collision response: Soft Step sequential impulses with warm starting, relax pass, friction, and restitution ([#34](https://github.com/nisarsyed/silk/issues/34))
+- [ ] Constraints: SoA joint pool with generational handles; distance and revolute joints ([#36](https://github.com/nisarsyed/silk/issues/36))
+- [ ] Sandbox: collision scene, materials, and contact/AABB/joint debug drawing ([#37](https://github.com/nisarsyed/silk/issues/37))
+- [ ] Benchmark: deterministic pyramid and rain scenes with warm-up, per-step timing, and a state checksum ([#35](https://github.com/nisarsyed/silk/issues/35))
+- [ ] Wrap: version 0.3.0, README, roadmap, attribution, and release verification ([#38](https://github.com/nisarsyed/silk/issues/38))
+
 ## Phase Progression
 
 Condensed from the technical specification. Near-term phases stay itemized; later ones remain coarse until they become near-term.

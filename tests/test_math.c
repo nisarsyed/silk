@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include <float.h>
 #include <math.h>
 #include <stdint.h>
 
@@ -113,6 +114,19 @@ static void test_vec2_perp_is_orthogonal_ccw(void)
     SL_EXPECT_NEAR(sl_vec2_dot(v, p), 0.0f, SL_EPSILON);
 }
 
+static void test_vec2_right_perp_and_scalar_cross_order(void)
+{
+    const sl_vec2 v = sl_vec2_make(2.0f, 1.0f);
+    const sl_vec2 right = sl_vec2_right_perp(v);
+    SL_EXPECT(right.x == 1.0f && right.y == -2.0f);
+    SL_EXPECT(sl_vec2_dot(v, right) == 0.0f);
+
+    const sl_vec2 scalar_vector = sl_scalar_cross_vec2(3.0f, v);
+    const sl_vec2 vector_scalar = sl_vec2_cross_scalar(v, 3.0f);
+    SL_EXPECT(scalar_vector.x == -3.0f && scalar_vector.y == 6.0f);
+    SL_EXPECT(vector_scalar.x == 3.0f && vector_scalar.y == -6.0f);
+}
+
 static void test_vec2_lerp_endpoints(void)
 {
     sl_vec2 a = sl_vec2_make(0.0f, 0.0f);
@@ -213,6 +227,73 @@ static void test_rotation_apply_inverse_roundtrip(void)
     SL_EXPECT_NEAR(inv_only.y, negated.s, SL_TEST_EPS);
 }
 
+static void test_rotation_mul_composes_and_reports_angle(void)
+{
+    const sl_rotation a = sl_rotation_make(0.3f);
+    const sl_rotation b = sl_rotation_make(-0.8f);
+    const sl_rotation product = sl_rotation_mul(a, b);
+    const sl_rotation expected = sl_rotation_make(-0.5f);
+
+    SL_EXPECT_NEAR(product.c, expected.c, SL_TEST_EPS);
+    SL_EXPECT_NEAR(product.s, expected.s, SL_TEST_EPS);
+    SL_EXPECT_NEAR(sl_rotation_angle(product), -0.5f, SL_TEST_EPS);
+
+    const sl_vec2 v = sl_vec2_make(2.0f, -3.0f);
+    const sl_vec2 composed = sl_rotation_apply(product, v);
+    const sl_vec2 sequential = sl_rotation_apply(a, sl_rotation_apply(b, v));
+    SL_EXPECT_NEAR(composed.x, sequential.x, SL_TEST_EPS);
+    SL_EXPECT_NEAR(composed.y, sequential.y, SL_TEST_EPS);
+}
+
+static void test_rotation_normalize_is_scale_safe(void)
+{
+    const sl_rotation huge =
+        sl_rotation_normalize((sl_rotation){ .c = FLT_MAX, .s = FLT_MAX });
+    SL_EXPECT(sl_rotation_is_finite(huge));
+    SL_EXPECT_NEAR(huge.c * huge.c + huge.s * huge.s, 1.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(huge.c, sqrtf(0.5f), SL_TEST_EPS);
+    SL_EXPECT_NEAR(huge.s, sqrtf(0.5f), SL_TEST_EPS);
+
+    const sl_rotation unit = sl_rotation_make(0.7f);
+    const sl_rotation normalized = sl_rotation_normalize(unit);
+    SL_EXPECT_NEAR(normalized.c, unit.c, SL_TEST_EPS);
+    SL_EXPECT_NEAR(normalized.s, unit.s, SL_TEST_EPS);
+
+    const sl_rotation zero =
+        sl_rotation_normalize((sl_rotation){ .c = 0.0f, .s = 0.0f });
+    const sl_rotation infinite =
+        sl_rotation_normalize((sl_rotation){ .c = INFINITY, .s = 1.0f });
+    SL_EXPECT(zero.c == 1.0f && zero.s == 0.0f);
+    SL_EXPECT(infinite.c == 1.0f && infinite.s == 0.0f);
+}
+
+static void test_rotation_integrate_small_and_extreme_deltas(void)
+{
+    const sl_rotation identity = sl_rotation_identity();
+    const sl_rotation unchanged = sl_rotation_integrate(identity, 0.0f);
+    SL_EXPECT(unchanged.c == identity.c && unchanged.s == identity.s);
+
+    const sl_rotation integrated = sl_rotation_integrate(identity, 0.1f);
+    const sl_rotation exact = sl_rotation_make(0.1f);
+    SL_EXPECT_NEAR(integrated.c, exact.c, 1e-3f);
+    SL_EXPECT_NEAR(integrated.s, exact.s, 1e-3f);
+    SL_EXPECT_NEAR(sl_rotation_angle(integrated), atanf(0.1f), SL_TEST_EPS);
+
+    const sl_rotation initial = sl_rotation_make(0.3f);
+    const sl_rotation huge = sl_rotation_integrate(initial, FLT_MAX);
+    SL_EXPECT(sl_rotation_is_finite(huge));
+    SL_EXPECT_NEAR(huge.c * huge.c + huge.s * huge.s, 1.0f, SL_TEST_EPS);
+    const sl_rotation quarter =
+        sl_rotation_mul(initial, sl_rotation_make(0.5f * SL_PI));
+    SL_EXPECT_NEAR(huge.c, quarter.c, SL_TEST_EPS);
+    SL_EXPECT_NEAR(huge.s, quarter.s, SL_TEST_EPS);
+
+    const sl_rotation nan_delta = sl_rotation_integrate(initial, NAN);
+    const sl_rotation inf_delta = sl_rotation_integrate(initial, INFINITY);
+    SL_EXPECT(nan_delta.c == initial.c && nan_delta.s == initial.s);
+    SL_EXPECT(inf_delta.c == initial.c && inf_delta.s == initial.s);
+}
+
 /* Operand-order pin for the frame: rotate-then-translate. A
  * translate-first mistake turns local (1, 0) at position (10, 0) by a
  * quarter turn into ~(11, 0) instead of the correct ~(10, 1). */
@@ -285,6 +366,104 @@ static void test_aabb_is_valid_rejects_inverted_or_non_finite(void)
         sl_aabb_make(sl_vec2_make(NAN, 0.0f), sl_vec2_make(3.0f, 4.0f))));
     SL_EXPECT(!sl_aabb_is_valid(
         sl_aabb_make(sl_vec2_make(0.0f, 0.0f), sl_vec2_make(INFINITY, 4.0f))));
+}
+
+static void test_aabb_set_operations_are_boundary_inclusive(void)
+{
+    const sl_aabb a =
+        sl_aabb_make(sl_vec2_make(-2.0f, -1.0f), sl_vec2_make(2.0f, 3.0f));
+    const sl_aabb touching =
+        sl_aabb_make(sl_vec2_make(2.0f, 0.0f), sl_vec2_make(4.0f, 1.0f));
+    const sl_aabb outside =
+        sl_aabb_make(sl_vec2_make(2.1f, 0.0f), sl_vec2_make(4.0f, 1.0f));
+    const sl_aabb inner =
+        sl_aabb_make(sl_vec2_make(-2.0f, 0.0f), sl_vec2_make(1.0f, 3.0f));
+
+    SL_EXPECT(sl_aabb_overlaps(a, touching));
+    SL_EXPECT(!sl_aabb_overlaps(a, outside));
+    SL_EXPECT(sl_aabb_contains(a, inner));
+    SL_EXPECT(!sl_aabb_contains(inner, a));
+
+    const sl_aabb combined = sl_aabb_union(a, outside);
+    SL_EXPECT(combined.lower.x == -2.0f && combined.lower.y == -1.0f);
+    SL_EXPECT(combined.upper.x == 4.0f && combined.upper.y == 3.0f);
+    SL_EXPECT(sl_aabb_perimeter(a) == 16.0f);
+
+    const sl_aabb extended = sl_aabb_extend(a, 0.5f);
+    SL_EXPECT(extended.lower.x == -2.5f && extended.lower.y == -1.5f);
+    SL_EXPECT(extended.upper.x == 2.5f && extended.upper.y == 3.5f);
+
+    const sl_aabb invalid =
+        sl_aabb_make(sl_vec2_make(NAN, 0.0f), sl_vec2_make(1.0f, 1.0f));
+    SL_EXPECT(!sl_aabb_overlaps(a, invalid));
+    SL_EXPECT(!sl_aabb_contains(a, invalid));
+    SL_EXPECT(sl_aabb_perimeter(invalid) == 0.0f);
+
+    const sl_aabb unchanged = sl_aabb_extend(a, -1.0f);
+    SL_EXPECT(unchanged.lower.x == a.lower.x && unchanged.lower.y == a.lower.y);
+    SL_EXPECT(unchanged.upper.x == a.upper.x && unchanged.upper.y == a.upper.y);
+
+    const sl_aabb enormous = sl_aabb_make(sl_vec2_make(-FLT_MAX, -FLT_MAX),
+                                          sl_vec2_make(FLT_MAX, FLT_MAX));
+    SL_EXPECT(sl_aabb_perimeter(enormous) == FLT_MAX);
+}
+
+static void test_segment_distance_crossing_and_parallel(void)
+{
+    sl_segment_distance_result result = { 0 };
+    SL_EXPECT(sl_segment_distance(
+        sl_vec2_make(0.0f, 0.0f), sl_vec2_make(2.0f, 2.0f),
+        sl_vec2_make(0.0f, 2.0f), sl_vec2_make(2.0f, 0.0f), &result));
+    SL_EXPECT_NEAR(result.fraction_a, 0.5f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(result.fraction_b, 0.5f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(result.point_a.x, 1.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(result.point_a.y, 1.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(result.point_b.x, 1.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(result.point_b.y, 1.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(result.distance_sq, 0.0f, SL_TEST_EPS);
+
+    SL_EXPECT(sl_segment_distance(
+        sl_vec2_make(0.0f, 0.0f), sl_vec2_make(4.0f, 0.0f),
+        sl_vec2_make(0.0f, 2.0f), sl_vec2_make(4.0f, 2.0f), &result));
+    SL_EXPECT(result.fraction_a == 0.0f && result.fraction_b == 0.0f);
+    SL_EXPECT(result.distance_sq == 4.0f);
+}
+
+static void test_segment_distance_handles_degenerate_and_invalid(void)
+{
+    sl_segment_distance_result result = { 0 };
+    SL_EXPECT(sl_segment_distance(
+        sl_vec2_make(1.0f, 1.0f), sl_vec2_make(1.0f, 1.0f),
+        sl_vec2_make(0.0f, 0.0f), sl_vec2_make(2.0f, 0.0f), &result));
+    SL_EXPECT(result.fraction_a == 0.0f);
+    SL_EXPECT_NEAR(result.fraction_b, 0.5f, SL_TEST_EPS);
+    SL_EXPECT(result.point_a.x == 1.0f && result.point_a.y == 1.0f);
+    SL_EXPECT(result.point_b.x == 1.0f && result.point_b.y == 0.0f);
+    SL_EXPECT(result.distance_sq == 1.0f);
+
+    const sl_segment_distance_result sentinel = {
+        .point_a = { 1.0f, 2.0f },
+        .point_b = { 3.0f, 4.0f },
+        .fraction_a = 0.25f,
+        .fraction_b = 0.75f,
+        .distance_sq = 5.0f,
+    };
+    result = sentinel;
+    SL_EXPECT(!sl_segment_distance(
+        sl_vec2_make(NAN, 0.0f), sl_vec2_make(0.0f, 0.0f),
+        sl_vec2_make(0.0f, 0.0f), sl_vec2_make(1.0f, 0.0f), &result));
+    SL_EXPECT(result.point_a.x == sentinel.point_a.x &&
+              result.point_a.y == sentinel.point_a.y &&
+              result.point_b.x == sentinel.point_b.x &&
+              result.point_b.y == sentinel.point_b.y &&
+              result.fraction_a == sentinel.fraction_a &&
+              result.fraction_b == sentinel.fraction_b &&
+              result.distance_sq == sentinel.distance_sq);
+
+    SL_EXPECT(!sl_segment_distance(
+        sl_vec2_make(FLT_MAX, 0.0f), sl_vec2_make(FLT_MAX, 0.0f),
+        sl_vec2_make(-FLT_MAX, 0.0f), sl_vec2_make(-FLT_MAX, 0.0f), &result));
+    SL_EXPECT(result.distance_sq == sentinel.distance_sq);
 }
 
 static void test_angle_wrap_identity_inside_range(void)
@@ -381,6 +560,42 @@ static void test_mat2_transpose_inverse_for_rotation(void)
     SL_EXPECT_NEAR(rt_r.m11, id.m11, SL_TEST_EPS);
 }
 
+static void test_mat2_solve_known_system(void)
+{
+    const sl_mat2 matrix = { 3.0f, 2.0f, 1.0f, 2.0f };
+    const sl_vec2 b = sl_vec2_make(7.0f, 5.0f);
+    sl_vec2 solution = sl_vec2_make(0.0f, 0.0f);
+    SL_EXPECT(sl_mat2_solve(matrix, b, &solution));
+    SL_EXPECT_NEAR(solution.x, 1.0f, SL_TEST_EPS);
+    SL_EXPECT_NEAR(solution.y, 2.0f, SL_TEST_EPS);
+
+    const sl_vec2 reconstructed = sl_mat2_multiply_vec2(matrix, solution);
+    SL_EXPECT_NEAR(reconstructed.x, b.x, SL_TEST_EPS);
+    SL_EXPECT_NEAR(reconstructed.y, b.y, SL_TEST_EPS);
+}
+
+static void test_mat2_solve_rejects_without_partial_output(void)
+{
+    const sl_vec2 sentinel = sl_vec2_make(7.0f, -9.0f);
+    sl_vec2 output = sentinel;
+    SL_EXPECT(!sl_mat2_solve((sl_mat2){ 1.0f, 2.0f, 2.0f, 4.0f },
+                             sl_vec2_make(1.0f, 2.0f), &output));
+    SL_EXPECT(output.x == sentinel.x && output.y == sentinel.y);
+
+    const float almost_singular = 0.5f * FLT_EPSILON;
+    SL_EXPECT(!sl_mat2_solve((sl_mat2){ 1.0f, 0.0f, 0.0f, almost_singular },
+                             sl_vec2_make(1.0f, 1.0f), &output));
+    SL_EXPECT(output.x == sentinel.x && output.y == sentinel.y);
+
+    SL_EXPECT(!sl_mat2_solve((sl_mat2){ FLT_MIN, 0.0f, 0.0f, FLT_MIN },
+                             sl_vec2_make(FLT_MAX, 1.0f), &output));
+    SL_EXPECT(output.x == sentinel.x && output.y == sentinel.y);
+
+    SL_EXPECT(!sl_mat2_solve((sl_mat2){ NAN, 0.0f, 0.0f, 1.0f },
+                             sl_vec2_make(1.0f, 1.0f), &output));
+    SL_EXPECT(output.x == sentinel.x && output.y == sentinel.y);
+}
+
 static const sl_test_case k_cases[] = {
     { "scalar_min_max", test_scalar_min_max },
     { "scalar_clamp", test_scalar_clamp },
@@ -391,6 +606,8 @@ static const sl_test_case k_cases[] = {
     { "vec2_cross_sign", test_vec2_cross_sign },
     { "vec2_length_normalize", test_vec2_length_normalize },
     { "vec2_perp_is_orthogonal_ccw", test_vec2_perp_is_orthogonal_ccw },
+    { "vec2_right_perp_and_scalar_cross_order",
+      test_vec2_right_perp_and_scalar_cross_order },
     { "vec2_lerp_endpoints", test_vec2_lerp_endpoints },
     { "vec2_distance", test_vec2_distance },
     { "vec2_min_max_componentwise", test_vec2_min_max_componentwise },
@@ -401,6 +618,12 @@ static const sl_test_case k_cases[] = {
       test_rotation_make_matches_mat2_rotation },
     { "rotation_apply_inverse_roundtrip",
       test_rotation_apply_inverse_roundtrip },
+    { "rotation_mul_composes_and_reports_angle",
+      test_rotation_mul_composes_and_reports_angle },
+    { "rotation_normalize_is_scale_safe",
+      test_rotation_normalize_is_scale_safe },
+    { "rotation_integrate_small_and_extreme_deltas",
+      test_rotation_integrate_small_and_extreme_deltas },
     { "transform_apply_rotates_then_translates",
       test_transform_apply_rotates_then_translates },
     { "transform_apply_inverse_roundtrip",
@@ -409,6 +632,12 @@ static const sl_test_case k_cases[] = {
       test_aabb_contains_point_boundary_inclusive },
     { "aabb_is_valid_rejects_inverted_or_non_finite",
       test_aabb_is_valid_rejects_inverted_or_non_finite },
+    { "aabb_set_operations_are_boundary_inclusive",
+      test_aabb_set_operations_are_boundary_inclusive },
+    { "segment_distance_crossing_and_parallel",
+      test_segment_distance_crossing_and_parallel },
+    { "segment_distance_handles_degenerate_and_invalid",
+      test_segment_distance_handles_degenerate_and_invalid },
     { "angle_wrap_identity_inside_range",
       test_angle_wrap_identity_inside_range },
     { "angle_wrap_single_turn", test_angle_wrap_single_turn },
@@ -419,6 +648,9 @@ static const sl_test_case k_cases[] = {
     { "mat2_rotation_composition", test_mat2_rotation_composition },
     { "mat2_transpose_inverse_for_rotation",
       test_mat2_transpose_inverse_for_rotation },
+    { "mat2_solve_known_system", test_mat2_solve_known_system },
+    { "mat2_solve_rejects_without_partial_output",
+      test_mat2_solve_rejects_without_partial_output },
 };
 
 int sl_math_suite(void)
