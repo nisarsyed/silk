@@ -10,6 +10,7 @@ int main(void)
     failures += sl_math_suite();
     failures += sl_shape_suite();
     failures += sl_collide_suite();
+    failures += sl_tree_suite();
     failures += sl_body_suite();
     failures += sl_world_suite();
     failures += sl_step_suite();
