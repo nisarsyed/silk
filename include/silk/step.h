@@ -28,6 +28,12 @@ extern "C" {
  *     finalize:   p <- p + dp, q <- normalize(dq * q)
  *                 f <- 0, t <- 0
  *
+ * Before integration, persistent broad-phase contacts are reaped, refreshed,
+ * and discovered. This phase computes snapshot manifolds and material mixes
+ * only; contact impulses are not applied until the response layer lands.
+ * After finalization, shaped bodies that escaped their fat proxy AABBs are
+ * moved and queued for the following step.
+ *
  * Semi-implicit Euler -- each delta uses the post-drag velocity. The drag
  * forms divide instead of subtracting, so any drag >= 0 stays stable; force
  * and torque remain active for all substeps and clear once at finalization.

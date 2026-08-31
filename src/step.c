@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "contact_world.h"
+
 /* Scale-safe Euclidean cap. Dividing by the largest component before the
  * length avoids overflow for any finite externally supplied velocity. */
 static sl_vec2 linear_velocity_cap(sl_vec2 velocity, float speed_max)
@@ -89,6 +91,8 @@ void sl_world_step(sl_world *world, float dt)
     const float angular_drag_scale = 1.0f / (1.0f + h * world->angular_drag);
     const float angular_speed_max = SL_ROTATION_PER_STEP_MAX * inverse_dt;
 
+    sl_contact_step_begin(world);
+
     /* Deltas retain precision while the base transforms remain fixed for all
      * substeps and, later, for every solver iteration. */
     for (uint32_t i = 0u; i < world->body_count; ++i) {
@@ -160,6 +164,7 @@ void sl_world_step(sl_world *world, float dt)
         world->forces[i] = sl_vec2_make(0.0f, 0.0f);
         world->torques[i] = 0.0f;
     }
+    sl_contact_step_end(world);
 }
 
 bool sl_stepper_init(sl_stepper *stepper, float timestep)

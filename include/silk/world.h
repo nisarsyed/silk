@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "silk/body.h"
+#include "silk/contact.h"
 #include "silk/math.h"
 #include "silk/shape.h"
 
@@ -12,10 +14,9 @@
 extern "C" {
 #endif
 
-/* Bounds worst-case body-only world allocation: 169 bytes per body
- * (material and integration-delta columns included) lands at ~10.6 MiB at
- * this cap. Broad-phase and contact arenas join the budget in later PRs.
- * Raise only on profiling evidence, together with the budget test. */
+/* Bounds the packed body and broad-phase arrays. The exact maximum world
+ * allocation, including contacts and pair storage, is pinned by tests.
+ * Raise only on profiling evidence together with that budget. */
 #define SL_BODY_COUNT_MAX 65536u
 
 /* Soft Step defaults to four substeps; callers can explicitly choose one
@@ -38,24 +39,6 @@ extern "C" {
 /* slots[i].dense marker for a free slot; also the liveness bit.
  * Invariant: body_count + free_count == body_capacity. */
 #define SL_BODY_DENSE_NONE UINT32_MAX
-
-/* index means nothing unless generation != 0; generations are never
- * issued as 0, so any zeroed handle is the null handle. */
-typedef struct sl_body_handle {
-    uint32_t index;
-    uint32_t generation;
-} sl_body_handle;
-
-static inline sl_body_handle sl_body_handle_null(void)
-{
-    sl_body_handle h = { UINT32_MAX, 0 };
-    return h;
-}
-
-static inline bool sl_body_handle_is_null(sl_body_handle h)
-{
-    return h.generation == 0;
-}
 
 /* Zero is dynamic so a zeroed sl_body_desc keeps its historical
  * meaning. Static bodies never move (inv_mass = inv_inertia = 0);
@@ -95,9 +78,11 @@ typedef struct sl_body_desc {
 
 typedef struct sl_world_config {
     uint32_t body_capacity; /* in [1, SL_BODY_COUNT_MAX], fixed at init */
-    sl_vec2 gravity;        /* world units / second^2; default {0, 0} */
-    float linear_drag;      /* 1 / seconds, >= 0; default 0 */
-    float angular_drag;     /* 1 / seconds, >= 0; default 0 */
+    /* 0 selects min(4 * body_capacity, SL_CONTACT_COUNT_MAX). */
+    uint32_t contact_capacity;
+    sl_vec2 gravity;    /* world units / second^2; default {0, 0} */
+    float linear_drag;  /* 1 / seconds, >= 0; default 0 */
+    float angular_drag; /* 1 / seconds, >= 0; default 0 */
     /* 0 selects SL_SUBSTEP_COUNT_DEFAULT; otherwise [1, 8]. */
     uint32_t substep_count;
     /* World units / second; 0 selects SL_LINEAR_SPEED_MAX_DEFAULT. */
@@ -116,6 +101,11 @@ typedef struct sl_world {
     uint32_t body_count;    /* rows used by every packed array below */
     uint32_t body_capacity; /* slot count, fixed at init */
     uint32_t free_count;
+    uint32_t contact_count;
+    uint32_t contact_capacity;
+    uint32_t contact_drop_count;
+    uint32_t pair_capacity;
+    uint32_t moved_count;
 
     sl_vec2 gravity;        /* world units / second^2 */
     float linear_drag;      /* 1 / seconds, >= 0 */
@@ -158,21 +148,36 @@ typedef struct sl_world {
      * the record is the SoA granularity they use. */
     sl_shape *shapes;
 
+    /* Broad-phase state. Proxy ids and moved flags follow packed body rows;
+     * moved buffers carry stable body slots. tree is an internal sl_tree. */
+    sl_aabb *proxy_aabbs;
+    uint32_t *proxies;
+    uint8_t *moved;
+    uint32_t *moved_slots;
+    uint32_t *moved_next_slots;
+    uint32_t *query_slots;
+    void *tree;
+
+    /* Packed persistent records and an open-addressed set of canonical
+     * body-slot pair keys. */
+    sl_contact *contacts;
+    uint64_t *pair_keys;
+
     void *memory; /* backing block carved into every array above */
 } sl_world;
 
-/* Bytes sl_world_init allocates for the given capacity; 0 when
- * capacity is outside [1, SL_BODY_COUNT_MAX]. Lets callers size memory
- * and lets tests pin the budget. */
-size_t sl_world_memory_bytes(uint32_t body_capacity);
+/* Exact bytes sl_world_init allocates for this configuration after resolving
+ * zero defaults; 0 when a capacity or configuration value is invalid. */
+size_t sl_world_memory_bytes(const sl_world_config *config);
 
 /* *world must be zero-initialized or previously destroyed: re-initializing
  * a live world leaks its arena, so the assert fires in debug builds.
- * Returns false, leaving *world zeroed, when body_capacity is outside
- * [1, SL_BODY_COUNT_MAX], gravity is non-finite, linear_drag or
- * angular_drag is non-finite or negative, substep_count is above its cap,
- * linear_speed_max is non-finite or negative, or allocation fails. Zero
- * substep_count and linear_speed_max select their documented defaults.
+ * Returns false, leaving *world zeroed, when body_capacity or
+ * contact_capacity is outside its documented range, gravity is non-finite,
+ * linear_drag or angular_drag is non-finite or negative, substep_count is
+ * above its cap, linear_speed_max is non-finite or negative, or allocation
+ * fails. Zero contact_capacity, substep_count, and linear_speed_max select
+ * their documented defaults.
  * The full arena, including inactive rows and alignment gaps, starts
  * zeroed. Everything is allocated here; nothing allocates during
  * simulation. */
@@ -206,6 +211,14 @@ bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle);
 
 uint32_t sl_world_body_count(const sl_world *world);
 uint32_t sl_world_body_capacity(const sl_world *world);
+
+/* Contact-table snapshots are packed in deterministic processing order.
+ * contact_at asserts row < contact_count. Its pointer is conservatively valid
+ * only until the next non-const world operation. */
+uint32_t sl_world_contact_count(const sl_world *world);
+uint32_t sl_world_contact_capacity(const sl_world *world);
+uint32_t sl_world_contact_drop_count(const sl_world *world);
+const sl_contact *sl_world_contact_at(const sl_world *world, uint32_t row);
 
 sl_vec2 sl_world_get_gravity(const sl_world *world);
 float sl_world_get_linear_drag(const sl_world *world);
@@ -272,6 +285,11 @@ const sl_shape *sl_world_body_get_shape(const sl_world *world,
  * rotation; no trigonometry. */
 sl_transform sl_world_body_get_transform(const sl_world *world,
                                          sl_body_handle handle);
+
+/* Copies the fat broad-phase AABB. Returns false and leaves *out unchanged
+ * for a valid shapeless body. */
+bool sl_world_body_get_proxy_aabb(const sl_world *world, sl_body_handle handle,
+                                  sl_aabb *out);
 
 bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
                                 sl_vec2 position);

@@ -83,7 +83,7 @@ Controls:
 - Press `Space` to pause or resume, `.` to step while paused, and `R` to reset.
 
 Bodies intentionally pass through the preview ground and one another until the
-Phase 3 collision work lands.
+Phase 3 contact-response layer lands.
 
 ## Use as a CMake subproject
 
@@ -95,8 +95,9 @@ target_link_libraries(my_app PRIVATE silk::silk)
 ```
 
 Include the subsystem headers you use, such as `<silk/math.h>`,
-`<silk/shape.h>`, `<silk/world.h>`, and `<silk/step.h>`. The core chooses no
-timestep: call `sl_world_step` with one fixed value throughout a run, or
+`<silk/shape.h>`, `<silk/contact.h>`, `<silk/world.h>`, and `<silk/step.h>`.
+The core chooses no timestep: call `sl_world_step` with one fixed value
+throughout a run, or
 initialize `sl_stepper` with your application's fixed value. The sandbox's
 1/60-second timestep is an example policy, not a library default.
 

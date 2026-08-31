@@ -213,7 +213,7 @@ static void test_invalid_step_is_release_safe_and_atomic(void)
     const sl_body_handle handle = sl_world_body_create(&world, &desc);
     SL_EXPECT(
         sl_world_body_apply_force(&world, handle, sl_vec2_make(5.0f, 6.0f)));
-    const size_t bytes = sl_world_memory_bytes(1u);
+    const size_t bytes = sl_world_memory_bytes(&config);
     void *snapshot = malloc(bytes);
     SL_EXPECT(snapshot != NULL);
     if (snapshot != NULL) {

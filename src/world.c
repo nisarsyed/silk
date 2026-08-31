@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "contact_world.h"
+
 /* malloc aligns the base for every fundamental type. Every carved type's
  * alignment must divide 8, so advancing by 8-byte multiples preserves that
  * alignment without per-type padding math. The gates below make this arena
@@ -59,12 +61,63 @@ static size_t world_memory_bytes_for(size_t capacity)
            slice_bytes(capacity, sizeof(sl_shape));
 }
 
-size_t sl_world_memory_bytes(uint32_t body_capacity)
+static bool world_config_resolve(const sl_world_config *config,
+                                 uint32_t *contact_capacity,
+                                 uint32_t *substep_count,
+                                 float *linear_speed_max)
 {
-    if (body_capacity < 1u || body_capacity > SL_BODY_COUNT_MAX) {
+    if (config == NULL || config->body_capacity < 1u ||
+        config->body_capacity > SL_BODY_COUNT_MAX) {
+        return false;
+    }
+    if (!sl_vec2_is_finite(config->gravity) ||
+        !sl_is_finite(config->linear_drag) || config->linear_drag < 0.0f ||
+        !sl_is_finite(config->angular_drag) || config->angular_drag < 0.0f ||
+        config->substep_count > SL_SUBSTEP_COUNT_MAX ||
+        !sl_is_finite(config->linear_speed_max) ||
+        config->linear_speed_max < 0.0f) {
+        return false;
+    }
+
+    uint32_t contacts = config->contact_capacity;
+    if (contacts == 0u) {
+        if (config->body_capacity > SL_CONTACT_COUNT_MAX / 4u) {
+            return false;
+        }
+        contacts = 4u * config->body_capacity;
+    }
+    if (contacts < 1u || contacts > SL_CONTACT_COUNT_MAX) {
+        return false;
+    }
+
+    *contact_capacity = contacts;
+    *substep_count = (config->substep_count == 0u) ? SL_SUBSTEP_COUNT_DEFAULT
+                                                   : config->substep_count;
+    *linear_speed_max = (config->linear_speed_max == 0.0f)
+                            ? SL_LINEAR_SPEED_MAX_DEFAULT
+                            : config->linear_speed_max;
+    return true;
+}
+
+size_t sl_world_memory_bytes(const sl_world_config *config)
+{
+    uint32_t contact_capacity = 0u;
+    uint32_t substep_count = 0u;
+    float linear_speed_max = 0.0f;
+    if (!world_config_resolve(config, &contact_capacity, &substep_count,
+                              &linear_speed_max)) {
         return 0u;
     }
-    return world_memory_bytes_for((size_t)body_capacity);
+    (void)substep_count;
+    (void)linear_speed_max;
+    const size_t body_bytes =
+        world_memory_bytes_for((size_t)config->body_capacity);
+    const size_t contact_bytes =
+        sl_contact_world_memory_bytes(config->body_capacity, contact_capacity);
+    if (contact_bytes == 0u || body_bytes > SIZE_MAX - contact_bytes) {
+        return 0u;
+    }
+    return body_bytes + contact_bytes;
 }
 
 /* Generation counters are 1-based; a bump that lands on 0 skips to 1 so
@@ -285,28 +338,19 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
 
     memset(world, 0, sizeof(*world));
 
-    if (config->body_capacity < 1u ||
-        config->body_capacity > SL_BODY_COUNT_MAX) {
+    uint32_t contact_capacity = 0u;
+    uint32_t substep_count = 0u;
+    float linear_speed_max = 0.0f;
+    if (!world_config_resolve(config, &contact_capacity, &substep_count,
+                              &linear_speed_max)) {
         return false;
     }
-    if (!sl_vec2_is_finite(config->gravity) ||
-        !sl_is_finite(config->linear_drag) || config->linear_drag < 0.0f ||
-        !sl_is_finite(config->angular_drag) || config->angular_drag < 0.0f ||
-        config->substep_count > SL_SUBSTEP_COUNT_MAX ||
-        !sl_is_finite(config->linear_speed_max) ||
-        config->linear_speed_max < 0.0f) {
-        return false;
-    }
-
-    const uint32_t substep_count = (config->substep_count == 0u)
-                                       ? SL_SUBSTEP_COUNT_DEFAULT
-                                       : config->substep_count;
-    const float linear_speed_max = (config->linear_speed_max == 0.0f)
-                                       ? SL_LINEAR_SPEED_MAX_DEFAULT
-                                       : config->linear_speed_max;
 
     const size_t capacity = (size_t)config->body_capacity;
-    const size_t total_bytes = world_memory_bytes_for(capacity);
+    const size_t body_bytes = world_memory_bytes_for(capacity);
+    const size_t contact_bytes =
+        sl_contact_world_memory_bytes(config->body_capacity, contact_capacity);
+    const size_t total_bytes = body_bytes + contact_bytes;
 
     unsigned char *base = malloc(total_bytes);
     if (base == NULL) {
@@ -351,17 +395,30 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->types = (uint8_t *)carve(base, &offset, capacity, sizeof(uint8_t));
     world->shapes =
         (sl_shape *)carve(base, &offset, capacity, sizeof(sl_shape));
-    SL_ASSERT(offset == total_bytes);
-    world->memory = base;
+    SL_ASSERT(offset == body_bytes);
 
     world->body_count = 0u;
     world->body_capacity = config->body_capacity;
     world->free_count = config->body_capacity;
+    world->contact_count = 0u;
+    world->contact_capacity = contact_capacity;
+    world->contact_drop_count = 0u;
+    world->pair_capacity = sl_contact_pair_capacity(contact_capacity);
+    world->moved_count = 0u;
     world->gravity = config->gravity;
     world->linear_drag = config->linear_drag;
     world->angular_drag = config->angular_drag;
     world->substep_count = substep_count;
     world->linear_speed_max = linear_speed_max;
+
+    void *contact_memory = carve(base, &offset, contact_bytes, 1u);
+    SL_ASSERT(offset == total_bytes);
+    if (!sl_contact_world_init(world, contact_memory, contact_bytes)) {
+        free(base);
+        memset(world, 0, sizeof(*world));
+        return false;
+    }
+    world->memory = base;
 
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
         /* Descending push => LIFO pops hand out slots 0,1,2,... */
@@ -386,6 +443,7 @@ void sl_world_reset(sl_world *world)
 {
     SL_ASSERT(world != NULL);
 
+    sl_contact_world_reset(world);
     world->body_count = 0u;
     world->free_count = world->body_capacity;
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
@@ -450,7 +508,12 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
         shape_write_normalized(desc->shape, &world->shapes[dense]);
     }
 
-    return handle_for(world, dense);
+    const sl_body_handle handle = handle_for(world, dense);
+    if (!sl_contact_body_create(world, dense, slot_id)) {
+        sl_world_body_destroy(world, handle);
+        return sl_body_handle_null();
+    }
+    return handle;
 }
 
 void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
@@ -474,6 +537,7 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
      * this copy chain and create's initialization. */
     const uint32_t dense = slot->dense;
     const uint32_t last = world->body_count - 1u;
+    sl_contact_body_destroy(world, dense, handle.index);
     if (dense != last) {
         world->positions[dense] = world->positions[last];
         world->velocities[dense] = world->velocities[last];
@@ -491,6 +555,9 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
         world->restitutions[dense] = world->restitutions[last];
         world->types[dense] = world->types[last];
         world->shapes[dense] = world->shapes[last];
+        world->proxy_aabbs[dense] = world->proxy_aabbs[last];
+        world->proxies[dense] = world->proxies[last];
+        world->moved[dense] = world->moved[last];
 
         const uint32_t moved_slot = world->slot_of[last];
         world->slot_of[dense] = moved_slot;
@@ -702,7 +769,11 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
     if (!position_valid(position)) {
         return false;
     }
-    world->positions[world->slots[handle.index].dense] = position;
+    const uint32_t dense = world->slots[handle.index].dense;
+    world->positions[dense] = position;
+    const bool updated = sl_contact_body_update(world, dense, handle.index);
+    SL_ASSERT(updated);
+    (void)updated;
     return true;
 }
 
@@ -733,8 +804,11 @@ bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
     if (!sl_is_finite(angle)) {
         return false;
     }
-    world->rotations[world->slots[handle.index].dense] =
-        sl_rotation_make(sl_angle_wrap(angle));
+    const uint32_t dense = world->slots[handle.index].dense;
+    world->rotations[dense] = sl_rotation_make(sl_angle_wrap(angle));
+    const bool updated = sl_contact_body_update(world, dense, handle.index);
+    SL_ASSERT(updated);
+    (void)updated;
     return true;
 }
 
@@ -842,6 +916,9 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
         shape_write_normalized(shape, &world->shapes[dense]);
     }
     body_write_inertia(world, dense, inertia);
+    const bool updated = sl_contact_body_update(world, dense, handle.index);
+    SL_ASSERT(updated);
+    (void)updated;
     return true;
 }
 
