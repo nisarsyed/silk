@@ -4,6 +4,7 @@ add_library(silk STATIC
     step.c
     shape.c
     collide.c
+    tree.c
 )
 add_library(silk::silk ALIAS silk)
 
