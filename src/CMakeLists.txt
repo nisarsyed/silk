@@ -3,6 +3,7 @@ add_library(silk STATIC
     world.c
     step.c
     shape.c
+    collide.c
 )
 add_library(silk::silk ALIAS silk)
 
