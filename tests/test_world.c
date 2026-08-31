@@ -119,15 +119,15 @@ static void test_create_roundtrips_state(void)
 }
 
 /* The complete arena is bounded by contract: max bodies plus the default
- * four-contacts-per-body pool remains below 56 MiB. */
+ * four-contacts-per-body pool and constraint scratch remain below 93 MiB. */
 static void test_memory_bytes_at_capacity_max_within_budget(void)
 {
     const sl_world_config worst_config = {
         .body_capacity = SL_BODY_COUNT_MAX,
     };
     const size_t worst = sl_world_memory_bytes(&worst_config);
-    SL_EXPECT(worst == (size_t)58327096u);
-    SL_EXPECT(worst <= (size_t)56u << 20);
+    SL_EXPECT(worst == (size_t)96075832u);
+    SL_EXPECT(worst <= (size_t)93u << 20);
 
     const sl_world_config zero = { 0 };
     const sl_world_config too_many = {
@@ -139,7 +139,7 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     /* Four body rows default to sixteen contacts and 32 pair buckets. */
     const sl_world_config small_config = { .body_capacity = 4u };
     const size_t small = sl_world_memory_bytes(&small_config);
-    SL_EXPECT(small == (size_t)3624u);
+    SL_EXPECT(small == (size_t)5928u);
 }
 
 static void test_create_rejects_non_finite_state(void)

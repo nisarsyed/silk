@@ -29,10 +29,12 @@ extern "C" {
  *                 f <- 0, t <- 0
  *
  * Before integration, persistent broad-phase contacts are reaped, refreshed,
- * and discovered. This phase computes snapshot manifolds and material mixes
- * only; contact impulses are not applied until the response layer lands.
- * After finalization, shaped bodies that escaped their fat proxy AABBs are
- * moved and queued for the following step.
+ * and discovered. Touching contacts are prepared once, then each substep
+ * warm-starts and solves biased normal/friction impulses before delta
+ * integration and performs an unbiased relax afterward. Two-point manifolds
+ * solve their coupled normal LCP in the biased pass. Restitution runs once
+ * after all substeps. After finalization, shaped bodies that escaped their fat
+ * proxy AABBs are moved and queued for the following step.
  *
  * Semi-implicit Euler -- each delta uses the post-drag velocity. The drag
  * forms divide instead of subtracting, so any drag >= 0 stays stable; force
@@ -43,10 +45,10 @@ extern "C" {
  * zero velocities), which integration neither reads nor disturbs.
  * Angular drag gates on body type, not inertia: a dynamic body with infinite
  * rotational inertia still damps toward zero spin. Before integration and
- * future constraint work, every dynamic and kinematic linear velocity is
- * capped to linear_speed_max and angular velocity to
- * SL_ROTATION_PER_STEP_MAX / dt. A future constraint solver must guard its
- * own impulse candidates and may add a final post-solve cap policy.
+ * constraint work, every dynamic and kinematic linear velocity is capped to
+ * linear_speed_max and angular velocity to SL_ROTATION_PER_STEP_MAX / dt.
+ * Contact impulses are validated atomically and may raise a finite post-solver
+ * velocity above the free-integration cap.
  *
  * Linear axes test base position plus candidate accumulated delta on every
  * substep. An out-of-domain dynamic axis holds and zeroes its velocity;
