@@ -129,22 +129,20 @@ static void test_create_roundtrips_state(void)
 }
 
 /* The world's arena is bounded by contract: at the population cap it
- * stays inside a 10 MiB budget (141 bytes per body plus slice padding),
+ * stays inside a 10 MiB budget (145 bytes per body plus slice padding),
  * and out-of-range capacities report zero bytes rather than guessing. */
 static void test_memory_bytes_at_capacity_max_within_budget(void)
 {
     const size_t worst = sl_world_memory_bytes(SL_BODY_COUNT_MAX);
-    SL_EXPECT(worst > 0u);
+    SL_EXPECT(worst == (size_t)9502720u);
     SL_EXPECT(worst <= (size_t)10u << 20);
 
     SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(0u), 0);
     SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(SL_BODY_COUNT_MAX + 1u), 0);
 
-    /* A tiny world allocates plausibly more than its raw payload but
-     * nothing extravagant. */
+    /* Four rows carry four bytes of alignment after the type slice. */
     const size_t small = sl_world_memory_bytes(4u);
-    SL_EXPECT(small >= 4u * 141u);
-    SL_EXPECT(small <= 4u * 141u + 256u);
+    SL_EXPECT(small == (size_t)584u);
 }
 
 static void test_create_rejects_non_finite_state(void)

@@ -175,8 +175,8 @@ static inline sl_vec2 sl_vec2_lerp(sl_vec2 a, sl_vec2 b, float t)
 }
 
 /* Rotation stored as (cos, sin): applying it is four multiplies and no
- * trig, so hot loops rotate freely while the world integrates a single
- * scalar angle. c^2 + s^2 == 1 within rounding for anything built by
+ * trig, so hot loops rotate freely while the world integrates this pair
+ * directly. c^2 + s^2 == 1 within rounding for anything built by
  * sl_rotation_make. */
 typedef struct sl_rotation {
     float c, s;

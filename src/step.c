@@ -74,10 +74,8 @@ void sl_world_step(sl_world *world, float dt)
                                  &world->velocities[i].y);
             if (sl_is_finite(spin)) {
                 world->angular_velocities[i] = spin;
-                const float angle = sl_angle_wrap(world->angles[i] + spin * dt);
-                if (sl_is_finite(angle)) {
-                    world->angles[i] = angle;
-                }
+                world->rotations[i] =
+                    sl_rotation_integrate(world->rotations[i], spin * dt);
             }
         }
 

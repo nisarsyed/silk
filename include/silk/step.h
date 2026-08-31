@@ -22,7 +22,7 @@ extern "C" {
  *     kinematic:  v, w unchanged
  *     static:     v, w are zero and stay zero
  *     all:        p <- p + v * dt
- *                 a <- wrap(a + w * dt)          (a stored in [-pi, pi])
+ *                 q <- normalize(q + w * dt * perp(q))
  *                 f <- 0, t <- 0
  *
  * Semi-implicit Euler -- position uses the post-drag velocity. The drag
@@ -42,11 +42,12 @@ extern "C" {
  * component is zeroed, preventing unbounded outward accumulation and
  * allowing inward acceleration to recover on the next step, so the body
  * halts up to velocity * dt inside the bound rather than against it;
- * kinematic velocity remains controller-owned. Spin commits when finite and
- * angle holds when wrapping would be non-finite. dt is the caller-selected
- * fixed timestep; Silk supplies no default. It must be identical across the
- * calls of a run, and timing policy lives above this function. Consumed
- * forces and torques always clear. */
+ * kinematic velocity remains controller-owned. Spin commits when finite;
+ * rotation advances by atan(w * dt), and holds when the delta or normalized
+ * candidate would be non-finite. dt is the caller-selected fixed timestep;
+ * Silk supplies no default. It must be identical across the calls of a run,
+ * and timing policy lives above this function. Consumed forces and torques
+ * always clear. */
 void sl_world_step(sl_world *world, float dt);
 
 typedef struct sl_stepper {
