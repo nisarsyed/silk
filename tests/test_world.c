@@ -32,34 +32,24 @@ static void test_init_destroy_roundtrip(void)
     SL_EXPECT(world.memory == NULL);
 }
 
-static void test_init_zeroes_complete_arena(void)
+static void test_init_zeroes_contact_storage(void)
 {
     sl_world_config config = { .body_capacity = 3u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    const size_t bytes = sl_world_memory_bytes(config.body_capacity);
-    unsigned char *expected = calloc(bytes, 1u);
+    const size_t contact_bytes =
+        (size_t)world.contact_capacity * sizeof(world.contacts[0]);
+    const size_t pair_bytes =
+        (size_t)world.pair_capacity * sizeof(world.pair_keys[0]);
+    unsigned char *expected =
+        calloc((contact_bytes > pair_bytes) ? contact_bytes : pair_bytes, 1u);
     SL_EXPECT(expected != NULL);
     if (expected != NULL) {
-        const unsigned char *base = world.memory;
-        const size_t slots_offset =
-            (size_t)((const unsigned char *)world.slots - base);
-        const size_t slot_of_offset =
-            (size_t)((const unsigned char *)world.slot_of - base);
-        const size_t free_indices_offset =
-            (size_t)((const unsigned char *)world.free_indices - base);
-
-        /* Init writes only pool metadata after clearing the arena. Copy
-         * those intentional values into an otherwise-zero oracle; the
-         * final comparison covers inactive body rows and slice padding. */
-        memcpy(expected + slots_offset, world.slots,
-               (size_t)world.body_capacity * sizeof(world.slots[0]));
-        memcpy(expected + slot_of_offset, world.slot_of,
-               (size_t)world.body_capacity * sizeof(world.slot_of[0]));
-        memcpy(expected + free_indices_offset, world.free_indices,
-               (size_t)world.body_capacity * sizeof(world.free_indices[0]));
-        SL_EXPECT(memcmp(world.memory, expected, bytes) == 0);
+        /* Tree initialization writes its bounded free list after the arena
+         * clear. Contact records and hash storage remain wholly zeroed. */
+        SL_EXPECT(memcmp(world.contacts, expected, contact_bytes) == 0);
+        SL_EXPECT(memcmp(world.pair_keys, expected, pair_bytes) == 0);
     }
 
     free(expected);
@@ -128,21 +118,28 @@ static void test_create_roundtrips_state(void)
     sl_world_destroy(&world);
 }
 
-/* The body's arena is bounded by contract: at the population cap it stays
- * inside an 11 MiB budget (169 bytes per body plus slice padding), and
- * out-of-range capacities report zero bytes rather than guessing. */
+/* The complete arena is bounded by contract: max bodies plus the default
+ * four-contacts-per-body pool remains below 56 MiB. */
 static void test_memory_bytes_at_capacity_max_within_budget(void)
 {
-    const size_t worst = sl_world_memory_bytes(SL_BODY_COUNT_MAX);
-    SL_EXPECT(worst == (size_t)11075584u);
-    SL_EXPECT(worst <= (size_t)11u << 20);
+    const sl_world_config worst_config = {
+        .body_capacity = SL_BODY_COUNT_MAX,
+    };
+    const size_t worst = sl_world_memory_bytes(&worst_config);
+    SL_EXPECT(worst == (size_t)58327096u);
+    SL_EXPECT(worst <= (size_t)56u << 20);
 
-    SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(0u), 0);
-    SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(SL_BODY_COUNT_MAX + 1u), 0);
+    const sl_world_config zero = { 0 };
+    const sl_world_config too_many = {
+        .body_capacity = SL_BODY_COUNT_MAX + 1u,
+    };
+    SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(&zero), 0);
+    SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(&too_many), 0);
 
-    /* Four rows carry four bytes of alignment after the type slice. */
-    const size_t small = sl_world_memory_bytes(4u);
-    SL_EXPECT(small == (size_t)680u);
+    /* Four body rows default to sixteen contacts and 32 pair buckets. */
+    const sl_world_config small_config = { .body_capacity = 4u };
+    const size_t small = sl_world_memory_bytes(&small_config);
+    SL_EXPECT(small == (size_t)3624u);
 }
 
 static void test_create_rejects_non_finite_state(void)
@@ -764,7 +761,7 @@ static void test_churn_stress_matches_model(void)
 
 static const sl_test_case k_cases[] = {
     { "init_destroy_roundtrip", test_init_destroy_roundtrip },
-    { "init_zeroes_complete_arena", test_init_zeroes_complete_arena },
+    { "init_zeroes_contact_storage", test_init_zeroes_contact_storage },
     { "init_rejects_bad_capacity", test_init_rejects_bad_capacity },
     { "create_roundtrips_state", test_create_roundtrips_state },
     { "memory_bytes_at_capacity_max_within_budget",
