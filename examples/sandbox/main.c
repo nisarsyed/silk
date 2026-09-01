@@ -16,9 +16,12 @@
  *                              point (off-center grabs spin it)
  *   space                      pause / resume
  *   period                     execute one fixed step (while paused)
+ *   c                          toggle contact points and normals
+ *   a                          toggle fat proxy AABBs
+ *   j                          spawn a six-link revolute chain at cursor
  *   r                          reset to the default scene
  *
- * Shaped bodies collide with the static preview ground and one another.
+ * Shaped bodies collide with the static ground and one another.
  * The off-screen cull remains a safety net for objects that tunnel at high
  * speed before continuous collision detection lands. Tethered bodies are
  * exempt and can be reeled back on-screen; slingshot bodies come into
@@ -48,6 +51,12 @@
 #define SB_SCREEN_WIDTH 1280
 #define SB_SCREEN_HEIGHT 720
 #define SB_BODY_CAPACITY 512u
+#define SB_CONTACT_CAPACITY 2048u
+#define SB_JOINT_CAPACITY 64u
+#define SB_SUBSTEP_COUNT 4u
+#define SB_PYRAMID_ROW_COUNT 10u
+#define SB_RAIN_BODY_COUNT 24u
+#define SB_CHAIN_LINK_COUNT 6u
 
 /* Committed PRNG seed; identical default scene on every launch. */
 #define SB_RNG_SEED 0x9E3779B9u
@@ -59,6 +68,8 @@ static const float k_sb_pixels_per_metre = 100.0f;
 static const sl_vec2 k_sb_gravity = { 0.0f, 9.81f }; /* metres / second^2 */
 
 static const float k_sb_timestep = 1.0f / 60.0f; /* seconds */
+static const float k_sb_friction = 0.6f;
+static const float k_sb_restitution = 0.1f;
 
 /* Mild damping settles both tether oscillation and free spin
  * (amplitude e-folds in 1/drag ~= 10 s); any drag >= 0 is stable under
@@ -131,6 +142,8 @@ typedef struct sb_app {
     sl_vec2 tether_force; /* most recent applied force, for the arrow */
 
     bool paused;
+    bool show_contacts;
+    bool show_aabbs;
     uint32_t last_steps; /* steps executed by the most recent frame or
                           * manual single-step */
 } sb_app;
@@ -202,38 +215,69 @@ static void sb_make_spawn_shape(sb_spawn_kind kind, float mass, sl_shape *out)
     (void)made;
 }
 
-static void sb_spawn_default_scene(sl_world *world)
+static void sb_spawn_pyramid(sl_world *world)
 {
-    /* Preserve the screen composition across render scales: centers stay
-     * 96 px from either side and between 64 px from the top and 400 px
-     * from the bottom. */
     const float screen_width_metres =
         sb_length_from_pixels((float)SB_SCREEN_WIDTH);
     const float screen_height_metres =
         sb_length_from_pixels((float)SB_SCREEN_HEIGHT);
-    const float margin_side_metres = sb_length_from_pixels(96.0f);
-    const float margin_top_metres = sb_length_from_pixels(64.0f);
-    const float margin_bottom_metres = sb_length_from_pixels(400.0f);
+    const float half = 0.25f;
+    const float spacing = 2.0f * half + 0.01f;
+    const float ground_top = screen_height_metres - 0.4f;
+    sl_shape box = sl_shape_none();
+    const bool made = sl_shape_make_box(half, half, &box);
+    SL_ASSERT(made);
+    (void)made;
 
-    for (uint32_t i = 0u; i < 32u; ++i) {
-        sl_body_desc desc = { 0 };
-        desc.position.x = sb_rng_range(
-            margin_side_metres, screen_width_metres - margin_side_metres);
-        desc.position.y = sb_rng_range(
-            margin_top_metres, screen_height_metres - margin_bottom_metres);
-        desc.velocity.x = sb_rng_range(-0.9f, 0.9f);
-        desc.velocity.y = sb_rng_range(-0.3f, 0.6f);
-        desc.mass = sb_rng_range(1.0f, 5.0f);
-        desc.angle = sb_rng_range(-SL_PI, SL_PI);
-        desc.angular_velocity = sb_rng_range(-3.0f, 3.0f);
+    for (uint32_t row = 0u; row < SB_PYRAMID_ROW_COUNT; ++row) {
+        const uint32_t count = SB_PYRAMID_ROW_COUNT - row;
+        const float y = ground_top - half - (float)row * spacing;
+        for (uint32_t column = 0u; column < count; ++column) {
+            const sl_body_desc desc = {
+                .position = {
+                    0.5f * screen_width_metres +
+                        ((float)column - 0.5f * (float)(count - 1u)) * spacing,
+                    y,
+                },
+                .mass = 1.0f,
+                .shape = &box,
+                .friction = k_sb_friction,
+                .restitution = k_sb_restitution,
+            };
+            const sl_body_handle body = sl_world_body_create(world, &desc);
+            SL_ASSERT(!sl_body_handle_is_null(body));
+            (void)body;
+        }
+    }
+}
 
-        sl_shape shape = sl_shape_none();
-        sb_make_spawn_shape((i % 2u == 0u) ? SB_SPAWN_CIRCLE : SB_SPAWN_BOX,
-                            desc.mass, &shape);
-        desc.shape = &shape;
-
+static void sb_spawn_rain(sl_world *world)
+{
+    const float screen_width_metres =
+        sb_length_from_pixels((float)SB_SCREEN_WIDTH);
+    for (uint32_t i = 0u; i < SB_RAIN_BODY_COUNT; ++i) {
+        const uint32_t column = i % 8u;
+        const uint32_t row = i / 8u;
+        const float mass = sb_rng_range(0.5f, 1.5f);
+        sl_shape circle = sl_shape_none();
+        sb_make_spawn_shape(SB_SPAWN_CIRCLE, mass, &circle);
+        const sl_body_desc desc = {
+            .position = {
+                0.2f * screen_width_metres +
+                    (float)column * (0.6f * screen_width_metres / 7.0f) +
+                    sb_rng_range(-0.08f, 0.08f),
+                0.3f + (float)row * 0.5f + sb_rng_range(-0.05f, 0.05f),
+            },
+            .velocity = { sb_rng_range(-0.25f, 0.25f),
+                          sb_rng_range(0.0f, 0.3f) },
+            .mass = mass,
+            .angle = sb_rng_range(-SL_PI, SL_PI),
+            .angular_velocity = sb_rng_range(-2.0f, 2.0f),
+            .shape = &circle,
+            .friction = k_sb_friction,
+            .restitution = k_sb_restitution,
+        };
         const sl_body_handle body = sl_world_body_create(world, &desc);
-        /* Capacity guarantees room for the whole scene. */
         SL_ASSERT(!sl_body_handle_is_null(body));
         (void)body;
     }
@@ -263,6 +307,8 @@ static void sb_spawn_ground(sl_world *world)
     desc.mass = 0.0f;
     desc.type = SL_BODY_STATIC;
     desc.shape = &slab;
+    desc.friction = k_sb_friction;
+    desc.restitution = k_sb_restitution;
 
     const sl_body_handle body = sl_world_body_create(world, &desc);
     SL_ASSERT(!sl_body_handle_is_null(body));
@@ -279,9 +325,12 @@ static void sb_reset(sb_app *app)
     app->grab_local = sl_vec2_make(0.0f, 0.0f);
     app->sling_armed = false;
     app->tether_force = sl_vec2_make(0.0f, 0.0f);
+    app->bank = 0.0f;
+    app->last_steps = 0u;
     sb_rng_state = SB_RNG_SEED;
     sb_spawn_ground(&app->world);
-    sb_spawn_default_scene(&app->world);
+    sb_spawn_pyramid(&app->world);
+    sb_spawn_rain(&app->world);
 }
 
 /* Nearest dynamic body whose shape covers the point (or whose reach
@@ -340,11 +389,75 @@ static void sb_launch_slingshot(sb_app *app)
     desc.position = app->press_point;
     desc.velocity = velocity;
     desc.mass = app->sling_mass;
+    desc.friction = k_sb_friction;
+    desc.restitution = k_sb_restitution;
 
     sl_shape shape = sl_shape_none();
     sb_make_spawn_shape(app->spawn_kind, desc.mass, &shape);
     desc.shape = &shape;
     sl_world_body_create(&app->world, &desc);
+}
+
+static void sb_spawn_joint_chain(sb_app *app)
+{
+    const uint32_t body_remaining =
+        sl_world_body_capacity(&app->world) - sl_world_body_count(&app->world);
+    const uint32_t joint_remaining = sl_world_joint_capacity(&app->world) -
+                                     sl_world_joint_count(&app->world);
+    if (body_remaining < SB_CHAIN_LINK_COUNT + 1u ||
+        joint_remaining < SB_CHAIN_LINK_COUNT) {
+        return;
+    }
+
+    const sl_body_desc anchor_desc = {
+        .position = app->cursor,
+        .type = SL_BODY_STATIC,
+    };
+    sl_body_handle previous = sl_world_body_create(&app->world, &anchor_desc);
+    SL_ASSERT(!sl_body_handle_is_null(previous));
+
+    const float half_width = 0.1f;
+    const float half_height = 0.225f;
+    const float link_height = 2.0f * half_height;
+    const float link_angle = 0.35f;
+    const sl_vec2 link_step = sl_rotation_apply(
+        sl_rotation_make(link_angle), sl_vec2_make(0.0f, link_height));
+    sl_shape link_shape = sl_shape_none();
+    const bool made = sl_shape_make_box(half_width, half_height, &link_shape);
+    SL_ASSERT(made);
+    (void)made;
+
+    for (uint32_t i = 0u; i < SB_CHAIN_LINK_COUNT; ++i) {
+        const sl_body_desc link_desc = {
+            /* Start 0.35 rad off vertical so gravity produces an immediately
+             * visible swing while adjacent anchors still coincide exactly. */
+            .position = sl_vec2_add(app->cursor,
+                                    sl_vec2_scale(link_step, (float)i + 0.5f)),
+            .mass = 0.75f,
+            .angle = link_angle,
+            .shape = &link_shape,
+            .friction = k_sb_friction,
+            .restitution = k_sb_restitution,
+        };
+        const sl_body_handle link =
+            sl_world_body_create(&app->world, &link_desc);
+        SL_ASSERT(!sl_body_handle_is_null(link));
+
+        const sl_joint_desc joint_desc = {
+            .kind = SL_JOINT_REVOLUTE,
+            .body_a = previous,
+            .body_b = link,
+            .local_anchor_a = (i == 0u) ? sl_vec2_make(0.0f, 0.0f)
+                                        : sl_vec2_make(0.0f, half_height),
+            .local_anchor_b = sl_vec2_make(0.0f, -half_height),
+            .collide_connected = false,
+        };
+        const sl_joint_handle joint =
+            sl_world_joint_create(&app->world, &joint_desc);
+        SL_ASSERT(!sl_joint_handle_is_null(joint));
+        (void)joint;
+        previous = link;
+    }
 }
 
 static void sb_apply_tether_for_step(sb_app *app);
@@ -365,6 +478,15 @@ static void sb_handle_input(sb_app *app)
         app->spawn_kind = (app->spawn_kind == SB_SPAWN_CIRCLE)
                               ? SB_SPAWN_BOX
                               : SB_SPAWN_CIRCLE;
+    }
+    if (IsKeyPressed(KEY_C)) {
+        app->show_contacts = !app->show_contacts;
+    }
+    if (IsKeyPressed(KEY_A)) {
+        app->show_aabbs = !app->show_aabbs;
+    }
+    if (IsKeyPressed(KEY_J)) {
+        sb_spawn_joint_chain(app);
     }
     if (IsKeyPressed(KEY_PERIOD) && app->paused) {
         /* Manual step shows the tether acting: one application, one
@@ -570,6 +692,70 @@ static void sb_draw_bodies(const sb_app *app)
     }
 }
 
+static void sb_draw_aabbs(const sb_app *app)
+{
+    if (!app->show_aabbs) {
+        return;
+    }
+    for (sl_body_handle body = sl_world_body_first(&app->world);
+         !sl_body_handle_is_null(body);
+         body = sl_world_body_next(&app->world, body)) {
+        sl_aabb aabb;
+        if (!sl_world_body_get_proxy_aabb(&app->world, body, &aabb)) {
+            continue;
+        }
+        const Rectangle rectangle = {
+            sb_length_to_pixels(aabb.lower.x),
+            sb_length_to_pixels(aabb.lower.y),
+            sb_length_to_pixels(aabb.upper.x - aabb.lower.x),
+            sb_length_to_pixels(aabb.upper.y - aabb.lower.y),
+        };
+        DrawRectangleLinesEx(rectangle, 1.0f, Fade(SKYBLUE, 0.75f));
+    }
+}
+
+static void sb_draw_contacts(const sb_app *app)
+{
+    if (!app->show_contacts) {
+        return;
+    }
+    const sl_world *world = &app->world;
+    for (uint32_t row = 0u; row < sl_world_contact_count(world); ++row) {
+        /* Consume the snapshot immediately; no pointer survives this draw or
+         * any later world mutation. */
+        const sl_contact *contact = sl_world_contact_at(world, row);
+        for (uint32_t i = 0u; i < contact->manifold.point_count; ++i) {
+            const sl_manifold_point *point = &contact->manifold.points[i];
+            const Color color = (point->separation > 0.0f) ? GOLD : RED;
+            const sl_vec2 tip = sl_vec2_add(
+                point->point, sl_vec2_scale(contact->manifold.normal, 0.25f));
+            DrawCircleV(sb_to_raylib(point->point), 4.0f, color);
+            DrawLineEx(sb_to_raylib(point->point), sb_to_raylib(tip), 2.0f,
+                       color);
+        }
+    }
+}
+
+static void sb_draw_joints(const sb_app *app)
+{
+    const sl_world *world = &app->world;
+    for (uint32_t row = 0u; row < sl_world_joint_count(world); ++row) {
+        const sl_joint_handle joint = sl_world_joint_at(world, row);
+        const sl_joint_desc desc = sl_world_joint_get_desc(world, joint);
+        const sl_vec2 anchor_a =
+            sl_transform_apply(sl_world_body_get_transform(world, desc.body_a),
+                               desc.local_anchor_a);
+        const sl_vec2 anchor_b =
+            sl_transform_apply(sl_world_body_get_transform(world, desc.body_b),
+                               desc.local_anchor_b);
+        const Color color = (desc.kind == SL_JOINT_DISTANCE) ? VIOLET : MAGENTA;
+        DrawLineEx(sb_to_raylib(anchor_a), sb_to_raylib(anchor_b), 2.0f,
+                   Fade(color, 0.9f));
+        DrawCircleV(sb_to_raylib(anchor_a), 3.0f, color);
+        DrawCircleV(sb_to_raylib(anchor_b), 3.0f, color);
+    }
+}
+
 static void sb_draw_forces(const sb_app *app)
 {
     const float magnitude = sl_vec2_length(app->tether_force);
@@ -624,17 +810,27 @@ static void sb_draw_interactions(const sb_app *app)
 
 static void sb_draw_hud(const sb_app *app)
 {
-    const uint32_t count = sl_world_body_count(&app->world);
-    const uint32_t capacity = sl_world_body_capacity(&app->world);
-
-    DrawText(TextFormat("bodies %u/%u", count, capacity), 12, 10, 20, LIME);
-    DrawText(TextFormat("steps %u", app->last_steps), 12, 34, 20, LIME);
-    DrawText(TextFormat("bank %.1f ms", (double)app->bank * 1000.0), 12, 58, 20,
-             LIME);
-    DrawText(TextFormat("%d fps", GetFPS()), 12, 82, 20, LIME);
+    DrawText(TextFormat("bodies %u/%u", sl_world_body_count(&app->world),
+                        sl_world_body_capacity(&app->world)),
+             12, 10, 20, LIME);
+    DrawText(TextFormat("contacts %u/%u  dropped %u",
+                        sl_world_contact_count(&app->world),
+                        sl_world_contact_capacity(&app->world),
+                        sl_world_contact_drop_count(&app->world)),
+             12, 34, 20, LIME);
+    DrawText(TextFormat("joints %u/%u", sl_world_joint_count(&app->world),
+                        sl_world_joint_capacity(&app->world)),
+             12, 58, 20, LIME);
+    DrawText(TextFormat("steps %u  bank %.1f ms  %d fps", app->last_steps,
+                        (double)app->bank * 1000.0, GetFPS()),
+             12, 82, 20, LIME);
     DrawText(TextFormat("spawn: %s",
                         app->spawn_kind == SB_SPAWN_CIRCLE ? "circle" : "box"),
              12, 106, 20, LIME);
+    DrawText(TextFormat("debug: contacts %s  AABBs %s",
+                        app->show_contacts ? "on" : "off",
+                        app->show_aabbs ? "on" : "off"),
+             12, 130, 20, LIME);
 
     if (!sl_body_handle_is_null(app->tether_body)) {
         const float degrees =
@@ -648,8 +844,8 @@ static void sb_draw_hud(const sb_app *app)
         DrawText("PAUSED", SB_SCREEN_WIDTH - 130, 40, 20, RED);
     }
 
-    DrawText("drag: spawn + slingshot   b: shape   hold body: tether   "
-             "space: pause   period: step   r: reset",
+    DrawText("drag: spawn   b: shape   hold: tether   c: contacts   "
+             "a: AABBs   j: chain   space: pause   .: step   r: reset",
              12, SB_SCREEN_HEIGHT - 28, 16, GRAY);
 }
 
@@ -660,6 +856,9 @@ static void sb_draw(const sb_app *app)
     sb_draw_grid();
     sb_draw_interactions(app);
     sb_draw_bodies(app);
+    sb_draw_aabbs(app);
+    sb_draw_contacts(app);
+    sb_draw_joints(app);
     sb_draw_forces(app);
     sb_draw_hud(app);
     EndDrawing();
@@ -673,11 +872,15 @@ int main(void)
 
     sb_app app = { 0 };
 
-    sl_world_config config;
-    config.body_capacity = SB_BODY_CAPACITY;
-    config.gravity = k_sb_gravity;
-    config.linear_drag = k_sb_linear_drag;
-    config.angular_drag = k_sb_angular_drag;
+    const sl_world_config config = {
+        .body_capacity = SB_BODY_CAPACITY,
+        .contact_capacity = SB_CONTACT_CAPACITY,
+        .joint_capacity = SB_JOINT_CAPACITY,
+        .gravity = k_sb_gravity,
+        .linear_drag = k_sb_linear_drag,
+        .angular_drag = k_sb_angular_drag,
+        .substep_count = SB_SUBSTEP_COUNT,
+    };
     if (!sl_world_init(&app.world, &config)) {
         fprintf(stderr, "sandbox: world init failed\n");
         CloseWindow();
