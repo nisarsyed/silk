@@ -29,12 +29,13 @@ extern "C" {
  *                 f <- 0, t <- 0
  *
  * Before integration, persistent broad-phase contacts are reaped, refreshed,
- * and discovered. Touching contacts are prepared once, then each substep
- * warm-starts and solves biased normal/friction impulses before delta
- * integration and performs an unbiased relax afterward. Two-point manifolds
- * solve their coupled normal LCP in the biased pass. Restitution runs once
- * after all substeps. After finalization, shaped bodies that escaped their fat
- * proxy AABBs are moved and queued for the following step.
+ * and discovered. Joints and touching contacts are prepared once. Each
+ * substep warm-starts and solves joints before biased contact impulses, then
+ * performs the same joint-before-contact order for the unbiased relax after
+ * delta integration. Two-point manifolds solve their coupled normal LCP in
+ * the biased pass. Restitution runs once after all substeps. After
+ * finalization, shaped bodies that escaped their fat proxy AABBs are moved and
+ * queued for the following step.
  *
  * Semi-implicit Euler -- each delta uses the post-drag velocity. The drag
  * forms divide instead of subtracting, so any drag >= 0 stays stable; force
@@ -47,8 +48,8 @@ extern "C" {
  * rotational inertia still damps toward zero spin. Before integration and
  * constraint work, every dynamic and kinematic linear velocity is capped to
  * linear_speed_max and angular velocity to SL_ROTATION_PER_STEP_MAX / dt.
- * Contact impulses are validated atomically and may raise a finite post-solver
- * velocity above the free-integration cap.
+ * Joint and contact impulses are validated atomically and may raise a finite
+ * post-solver velocity above the free-integration cap.
  *
  * Linear axes test base position plus candidate accumulated delta on every
  * substep. An out-of-domain dynamic axis holds and zeroes its velocity;

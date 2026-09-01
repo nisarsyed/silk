@@ -7,6 +7,7 @@
 
 #include "silk/body.h"
 #include "silk/contact.h"
+#include "silk/joint.h"
 #include "silk/math.h"
 #include "silk/shape.h"
 
@@ -14,8 +15,8 @@
 extern "C" {
 #endif
 
-/* Bounds the packed body and broad-phase arrays. The exact maximum world
- * allocation, including contacts and pair storage, is pinned by tests.
+/* Bound packed ownership arrays. The exact maximum world allocation,
+ * including opt-in joints, contacts, and pair storage, is pinned by tests.
  * Raise only on profiling evidence together with that budget. */
 #define SL_BODY_COUNT_MAX 65536u
 
@@ -35,6 +36,11 @@ extern "C" {
 #define SL_CONTACT_DAMPING_RATIO_DEFAULT 10.0f
 #define SL_CONTACT_PUSH_VELOCITY_MAX_DEFAULT 3.0f
 #define SL_RESTITUTION_THRESHOLD_DEFAULT 1.0f
+
+/* Implicit joint regularization. Zero-valued config fields select these
+ * defaults; joint hertz is capped at one eighth of the substep rate. */
+#define SL_JOINT_HERTZ_DEFAULT 60.0f
+#define SL_JOINT_DAMPING_RATIO_DEFAULT 2.0f
 
 /* Maximum absolute body-center coordinate. IEEE-754 binary32 spacing at
  * 8192 is 0.0009765625; a shape adds at most SL_SHAPE_EXTENT_MAX, and the
@@ -88,6 +94,8 @@ typedef struct sl_world_config {
     uint32_t body_capacity; /* in [1, SL_BODY_COUNT_MAX], fixed at init */
     /* 0 selects min(4 * body_capacity, SL_CONTACT_COUNT_MAX). */
     uint32_t contact_capacity;
+    /* 0 disables joints; otherwise in [1, SL_JOINT_COUNT_MAX]. */
+    uint32_t joint_capacity;
     sl_vec2 gravity;    /* world units / second^2; default {0, 0} */
     float linear_drag;  /* 1 / seconds, >= 0; default 0 */
     float angular_drag; /* 1 / seconds, >= 0; default 0 */
@@ -100,12 +108,19 @@ typedef struct sl_world_config {
     float contact_damping_ratio;
     float contact_push_velocity_max; /* world units / second */
     float restitution_threshold;     /* world units / second */
+    float joint_hertz;               /* zero selects documented default */
+    float joint_damping_ratio;       /* zero selects documented default */
 } sl_world_config;
 
 typedef struct sl_body_slot {
     uint32_t dense;      /* row in [0, body_count) or SL_BODY_DENSE_NONE */
     uint32_t generation; /* bumped on destroy (wrap skips 0) */
 } sl_body_slot;
+
+typedef struct sl_joint_slot {
+    uint32_t dense;      /* packed row or SL_BODY_DENSE_NONE when free */
+    uint32_t generation; /* bumped on destroy/reset; wrap skips zero */
+} sl_joint_slot;
 
 /* Owning runtime object: initialize from zero, never copy after init, and
  * treat every field below as engine-private. Copying duplicates arena
@@ -119,6 +134,10 @@ typedef struct sl_world {
     uint32_t contact_drop_count;
     uint32_t pair_capacity;
     uint32_t moved_count;
+    uint32_t joint_count;
+    uint32_t joint_capacity;
+    uint32_t joint_free_count;
+    uint32_t joint_constraint_count;
 
     sl_vec2 gravity;        /* world units / second^2 */
     float linear_drag;      /* 1 / seconds, >= 0 */
@@ -129,6 +148,8 @@ typedef struct sl_world {
     float contact_damping_ratio;
     float contact_push_velocity_max;
     float restitution_threshold;
+    float joint_hertz;
+    float joint_damping_ratio;
 
     /* Dual indexing: slots[handle.index] -> packed row, slot_of[row] ->
      * owning slot. Swap-remove repairs exactly one slot_of entry. */
@@ -185,6 +206,31 @@ typedef struct sl_world {
     void *contact_constraints;
     uint32_t contact_constraint_count;
 
+    /* Persistent joint state is SoA. Joint slots remain stable while packed
+     * rows swap-remove; edge ids are 2 * slot + endpoint and link through
+     * stable body-slot adjacency heads. */
+    sl_joint_slot *joint_slots;
+    uint32_t *joint_slot_of;
+    uint32_t *joint_free_indices;
+    uint8_t *joint_kinds;
+    sl_body_handle *joint_bodies_a;
+    sl_body_handle *joint_bodies_b;
+    sl_vec2 *joint_local_anchors_a;
+    sl_vec2 *joint_local_anchors_b;
+    uint8_t *joint_collide_connected;
+    float *joint_distance_lengths;
+    float *joint_distance_impulses;
+    sl_vec2 *joint_revolute_impulses;
+    sl_vec2 *joint_linear_impulses;
+    uint32_t *body_joint_heads;
+    uint32_t *body_joint_counts;
+    uint32_t *joint_edge_prevs;
+    uint32_t *joint_edge_nexts;
+
+    /* Complete transient records are consumed together by each scalar
+     * solver stage, so AoS is the appropriate scratch granularity. */
+    void *joint_constraints;
+
     void *memory; /* backing block carved into every array above */
 } sl_world;
 
@@ -195,11 +241,13 @@ size_t sl_world_memory_bytes(const sl_world_config *config);
 /* *world must be zero-initialized or previously destroyed: re-initializing
  * a live world leaks its arena, so the assert fires in debug builds.
  * Returns false, leaving *world zeroed, when body_capacity or
- * contact_capacity is outside its documented range, gravity is non-finite,
+ * contact_capacity or joint_capacity is outside its documented range,
+ * gravity is non-finite,
  * linear_drag or angular_drag is non-finite or negative, substep_count is
  * above its cap, or a speed/solver tuning value is non-finite, negative, or
  * derives non-finite softness terms. Zero contact_capacity, substep_count,
- * speed, and solver tuning fields select their documented defaults.
+ * speed, and solver tuning fields select their documented defaults; zero
+ * joint_capacity disables joint storage.
  * The full arena, including inactive rows and alignment gaps, starts
  * zeroed. Everything is allocated here; nothing allocates during
  * simulation. */
@@ -208,8 +256,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config);
 /* Frees all engine-owned memory and zeroes *world; safe to repeat. */
 void sl_world_destroy(sl_world *world);
 
-/* Destroys every body and bumps every generation, so handles held from
- * before a reset never validate afterwards. */
+/* Destroys every body and joint and bumps both pools' generations, so handles
+ * held from before a reset never validate afterwards. */
 void sl_world_reset(sl_world *world);
 
 /* Returns the null handle -- leaving the world unchanged -- when any
@@ -223,8 +271,8 @@ void sl_world_reset(sl_world *world);
  * overflow; also when the world is full. */
 sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc);
 
-/* Tolerant no-op for null, malformed, and stale handles, so deferred
- * destruction never corrupts the pool. */
+/* Tolerant no-op for null, malformed, and stale handles. Attached joints are
+ * destroyed eagerly before the body slot can be reused. */
 void sl_world_body_destroy(sl_world *world, sl_body_handle handle);
 
 /* True when handle names a live body in this world; safe on arbitrary
@@ -233,6 +281,26 @@ bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle);
 
 uint32_t sl_world_body_count(const sl_world *world);
 uint32_t sl_world_body_capacity(const sl_world *world);
+
+/* Joint storage is opt-in: capacity zero disables creation without adding
+ * per-step work. Creation validates the complete descriptor before mutation.
+ * Bodies must be distinct and live, at least one must be dynamic, anchor
+ * components must be finite and within SL_SHAPE_EXTENT_MAX, and distance
+ * length must be in [SL_LINEAR_SLOP, 2 * SL_POSITION_ABS_MAX]. Destroy is a
+ * tolerant no-op for null, malformed, and stale handles. */
+uint32_t sl_world_joint_count(const sl_world *world);
+uint32_t sl_world_joint_capacity(const sl_world *world);
+sl_joint_handle sl_world_joint_create(sl_world *world,
+                                      const sl_joint_desc *desc);
+void sl_world_joint_destroy(sl_world *world, sl_joint_handle handle);
+bool sl_world_joint_is_valid(const sl_world *world, sl_joint_handle handle);
+sl_joint_handle sl_world_joint_at(const sl_world *world, uint32_t row);
+sl_joint_desc sl_world_joint_get_desc(const sl_world *world,
+                                      sl_joint_handle handle);
+/* Constraint impulse applied to body_b during the most recently completed
+ * step, in linear impulse units. */
+sl_vec2 sl_world_joint_get_linear_impulse(const sl_world *world,
+                                          sl_joint_handle handle);
 
 /* Contact-table snapshots are packed in deterministic processing order.
  * contact_at asserts row < contact_count. Its pointer is conservatively valid

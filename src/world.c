@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "contact_world.h"
+#include "joint.h"
 #include "solver.h"
 
 /* malloc aligns the base for every fundamental type. Every carved type's
@@ -62,13 +63,12 @@ static size_t world_memory_bytes_for(size_t capacity)
            slice_bytes(capacity, sizeof(sl_shape));
 }
 
-static bool world_config_resolve(const sl_world_config *config,
-                                 uint32_t *contact_capacity,
-                                 uint32_t *substep_count,
-                                 float *linear_speed_max, float *contact_hertz,
-                                 float *contact_damping_ratio,
-                                 float *contact_push_velocity_max,
-                                 float *restitution_threshold)
+static bool world_config_resolve(
+    const sl_world_config *config, uint32_t *contact_capacity,
+    uint32_t *joint_capacity, uint32_t *substep_count, float *linear_speed_max,
+    float *contact_hertz, float *contact_damping_ratio,
+    float *contact_push_velocity_max, float *restitution_threshold,
+    float *joint_hertz, float *joint_damping_ratio)
 {
     if (config == NULL || config->body_capacity < 1u ||
         config->body_capacity > SL_BODY_COUNT_MAX) {
@@ -86,7 +86,11 @@ static bool world_config_resolve(const sl_world_config *config,
         !sl_is_finite(config->contact_push_velocity_max) ||
         config->contact_push_velocity_max < 0.0f ||
         !sl_is_finite(config->restitution_threshold) ||
-        config->restitution_threshold < 0.0f) {
+        config->restitution_threshold < 0.0f ||
+        config->joint_capacity > SL_JOINT_COUNT_MAX ||
+        !sl_is_finite(config->joint_hertz) || config->joint_hertz < 0.0f ||
+        !sl_is_finite(config->joint_damping_ratio) ||
+        config->joint_damping_ratio < 0.0f) {
         return false;
     }
 
@@ -102,6 +106,7 @@ static bool world_config_resolve(const sl_world_config *config,
     }
 
     *contact_capacity = contacts;
+    *joint_capacity = config->joint_capacity;
     *substep_count = (config->substep_count == 0u) ? SL_SUBSTEP_COUNT_DEFAULT
                                                    : config->substep_count;
     *linear_speed_max = (config->linear_speed_max == 0.0f)
@@ -118,6 +123,11 @@ static bool world_config_resolve(const sl_world_config *config,
     *restitution_threshold = (config->restitution_threshold == 0.0f)
                                  ? SL_RESTITUTION_THRESHOLD_DEFAULT
                                  : config->restitution_threshold;
+    *joint_hertz = (config->joint_hertz == 0.0f) ? SL_JOINT_HERTZ_DEFAULT
+                                                 : config->joint_hertz;
+    *joint_damping_ratio = (config->joint_damping_ratio == 0.0f)
+                               ? SL_JOINT_DAMPING_RATIO_DEFAULT
+                               : config->joint_damping_ratio;
 
     /* Static contacts double hertz before the runtime substep-rate cap.
      * Validate that path and the worst capped h*omega softness terms now. */
@@ -131,22 +141,37 @@ static bool world_config_resolve(const sl_world_config *config,
         !sl_is_finite(1.0f + a_2_max)) {
         return false;
     }
+
+    /* The joint cap is one eighth of the substep rate, so h*omega is at
+     * most pi/4. Validate the raw tuning and that worst capped path. */
+    const float joint_omega = 2.0f * SL_PI * *joint_hertz;
+    const float joint_h_omega_max = 0.25f * SL_PI;
+    const float joint_a_1_max = 2.0f * *joint_damping_ratio + joint_h_omega_max;
+    const float joint_a_2_max = joint_h_omega_max * joint_a_1_max;
+    if (!sl_is_finite(joint_omega) || !sl_is_finite(joint_a_1_max) ||
+        !sl_is_finite(joint_a_2_max) || !sl_is_finite(1.0f + joint_a_2_max)) {
+        return false;
+    }
     return true;
 }
 
 size_t sl_world_memory_bytes(const sl_world_config *config)
 {
     uint32_t contact_capacity = 0u;
+    uint32_t joint_capacity = 0u;
     uint32_t substep_count = 0u;
     float linear_speed_max = 0.0f;
     float contact_hertz = 0.0f;
     float contact_damping_ratio = 0.0f;
     float contact_push_velocity_max = 0.0f;
     float restitution_threshold = 0.0f;
+    float joint_hertz = 0.0f;
+    float joint_damping_ratio = 0.0f;
     if (!world_config_resolve(
-            config, &contact_capacity, &substep_count, &linear_speed_max,
-            &contact_hertz, &contact_damping_ratio, &contact_push_velocity_max,
-            &restitution_threshold)) {
+            config, &contact_capacity, &joint_capacity, &substep_count,
+            &linear_speed_max, &contact_hertz, &contact_damping_ratio,
+            &contact_push_velocity_max, &restitution_threshold, &joint_hertz,
+            &joint_damping_ratio)) {
         return 0u;
     }
     (void)substep_count;
@@ -155,17 +180,23 @@ size_t sl_world_memory_bytes(const sl_world_config *config)
     (void)contact_damping_ratio;
     (void)contact_push_velocity_max;
     (void)restitution_threshold;
+    (void)joint_hertz;
+    (void)joint_damping_ratio;
     const size_t body_bytes =
         world_memory_bytes_for((size_t)config->body_capacity);
     const size_t contact_bytes =
         sl_contact_world_memory_bytes(config->body_capacity, contact_capacity);
     const size_t solver_bytes = sl_solver_memory_bytes(contact_capacity);
+    const size_t joint_bytes =
+        sl_joint_memory_bytes(config->body_capacity, joint_capacity);
     if (contact_bytes == 0u || solver_bytes == 0u ||
+        (joint_capacity > 0u && joint_bytes == 0u) ||
         body_bytes > SIZE_MAX - contact_bytes ||
-        body_bytes + contact_bytes > SIZE_MAX - solver_bytes) {
+        body_bytes + contact_bytes > SIZE_MAX - solver_bytes ||
+        body_bytes + contact_bytes + solver_bytes > SIZE_MAX - joint_bytes) {
         return 0u;
     }
-    return body_bytes + contact_bytes + solver_bytes;
+    return body_bytes + contact_bytes + solver_bytes + joint_bytes;
 }
 
 /* Generation counters are 1-based; a bump that lands on 0 skips to 1 so
@@ -387,16 +418,20 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     memset(world, 0, sizeof(*world));
 
     uint32_t contact_capacity = 0u;
+    uint32_t joint_capacity = 0u;
     uint32_t substep_count = 0u;
     float linear_speed_max = 0.0f;
     float contact_hertz = 0.0f;
     float contact_damping_ratio = 0.0f;
     float contact_push_velocity_max = 0.0f;
     float restitution_threshold = 0.0f;
+    float joint_hertz = 0.0f;
+    float joint_damping_ratio = 0.0f;
     if (!world_config_resolve(
-            config, &contact_capacity, &substep_count, &linear_speed_max,
-            &contact_hertz, &contact_damping_ratio, &contact_push_velocity_max,
-            &restitution_threshold)) {
+            config, &contact_capacity, &joint_capacity, &substep_count,
+            &linear_speed_max, &contact_hertz, &contact_damping_ratio,
+            &contact_push_velocity_max, &restitution_threshold, &joint_hertz,
+            &joint_damping_ratio)) {
         return false;
     }
 
@@ -405,7 +440,10 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     const size_t contact_bytes =
         sl_contact_world_memory_bytes(config->body_capacity, contact_capacity);
     const size_t solver_bytes = sl_solver_memory_bytes(contact_capacity);
-    const size_t total_bytes = body_bytes + contact_bytes + solver_bytes;
+    const size_t joint_bytes =
+        sl_joint_memory_bytes(config->body_capacity, joint_capacity);
+    const size_t total_bytes =
+        body_bytes + contact_bytes + solver_bytes + joint_bytes;
 
     unsigned char *base = malloc(total_bytes);
     if (base == NULL) {
@@ -460,6 +498,10 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->contact_drop_count = 0u;
     world->pair_capacity = sl_contact_pair_capacity(contact_capacity);
     world->moved_count = 0u;
+    world->joint_count = 0u;
+    world->joint_capacity = joint_capacity;
+    world->joint_free_count = joint_capacity;
+    world->joint_constraint_count = 0u;
     world->gravity = config->gravity;
     world->linear_drag = config->linear_drag;
     world->angular_drag = config->angular_drag;
@@ -469,6 +511,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->contact_damping_ratio = contact_damping_ratio;
     world->contact_push_velocity_max = contact_push_velocity_max;
     world->restitution_threshold = restitution_threshold;
+    world->joint_hertz = joint_hertz;
+    world->joint_damping_ratio = joint_damping_ratio;
 
     void *contact_memory = carve(base, &offset, contact_bytes, 1u);
     if (!sl_contact_world_init(world, contact_memory, contact_bytes)) {
@@ -477,8 +521,17 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
         return false;
     }
     void *solver_memory = carve(base, &offset, solver_bytes, 1u);
-    SL_ASSERT(offset == total_bytes);
     if (!sl_solver_init(world, solver_memory, solver_bytes)) {
+        free(base);
+        memset(world, 0, sizeof(*world));
+        return false;
+    }
+    void *joint_memory = NULL;
+    if (joint_bytes > 0u) {
+        joint_memory = carve(base, &offset, joint_bytes, 1u);
+    }
+    SL_ASSERT(offset == total_bytes);
+    if (!sl_joint_world_init(world, joint_memory, joint_bytes)) {
         free(base);
         memset(world, 0, sizeof(*world));
         return false;
@@ -508,6 +561,7 @@ void sl_world_reset(sl_world *world)
 {
     SL_ASSERT(world != NULL);
 
+    sl_joint_world_reset(world);
     sl_contact_world_reset(world);
     world->contact_constraint_count = 0u;
     world->body_count = 0u;
@@ -603,6 +657,7 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
      * this copy chain and create's initialization. */
     const uint32_t dense = slot->dense;
     const uint32_t last = world->body_count - 1u;
+    sl_joint_body_destroy(world, handle.index);
     sl_contact_body_destroy(world, dense, handle.index);
     if (dense != last) {
         world->positions[dense] = world->positions[last];
@@ -837,6 +892,7 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
     }
     const uint32_t dense = world->slots[handle.index].dense;
     world->positions[dense] = position;
+    sl_joint_body_cache_clear(world, handle.index);
     const bool updated = sl_contact_body_update(world, dense, handle.index);
     SL_ASSERT(updated);
     (void)updated;
@@ -872,6 +928,7 @@ bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
     }
     const uint32_t dense = world->slots[handle.index].dense;
     world->rotations[dense] = sl_rotation_make(sl_angle_wrap(angle));
+    sl_joint_body_cache_clear(world, handle.index);
     const bool updated = sl_contact_body_update(world, dense, handle.index);
     SL_ASSERT(updated);
     (void)updated;
@@ -948,6 +1005,7 @@ bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass)
     world->masses[dense] = mass;
     world->inv_masses[dense] = inv_mass;
     body_write_inertia(world, dense, inertia);
+    sl_joint_body_cache_clear(world, handle.index);
     return true;
 }
 
@@ -982,6 +1040,7 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
         shape_write_normalized(shape, &world->shapes[dense]);
     }
     body_write_inertia(world, dense, inertia);
+    sl_joint_body_cache_clear(world, handle.index);
     const bool updated = sl_contact_body_update(world, dense, handle.index);
     SL_ASSERT(updated);
     (void)updated;

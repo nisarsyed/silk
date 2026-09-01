@@ -9,6 +9,7 @@ int sl_shape_suite(void);
 int sl_collide_suite(void);
 int sl_contact_suite(void);
 int sl_solver_suite(void);
+int sl_joint_suite(void);
 int sl_tree_suite(void);
 int sl_body_suite(void);
 int sl_world_suite(void);

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "contact_world.h"
+#include "joint.h"
 #include "solver.h"
 
 /* Scale-safe Euclidean cap. Dividing by the largest component before the
@@ -61,18 +62,21 @@ void sl_world_step(sl_world *world, float dt)
     if (world == NULL) {
         return;
     }
-    const bool world_valid = world->substep_count >= 1u &&
-                             world->substep_count <= SL_SUBSTEP_COUNT_MAX &&
-                             sl_is_finite(world->linear_speed_max) &&
-                             world->linear_speed_max > 0.0f &&
-                             sl_is_finite(world->contact_hertz) &&
-                             world->contact_hertz > 0.0f &&
-                             sl_is_finite(world->contact_damping_ratio) &&
-                             world->contact_damping_ratio > 0.0f &&
-                             sl_is_finite(world->contact_push_velocity_max) &&
-                             world->contact_push_velocity_max > 0.0f &&
-                             sl_is_finite(world->restitution_threshold) &&
-                             world->restitution_threshold > 0.0f;
+    const bool world_valid =
+        world->substep_count >= 1u &&
+        world->substep_count <= SL_SUBSTEP_COUNT_MAX &&
+        sl_is_finite(world->linear_speed_max) &&
+        world->linear_speed_max > 0.0f && sl_is_finite(world->contact_hertz) &&
+        world->contact_hertz > 0.0f &&
+        sl_is_finite(world->contact_damping_ratio) &&
+        world->contact_damping_ratio > 0.0f &&
+        sl_is_finite(world->contact_push_velocity_max) &&
+        world->contact_push_velocity_max > 0.0f &&
+        sl_is_finite(world->restitution_threshold) &&
+        world->restitution_threshold > 0.0f &&
+        sl_is_finite(world->joint_hertz) && world->joint_hertz > 0.0f &&
+        sl_is_finite(world->joint_damping_ratio) &&
+        world->joint_damping_ratio > 0.0f;
     SL_ASSERT(world_valid);
     if (!world_valid) {
         return;
@@ -101,6 +105,7 @@ void sl_world_step(sl_world *world, float dt)
     const float angular_speed_max = SL_ROTATION_PER_STEP_MAX * inverse_dt;
 
     sl_contact_step_begin(world);
+    sl_joint_prepare(world, h, inverse_h);
     sl_solver_prepare(world, h, inverse_h);
 
     /* Deltas retain precision while the base transforms remain fixed for all
@@ -150,7 +155,9 @@ void sl_world_step(sl_world *world, float dt)
                 angular_velocity_cap(angular_velocity, angular_speed_max);
         }
 
+        sl_joint_warm_start(world);
         sl_solver_warm_start(world);
+        sl_joint_solve(world, true);
         sl_solver_solve(world, inverse_h, true);
 
         for (uint32_t i = 0u; i < world->body_count; ++i) {
@@ -170,10 +177,12 @@ void sl_world_step(sl_world *world, float dt)
                 world->delta_rotations[i], world->angular_velocities[i] * h);
         }
 
+        sl_joint_solve(world, false);
         sl_solver_solve(world, inverse_h, false);
     }
 
     sl_solver_restitution(world);
+    sl_joint_store(world);
     sl_solver_store(world);
 
     for (uint32_t i = 0u; i < world->body_count; ++i) {

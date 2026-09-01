@@ -4,6 +4,7 @@ add_library(silk STATIC
     step.c
     shape.c
     solver.c
+    joint.c
     collide.c
     contact.c
     tree.c
