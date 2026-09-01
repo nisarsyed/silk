@@ -52,6 +52,13 @@ if(SL_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
+# Deterministic rigid-body performance harness: an off-by-default developer
+# executable, never a CTest entry. Wall-clock timing remains outside silk.
+option(SL_BUILD_BENCH "Build the deterministic benchmark executable" OFF)
+if(SL_BUILD_BENCH)
+    add_subdirectory(bench)
+endif()
+
 # Interactive raylib sandbox: an off-by-default dev tool, not a tested
 # artifact — enabling it fetches raylib at configure time and needs a
 # display to run, but it is compile-checked in CI (the sandbox job).
