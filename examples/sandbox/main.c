@@ -18,11 +18,11 @@
  *   period                     execute one fixed step (while paused)
  *   r                          reset to the default scene
  *
- * Bodies still overlap freely and fall through everything until Phase 3
- * collision lands: the static ground previews where a floor will be,
- * and unattended bodies despawn below the view rather than piling up
- * invisibly. Tethered bodies are exempt and can be reeled back
- * on-screen; slingshot bodies come into existence only at release.
+ * Shaped bodies collide with the static preview ground and one another.
+ * The off-screen cull remains a safety net for objects that tunnel at high
+ * speed before continuous collision detection lands. Tethered bodies are
+ * exempt and can be reeled back on-screen; slingshot bodies come into
+ * existence only at release.
  *
  * Timing policy lives entirely app-side: this file owns the accumulator
  * and calls sl_world_step directly, applying the tether immediately
@@ -248,9 +248,8 @@ static void sb_spawn_ground(sl_world *world)
     const float ground_half_width_metres = 0.5f * screen_width_metres;
     const float ground_half_height_metres = 0.2f;
 
-    /* Static preview floor: spans the window with its top edge 0.4 m
-     * above the bottom, so falling bodies visibly pass through it until
-     * collision lands. */
+    /* Static floor spans the window with its top edge 0.4 m above the
+     * bottom. */
     sl_shape slab = sl_shape_none();
     const bool made = sl_shape_make_box(ground_half_width_metres,
                                         ground_half_height_metres, &slab);
@@ -456,9 +455,9 @@ static void sb_advance_frame(sb_app *app)
     app->last_steps = steps;
 }
 
-/* Despawn unattended bodies that fell out of view: with no collision
- * there is no floor yet, and off-screen bodies would silently exhaust
- * the spawn cap. Destroy is a swap-remove -- the relocated body lands
+/* Despawn unattended bodies that fell out of view after a fast tunnel or
+ * launch, which would otherwise silently exhaust the spawn cap. Destroy is a
+ * swap-remove -- the relocated body lands
  * behind a captured-successor cursor -- so this walks rows with at()
  * instead, retesting whatever refills a removed row (see
  * include/silk/world.h). Tethered bodies are exempt -- a fast tethered
@@ -567,8 +566,7 @@ static void sb_draw_bodies(const sb_app *app)
             DrawLineStrip(points, (int)shape->polygon.count + 1, DARKBROWN);
         }
 
-        /* Outline keeps overlapping bodies readable -- with no
-         * collision, overlap is the common case. */
+        /* Outline keeps transient overlaps readable. */
     }
 }
 

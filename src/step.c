@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "contact_world.h"
+#include "solver.h"
 
 /* Scale-safe Euclidean cap. Dividing by the largest component before the
  * length avoids overflow for any finite externally supplied velocity. */
@@ -63,7 +64,15 @@ void sl_world_step(sl_world *world, float dt)
     const bool world_valid = world->substep_count >= 1u &&
                              world->substep_count <= SL_SUBSTEP_COUNT_MAX &&
                              sl_is_finite(world->linear_speed_max) &&
-                             world->linear_speed_max > 0.0f;
+                             world->linear_speed_max > 0.0f &&
+                             sl_is_finite(world->contact_hertz) &&
+                             world->contact_hertz > 0.0f &&
+                             sl_is_finite(world->contact_damping_ratio) &&
+                             world->contact_damping_ratio > 0.0f &&
+                             sl_is_finite(world->contact_push_velocity_max) &&
+                             world->contact_push_velocity_max > 0.0f &&
+                             sl_is_finite(world->restitution_threshold) &&
+                             world->restitution_threshold > 0.0f;
     SL_ASSERT(world_valid);
     if (!world_valid) {
         return;
@@ -92,6 +101,7 @@ void sl_world_step(sl_world *world, float dt)
     const float angular_speed_max = SL_ROTATION_PER_STEP_MAX * inverse_dt;
 
     sl_contact_step_begin(world);
+    sl_solver_prepare(world, h, inverse_h);
 
     /* Deltas retain precision while the base transforms remain fixed for all
      * substeps and, later, for every solver iteration. */
@@ -100,6 +110,10 @@ void sl_world_step(sl_world *world, float dt)
         world->delta_rotations[i] = sl_rotation_identity();
     }
 
+    /* One constraint sweep at each smaller step follows the error-reduction
+     * result of Macklin et al., "Small Steps in Physics Simulation" (SCA
+     * 2019). Silk reuses one frame manifold/Jacobian preparation so the
+     * substeps add bounded solver work without repeating broad-phase work. */
     for (uint32_t substep = 0u; substep < world->substep_count; ++substep) {
         for (uint32_t i = 0u; i < world->body_count; ++i) {
             const uint8_t type = world->types[i];
@@ -136,6 +150,9 @@ void sl_world_step(sl_world *world, float dt)
                 angular_velocity_cap(angular_velocity, angular_speed_max);
         }
 
+        sl_solver_warm_start(world);
+        sl_solver_solve(world, inverse_h, true);
+
         for (uint32_t i = 0u; i < world->body_count; ++i) {
             const uint8_t type = world->types[i];
             const bool dynamic = type == (uint8_t)SL_BODY_DYNAMIC;
@@ -152,7 +169,12 @@ void sl_world_step(sl_world *world, float dt)
             world->delta_rotations[i] = sl_rotation_integrate(
                 world->delta_rotations[i], world->angular_velocities[i] * h);
         }
+
+        sl_solver_solve(world, inverse_h, false);
     }
+
+    sl_solver_restitution(world);
+    sl_solver_store(world);
 
     for (uint32_t i = 0u; i < world->body_count; ++i) {
         world->positions[i] =

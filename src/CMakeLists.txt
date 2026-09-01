@@ -3,6 +3,7 @@ add_library(silk STATIC
     world.c
     step.c
     shape.c
+    solver.c
     collide.c
     contact.c
     tree.c

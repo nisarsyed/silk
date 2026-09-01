@@ -5,6 +5,7 @@ add_executable(sl_tests
     test_shape.c
     test_collide.c
     test_contact.c
+    test_solver.c
     test_tree.c
     test_body.c
     test_world.c

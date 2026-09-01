@@ -82,8 +82,8 @@ Controls:
 - Left-hold a body to tether it; off-center grabs apply torque.
 - Press `Space` to pause or resume, `.` to step while paused, and `R` to reset.
 
-Bodies intentionally pass through the preview ground and one another until the
-Phase 3 contact-response layer lands.
+Shaped bodies collide with the preview ground and one another. Fast objects may
+still tunnel until continuous collision detection lands in a later phase.
 
 ## Use as a CMake subproject
 

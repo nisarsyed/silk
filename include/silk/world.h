@@ -28,6 +28,14 @@ extern "C" {
 #define SL_LINEAR_SPEED_MAX_DEFAULT 400.0f
 #define SL_ROTATION_PER_STEP_MAX (0.25f * SL_PI)
 
+/* Implicit contact regularization, pinned by solver behavior and stress
+ * benchmarks. Zero-valued config fields select these defaults; hertz is
+ * capped at one quarter of the substep rate at runtime. */
+#define SL_CONTACT_HERTZ_DEFAULT 30.0f
+#define SL_CONTACT_DAMPING_RATIO_DEFAULT 10.0f
+#define SL_CONTACT_PUSH_VELOCITY_MAX_DEFAULT 3.0f
+#define SL_RESTITUTION_THRESHOLD_DEFAULT 1.0f
+
 /* Maximum absolute body-center coordinate. IEEE-754 binary32 spacing at
  * 8192 is 0.0009765625; a shape adds at most SL_SHAPE_EXTENT_MAX, and the
  * largest delta between two resulting points is at most 18432, where
@@ -87,6 +95,11 @@ typedef struct sl_world_config {
     uint32_t substep_count;
     /* World units / second; 0 selects SL_LINEAR_SPEED_MAX_DEFAULT. */
     float linear_speed_max;
+    /* Zero selects the documented defaults; otherwise finite and > 0. */
+    float contact_hertz;
+    float contact_damping_ratio;
+    float contact_push_velocity_max; /* world units / second */
+    float restitution_threshold;     /* world units / second */
 } sl_world_config;
 
 typedef struct sl_body_slot {
@@ -112,6 +125,10 @@ typedef struct sl_world {
     float angular_drag;     /* 1 / seconds, >= 0 */
     float linear_speed_max; /* world units / second, finite > 0 */
     uint32_t substep_count; /* in [1, SL_SUBSTEP_COUNT_MAX] */
+    float contact_hertz;
+    float contact_damping_ratio;
+    float contact_push_velocity_max;
+    float restitution_threshold;
 
     /* Dual indexing: slots[handle.index] -> packed row, slot_of[row] ->
      * owning slot. Swap-remove repairs exactly one slot_of entry. */
@@ -163,6 +180,11 @@ typedef struct sl_world {
     sl_contact *contacts;
     uint64_t *pair_keys;
 
+    /* Internal AoS scratch: complete constraint records are consumed
+     * together during every scalar solver stage. */
+    void *contact_constraints;
+    uint32_t contact_constraint_count;
+
     void *memory; /* backing block carved into every array above */
 } sl_world;
 
@@ -175,9 +197,9 @@ size_t sl_world_memory_bytes(const sl_world_config *config);
  * Returns false, leaving *world zeroed, when body_capacity or
  * contact_capacity is outside its documented range, gravity is non-finite,
  * linear_drag or angular_drag is non-finite or negative, substep_count is
- * above its cap, linear_speed_max is non-finite or negative, or allocation
- * fails. Zero contact_capacity, substep_count, and linear_speed_max select
- * their documented defaults.
+ * above its cap, or a speed/solver tuning value is non-finite, negative, or
+ * derives non-finite softness terms. Zero contact_capacity, substep_count,
+ * speed, and solver tuning fields select their documented defaults.
  * The full arena, including inactive rows and alignment gaps, starts
  * zeroed. Everything is allocated here; nothing allocates during
  * simulation. */

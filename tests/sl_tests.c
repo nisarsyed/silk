@@ -11,6 +11,7 @@ int main(void)
     failures += sl_shape_suite();
     failures += sl_collide_suite();
     failures += sl_contact_suite();
+    failures += sl_solver_suite();
     failures += sl_tree_suite();
     failures += sl_body_suite();
     failures += sl_world_suite();
