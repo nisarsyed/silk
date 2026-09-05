@@ -4,7 +4,8 @@ Living document, updated as milestones land. It records direction, not dates or
 commitments. Engineering principles and contribution policy live in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Status:** Phase 3 · 2D rigid-body physics (next)
+**Status:** Phase 3 · 2D rigid-body physics complete (0.3.0).
+Phase 4 · 2D engine maturity is next.
 
 ## Baseline
 
@@ -14,8 +15,8 @@ commitments. Engineering principles and contribution policy live in
 | Build | CMake ≥ 3.28 with `debug` / `release` / `sanitize` / `windows` / `sandbox` / `sandbox-release` presets |
 | Toolchain | GCC + Clang on Linux CI; Clang on macOS CI; MSVC on Windows CI; warnings-as-errors on the core |
 | Dependencies | None in the core; raylib linked only by the sandbox example |
-| API | `sl_` prefix, snake_case; SoA simulation state; generational body handles |
-| Simulation | Caller-selected fixed timestep (sandbox: 1/60 s), bounded accumulator, semi-implicit Euler, gravity + drag; deterministic for a fixed call sequence |
+| API | `sl_` prefix, snake_case; SoA simulation state; generational body and joint handles |
+| Simulation | Caller-selected fixed timestep (sandbox: 1/60 s), bounded accumulator, 1–8 substeps (default 4), semi-implicit Euler with stored rotations, gravity + drag, Soft Step contacts and joints, friction + restitution; deterministic for a fixed call sequence on a given platform/build |
 | Tests | Hand-rolled framework (`tests/silk_test.h`), CTest-integrated; seeded deterministic PRNGs only |
 | License | MIT |
 
@@ -41,18 +42,23 @@ and rotational integration — everything Phase 3 collision consumes.
 
 ## Milestone 3 — 2D rigid-body physics
 
-Phase 3 delivery: collision detection and response, materials, broad-phase,
-the first joints, and a deterministic performance baseline, on a Soft Step
-substepped solver laid out for later SIMD and threading work.
+Phase 3 implementation is merged: collision detection and response, materials,
+broad-phase, the first joints, and a deterministic performance baseline, on a
+Soft Step substepped solver. SIMD and threading remain deferred.
 
-- [ ] Math: robust rotation integration and composition, 2x2 solve, AABB set operations, and segment distance ([#28](https://github.com/nisarsyed/silk/issues/28))
-- [ ] Rigid-body state: stored rotations, substepped integration, per-body friction and restitution, and bounded speed controls ([#29](https://github.com/nisarsyed/silk/issues/29), [#32](https://github.com/nisarsyed/silk/issues/32))
-- [ ] Collision detection: circle and polygon manifolds with stable feature ids and speculative distance; dynamic AABB-tree broad phase; persistent contact pool and pair set ([#30](https://github.com/nisarsyed/silk/issues/30), [#31](https://github.com/nisarsyed/silk/issues/31), [#33](https://github.com/nisarsyed/silk/issues/33))
-- [ ] Collision response: Soft Step sequential impulses with warm starting, relax pass, friction, and restitution ([#34](https://github.com/nisarsyed/silk/issues/34))
-- [ ] Constraints: SoA joint pool with generational handles; distance and revolute joints ([#36](https://github.com/nisarsyed/silk/issues/36))
-- [ ] Sandbox: collision scene, materials, and contact/AABB/joint debug drawing ([#37](https://github.com/nisarsyed/silk/issues/37))
-- [ ] Benchmark: deterministic pyramid and rain scenes with warm-up, per-step timing, and a state checksum ([#35](https://github.com/nisarsyed/silk/issues/35))
-- [ ] Wrap: version 0.3.0, README, roadmap, attribution, and release verification ([#38](https://github.com/nisarsyed/silk/issues/38))
+- [x] Math: robust rotation integration and composition, 2x2 solve, AABB set operations, and segment distance ([issue #28](https://github.com/nisarsyed/silk/issues/28); [PR #42](https://github.com/nisarsyed/silk/pull/42), merged)
+- [x] Rigid-body state: stored rotations, substepped integration, per-body friction and restitution, and bounded speed controls ([issues #29](https://github.com/nisarsyed/silk/issues/29), [#32](https://github.com/nisarsyed/silk/issues/32); [PRs #43](https://github.com/nisarsyed/silk/pull/43), [#47](https://github.com/nisarsyed/silk/pull/47), merged)
+- [x] Collision detection: circle and polygon manifolds with stable feature IDs and speculative distance; dynamic AABB-tree broad phase; persistent contact pool and pair set ([issues #30](https://github.com/nisarsyed/silk/issues/30), [#31](https://github.com/nisarsyed/silk/issues/31), [#33](https://github.com/nisarsyed/silk/issues/33); [PRs #45](https://github.com/nisarsyed/silk/pull/45), [#46](https://github.com/nisarsyed/silk/pull/46), [#48](https://github.com/nisarsyed/silk/pull/48), merged)
+- [x] Collision response: Soft Step sequential impulses with warm starting, relax pass, friction, and restitution ([issue #34](https://github.com/nisarsyed/silk/issues/34); [PR #49](https://github.com/nisarsyed/silk/pull/49), merged)
+- [x] Constraints: SoA joint pool with generational handles; distance and revolute joints ([issue #36](https://github.com/nisarsyed/silk/issues/36); [PR #52](https://github.com/nisarsyed/silk/pull/52), merged)
+- [x] Sandbox: collision scene, materials, and contact/AABB/joint debug drawing ([issue #37](https://github.com/nisarsyed/silk/issues/37); [PR #53](https://github.com/nisarsyed/silk/pull/53), merged)
+- [x] Benchmark: deterministic pyramid and rain scenes with warm-up, per-step timing, and a state checksum ([issue #35](https://github.com/nisarsyed/silk/issues/35); [PR #51](https://github.com/nisarsyed/silk/pull/51), merged)
+- [x] Wrap: version 0.3.0, README, roadmap, attribution, and release verification ([issue #38](https://github.com/nisarsyed/silk/issues/38); [PR #55](https://github.com/nisarsyed/silk/pull/55))
+
+The remaining limits are explicit: no CCD/bullets, sleeping/islands, sensors,
+contact callbacks, joint limits/motors/user-facing springs, SIMD, or threading.
+Contacts are read-only snapshots valid only until the next non-const world
+operation. These are deferred capabilities, not part of Phase 3's delivery.
 
 ## Phase Progression
 
@@ -62,8 +68,8 @@ Condensed from the technical specification. Near-term phases stay itemized; late
 | --- | --- | --- |
 | 1 | Foundation | Milestone 1 above |
 | 2 | Basic simulation *(complete)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
-| 3 | 2D rigid-body physics *(next)* | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
-| 4 | 2D engine maturity | Determinism hardening; memory & data-oriented optimization; debug rendering; profiling & benchmarking; public engine API |
+| 3 | 2D rigid-body physics *(complete)* | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
+| 4 | 2D engine maturity *(next)* | Determinism hardening; memory & data-oriented optimization; debug rendering; profiling & benchmarking; public engine API |
 | 5 | WebAssembly | WASM build target; C ↔ JavaScript API boundary; browser demo infrastructure & web debug visualization |
 | 6 | GPU foundation | GPU buffer/memory model; compute pipeline abstraction; GPU particle simulation as the first workload |
 | 7 | WebGPU | WebGPU backend & compute pipelines; browser GPU particles; broad-phase/constraint experiments — stays outside the portable core |
