@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "collide.h"
+#include "joint.h"
 #include "silk/assert.h"
 #include "tree.h"
 
@@ -456,6 +457,42 @@ static void contact_remove(sl_world *world, uint32_t row)
     world->contact_count = last;
 }
 
+void sl_contact_pair_destroy(sl_world *world, uint32_t slot_a, uint32_t slot_b)
+{
+    SL_ASSERT(world != NULL);
+    if (slot_a == slot_b || slot_a >= world->body_capacity ||
+        slot_b >= world->body_capacity) {
+        return;
+    }
+    uint32_t index = 0u;
+    if (!pair_find(world, pair_key(slot_a, slot_b), &index)) {
+        return;
+    }
+    (void)index;
+    for (uint32_t row = 0u; row < world->contact_count; ++row) {
+        const sl_contact *contact = &world->contacts[row];
+        if (pair_key(contact->body_a.index, contact->body_b.index) ==
+            pair_key(slot_a, slot_b)) {
+            contact_remove(world, row);
+            return;
+        }
+    }
+    SL_ASSERT(false);
+}
+
+void sl_contact_body_mark_moved(sl_world *world, uint32_t slot)
+{
+    SL_ASSERT(world != NULL);
+    if (slot >= world->body_capacity ||
+        world->slots[slot].dense == SL_BODY_DENSE_NONE) {
+        return;
+    }
+    const uint32_t dense = world->slots[slot].dense;
+    if (world->proxies[dense] != SL_TREE_NODE_NONE) {
+        moved_mark(world, dense, slot);
+    }
+}
+
 static bool contact_is_live(const sl_world *world, const sl_contact *contact)
 {
     if (!sl_world_body_is_valid(world, contact->body_a) ||
@@ -470,7 +507,9 @@ static bool contact_is_live(const sl_world *world, const sl_contact *contact)
         world->proxies[dense_b] == SL_TREE_NODE_NONE) {
         return false;
     }
-    return sl_aabb_overlaps(world->proxy_aabbs[dense_a],
+    return sl_joint_pair_should_collide(world, contact->body_a.index,
+                                        contact->body_b.index) &&
+           sl_aabb_overlaps(world->proxy_aabbs[dense_a],
                             world->proxy_aabbs[dense_b]);
 }
 
@@ -524,7 +563,8 @@ static void pair_candidate(sl_world *world, uint32_t slot, uint32_t other_slot,
     }
     if (world->shapes[other_dense].kind == SL_SHAPE_NONE ||
         (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC &&
-         world->types[other_dense] != (uint8_t)SL_BODY_DYNAMIC)) {
+         world->types[other_dense] != (uint8_t)SL_BODY_DYNAMIC) ||
+        !sl_joint_pair_should_collide(world, slot, other_slot)) {
         return;
     }
     uint32_t index = 0u;

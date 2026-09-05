@@ -118,8 +118,8 @@ static void test_create_roundtrips_state(void)
     sl_world_destroy(&world);
 }
 
-/* The complete arena is bounded by contract: max bodies plus the default
- * four-contacts-per-body pool and constraint scratch remain below 93 MiB. */
+/* The default arena remains below 93 MiB. Opting into a maximum-size joint
+ * pool adds 12,189,696 bytes and remains below 104 MiB total. */
 static void test_memory_bytes_at_capacity_max_within_budget(void)
 {
     const sl_world_config worst_config = {
@@ -128,6 +128,14 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     const size_t worst = sl_world_memory_bytes(&worst_config);
     SL_EXPECT(worst == (size_t)96075832u);
     SL_EXPECT(worst <= (size_t)93u << 20);
+
+    const sl_world_config with_joints = {
+        .body_capacity = SL_BODY_COUNT_MAX,
+        .joint_capacity = SL_JOINT_COUNT_MAX,
+    };
+    const size_t joint_worst = sl_world_memory_bytes(&with_joints);
+    SL_EXPECT(joint_worst == (size_t)108265528u);
+    SL_EXPECT(joint_worst <= (size_t)104u << 20);
 
     const sl_world_config zero = { 0 };
     const sl_world_config too_many = {
@@ -140,6 +148,11 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     const sl_world_config small_config = { .body_capacity = 4u };
     const size_t small = sl_world_memory_bytes(&small_config);
     SL_EXPECT(small == (size_t)5928u);
+    const sl_world_config small_joints = {
+        .body_capacity = 4u,
+        .joint_capacity = 2u,
+    };
+    SL_EXPECT(sl_world_memory_bytes(&small_joints) == (size_t)6328u);
 }
 
 static void test_create_rejects_non_finite_state(void)

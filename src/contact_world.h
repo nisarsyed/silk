@@ -16,6 +16,8 @@ void sl_contact_world_reset(sl_world *world);
 bool sl_contact_body_create(sl_world *world, uint32_t dense, uint32_t slot);
 void sl_contact_body_destroy(sl_world *world, uint32_t dense, uint32_t slot);
 bool sl_contact_body_update(sl_world *world, uint32_t dense, uint32_t slot);
+void sl_contact_body_mark_moved(sl_world *world, uint32_t slot);
+void sl_contact_pair_destroy(sl_world *world, uint32_t slot_a, uint32_t slot_b);
 
 void sl_contact_step_begin(sl_world *world);
 void sl_contact_step_end(sl_world *world);
