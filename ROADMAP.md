@@ -53,7 +53,7 @@ Soft Step substepped solver. SIMD and threading remain deferred.
 - [x] Constraints: SoA joint pool with generational handles; distance and revolute joints ([issue #36](https://github.com/nisarsyed/silk/issues/36); [PR #52](https://github.com/nisarsyed/silk/pull/52), merged)
 - [x] Sandbox: collision scene, materials, and contact/AABB/joint debug drawing ([issue #37](https://github.com/nisarsyed/silk/issues/37); [PR #53](https://github.com/nisarsyed/silk/pull/53), merged)
 - [x] Benchmark: deterministic pyramid and rain scenes with warm-up, per-step timing, and a state checksum ([issue #35](https://github.com/nisarsyed/silk/issues/35); [PR #51](https://github.com/nisarsyed/silk/pull/51), merged)
-- [x] Wrap: version 0.3.0, README, roadmap, attribution, and release verification ([issue #38](https://github.com/nisarsyed/silk/issues/38))
+- [x] Wrap: version 0.3.0, README, roadmap, attribution, and release verification ([issue #38](https://github.com/nisarsyed/silk/issues/38); [PR #55](https://github.com/nisarsyed/silk/pull/55))
 
 The remaining limits are explicit: no CCD/bullets, sleeping/islands, sensors,
 contact callbacks, joint limits/motors/user-facing springs, SIMD, or threading.
