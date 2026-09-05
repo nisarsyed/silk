@@ -80,10 +80,15 @@ Controls:
 - Left-drag empty space to spawn and launch a body.
 - Press `B` to switch between circles and boxes.
 - Left-hold a body to tether it; off-center grabs apply torque.
+- Press `C` to toggle contact points and normals; gold points are speculative
+  contacts with positive separation.
+- Press `A` to toggle exact fat broad-phase proxy AABBs.
+- Press `J` to spawn a bounded revolute chain from the cursor.
 - Press `Space` to pause or resume, `.` to step while paused, and `R` to reset.
 
-Shaped bodies collide with the preview ground and one another. Fast objects may
-still tunnel until continuous collision detection lands in a later phase.
+The deterministic default scene combines falling bodies with a box pyramid on
+colliding static ground. Fast objects may still tunnel until continuous
+collision detection lands in a later phase.
 
 ## Use as a CMake subproject
 
@@ -95,9 +100,9 @@ target_link_libraries(my_app PRIVATE silk::silk)
 ```
 
 Include the subsystem headers you use, such as `<silk/math.h>`,
-`<silk/shape.h>`, `<silk/contact.h>`, `<silk/world.h>`, and `<silk/step.h>`.
-The core chooses no timestep: call `sl_world_step` with one fixed value
-throughout a run, or
+`<silk/shape.h>`, `<silk/contact.h>`, `<silk/joint.h>`, `<silk/world.h>`, and
+`<silk/step.h>`. The core chooses no timestep: call `sl_world_step` with one
+fixed value throughout a run, or
 initialize `sl_stepper` with your application's fixed value. The sandbox's
 1/60-second timestep is an example policy, not a library default.
 
