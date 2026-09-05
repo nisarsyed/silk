@@ -835,6 +835,12 @@ static void distance_solve(const sl_world *world,
     if (sl_vec2_length_sq(axis) == 0.0f) {
         axis = constraint->axis;
     }
+    /* Match the mass to the rotated Jacobian. Each solve adds two cross
+     * products and a reciprocal; storage and O(joints * substeps) work stay
+     * unchanged. */
+    constraint->axial_mass =
+        axial_mass_make(world, constraint->dense_a, constraint->dense_b,
+                        anchor_a, anchor_b, axis);
     if (constraint->axial_mass == 0.0f || sl_vec2_length_sq(axis) == 0.0f) {
         return;
     }
@@ -884,9 +890,8 @@ static void revolute_solve(const sl_world *world,
         mass_scale = constraint->softness.mass_scale;
         impulse_scale = constraint->softness.impulse_scale;
     }
-    const sl_vec2 rhs = sl_vec2_neg(
-        sl_vec2_add(sl_vec2_scale(sl_vec2_add(velocity, bias), mass_scale),
-                    sl_vec2_scale(constraint->impulse, impulse_scale)));
+    const sl_vec2 rhs =
+        sl_vec2_neg(sl_vec2_scale(sl_vec2_add(velocity, bias), mass_scale));
     sl_vec2 applied = sl_vec2_make(0.0f, 0.0f);
     const sl_mat2 effective_matrix = effective_matrix_make(
         world, constraint->dense_a, constraint->dense_b, anchor_a, anchor_b);
@@ -894,6 +899,10 @@ static void revolute_solve(const sl_world *world,
         !sl_mat2_solve(effective_matrix, rhs, &applied)) {
         return;
     }
+    /* Cached lambda already has impulse units; only velocity and bias need
+     * the effective-mass conversion. */
+    applied =
+        sl_vec2_sub(applied, sl_vec2_scale(constraint->impulse, impulse_scale));
     const sl_vec2 next_impulse = sl_vec2_add(constraint->impulse, applied);
     const sl_vec2 step_impulse = sl_vec2_add(constraint->step_impulse, applied);
     if (!sl_vec2_is_finite(next_impulse) || !sl_vec2_is_finite(step_impulse) ||

@@ -302,6 +302,92 @@ static void revolute_keeps_anchor_and_leaves_rotation_free(void)
     sl_world_destroy(&world);
 }
 
+static void revolute_load_correction_is_mass_independent(void)
+{
+    const sl_world_config config = {
+        .body_capacity = 4u,
+        .joint_capacity = 3u,
+        .gravity = { 0.0f, -10.0f },
+    };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+    const sl_body_handle fixed =
+        body_make(&world, SL_BODY_STATIC, sl_vec2_make(0.0f, 0.0f), 0.0f, NULL);
+    const float masses[] = { 1.0f, 0.1f, 100.0f };
+    sl_body_handle bodies[3];
+    sl_joint_handle joints[3];
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        bodies[i] = body_make(&world, SL_BODY_DYNAMIC, sl_vec2_make(0.0f, 0.0f),
+                              masses[i], NULL);
+        joints[i] =
+            revolute_make(&world, fixed, bodies[i], sl_vec2_make(0.0f, 0.0f),
+                          sl_vec2_make(0.0f, 0.0f), true);
+    }
+    for (uint32_t i = 0u; i < 120u; ++i) {
+        sl_world_step(&world, k_dt);
+    }
+    /* Hertz and damping specify the same acceleration response for each
+     * mass; only the supporting impulse scales with mass. */
+    const sl_vec2 reference = sl_world_body_get_position(&world, bodies[0]);
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        const sl_vec2 position = sl_world_body_get_position(&world, bodies[i]);
+        const sl_vec2 velocity = sl_world_body_get_velocity(&world, bodies[i]);
+        const sl_vec2 impulse =
+            sl_world_joint_get_linear_impulse(&world, joints[i]);
+        SL_EXPECT(sl_vec2_length(position) < SL_LINEAR_SLOP);
+        SL_EXPECT_NEAR(position.x, reference.x, 1e-5f);
+        SL_EXPECT_NEAR(position.y, reference.y, 1e-5f);
+        SL_EXPECT_NEAR(sl_vec2_length(velocity), 0.0f, 1e-5f);
+        SL_EXPECT_NEAR(impulse.y / masses[i], 10.0f * k_dt, 1e-4f);
+    }
+    sl_world_destroy(&world);
+}
+
+static void rotating_distance_does_not_inject_energy(void)
+{
+    const sl_world_config config = {
+        .body_capacity = 2u,
+        .joint_capacity = 1u,
+    };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+    const sl_shape circle = circle_make(0.1f);
+    const sl_body_handle fixed =
+        body_make(&world, SL_BODY_STATIC, sl_vec2_make(0.0f, 0.0f), 0.0f, NULL);
+    const sl_body_handle dynamic = body_make(
+        &world, SL_BODY_DYNAMIC, sl_vec2_make(1.0f, 0.0f), 1.0f, &circle);
+    const float spin = 50.0f;
+    SL_EXPECT(sl_world_body_set_angular_velocity(&world, dynamic, spin));
+    const sl_joint_desc desc = {
+        .kind = SL_JOINT_DISTANCE,
+        .body_a = fixed,
+        .body_b = dynamic,
+        .local_anchor_b = { 1.0f, 0.0f },
+        .collide_connected = true,
+        .distance = { .length = 2.0f },
+    };
+    const sl_joint_handle joint = sl_world_joint_create(&world, &desc);
+    SL_EXPECT(sl_world_joint_is_valid(&world, joint));
+    const float inertia = sl_world_body_get_inertia(&world, dynamic);
+    const float energy_initial = 0.5f * inertia * spin * spin;
+    /* The anchor initially moves perpendicular to the constraint. Its
+     * rotation changes the effective mass sharply within the first step.
+     * With no gravity or initial stretch, correction must not amplify the
+     * initial kinetic energy (allowing only roundoff). */
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        sl_world_step(&world, k_dt);
+        const sl_vec2 velocity = sl_world_body_get_velocity(&world, dynamic);
+        const float angular_velocity =
+            sl_world_body_get_angular_velocity(&world, dynamic);
+        const float energy =
+            0.5f * sl_vec2_length_sq(velocity) +
+            0.5f * inertia * angular_velocity * angular_velocity;
+        SL_EXPECT(sl_is_finite(energy));
+        SL_EXPECT(energy <= energy_initial + 1e-4f);
+    }
+    sl_world_destroy(&world);
+}
+
 static void coincident_distance_uses_deterministic_axis(void)
 {
     const sl_world_config config = {
@@ -518,6 +604,9 @@ static const sl_test_case k_cases[] = {
       collision_suppression_requeries_without_motion },
     { "revolute free rotation",
       revolute_keeps_anchor_and_leaves_rotation_free },
+    { "revolute mass-independent correction",
+      revolute_load_correction_is_mass_independent },
+    { "rotating distance energy", rotating_distance_does_not_inject_energy },
     { "coincident distance axis", coincident_distance_uses_deterministic_axis },
     { "distance load and step impulse",
       distance_supports_load_and_reports_full_step_impulse },
