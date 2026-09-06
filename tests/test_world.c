@@ -126,7 +126,7 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
         .body_capacity = SL_BODY_COUNT_MAX,
     };
     const size_t worst = sl_world_memory_bytes(&worst_config);
-    SL_EXPECT(worst == (size_t)96075832u);
+    SL_EXPECT(worst == (size_t)95813688u);
     SL_EXPECT(worst <= (size_t)93u << 20);
 
     const sl_world_config with_joints = {
@@ -134,7 +134,7 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
         .joint_capacity = SL_JOINT_COUNT_MAX,
     };
     const size_t joint_worst = sl_world_memory_bytes(&with_joints);
-    SL_EXPECT(joint_worst == (size_t)108265528u);
+    SL_EXPECT(joint_worst == (size_t)108003384u);
     SL_EXPECT(joint_worst <= (size_t)104u << 20);
 
     const sl_world_config zero = { 0 };
@@ -144,15 +144,17 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(&zero), 0);
     SL_EXPECT_INT_EQ((int)sl_world_memory_bytes(&too_many), 0);
 
-    /* Four body rows default to sixteen contacts and 32 pair buckets. */
+    /* Four body rows default to sixteen contacts and 32 pair buckets.
+     * One moved-slot queue saves 4 * sizeof(uint32_t) bytes here and
+     * SL_BODY_COUNT_MAX * sizeof(uint32_t) bytes at maximum capacity. */
     const sl_world_config small_config = { .body_capacity = 4u };
     const size_t small = sl_world_memory_bytes(&small_config);
-    SL_EXPECT(small == (size_t)5928u);
+    SL_EXPECT(small == (size_t)5912u);
     const sl_world_config small_joints = {
         .body_capacity = 4u,
         .joint_capacity = 2u,
     };
-    SL_EXPECT(sl_world_memory_bytes(&small_joints) == (size_t)6328u);
+    SL_EXPECT(sl_world_memory_bytes(&small_joints) == (size_t)6312u);
 }
 
 static void test_create_rejects_non_finite_state(void)

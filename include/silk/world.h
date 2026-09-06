@@ -192,7 +192,6 @@ typedef struct sl_world {
     uint32_t *proxies;
     uint8_t *moved;
     uint32_t *moved_slots;
-    uint32_t *moved_next_slots;
     uint32_t *query_slots;
     void *tree;
 
