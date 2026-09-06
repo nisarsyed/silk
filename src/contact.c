@@ -12,6 +12,11 @@
 
 #define SL_CONTACT_CARVE_ALIGN ((size_t)8u)
 
+/* Both nonzero states participate in pair deduplication until all moved
+ * proxies have been queried. RETRY survives the final queue compaction. */
+#define SL_PROXY_MOVED 1u
+#define SL_PROXY_RETRY 2u
+
 #define SL_CONTACT_ALIGNMENT_ASSERT(type)                                      \
     _Static_assert(_Alignof(type) <= SL_CONTACT_CARVE_ALIGN &&                 \
                        SL_CONTACT_CARVE_ALIGN % _Alignof(type) == 0u,          \
@@ -117,7 +122,6 @@ size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
     ADD_SLICE(body_capacity, uint8_t);
     ADD_SLICE(body_capacity, uint32_t);
     ADD_SLICE(body_capacity, uint32_t);
-    ADD_SLICE(body_capacity, uint32_t);
     ADD_SLICE(contact_capacity, sl_contact);
     ADD_SLICE(pair_capacity, uint64_t);
 
@@ -152,8 +156,6 @@ bool sl_contact_world_init(sl_world *world, void *memory, size_t memory_bytes)
     world->moved = (uint8_t *)contact_carve(base, &offset, world->body_capacity,
                                             sizeof(uint8_t));
     world->moved_slots = (uint32_t *)contact_carve(
-        base, &offset, world->body_capacity, sizeof(uint32_t));
-    world->moved_next_slots = (uint32_t *)contact_carve(
         base, &offset, world->body_capacity, sizeof(uint32_t));
     world->query_slots = (uint32_t *)contact_carve(
         base, &offset, world->body_capacity, sizeof(uint32_t));
@@ -204,7 +206,7 @@ static void moved_mark(sl_world *world, uint32_t dense, uint32_t slot)
     if (world->moved_count >= world->body_capacity) {
         return;
     }
-    world->moved[dense] = 1u;
+    world->moved[dense] = SL_PROXY_MOVED;
     world->moved_slots[world->moved_count] = slot;
     world->moved_count += 1u;
 }
@@ -596,7 +598,6 @@ static void query_root(sl_world *world, uint32_t slot, sl_tree_root_kind root,
 static void pairs_update(sl_world *world)
 {
     const uint32_t snapshot_count = world->moved_count;
-    uint32_t next_count = 0u;
     for (uint32_t i = 0u; i < snapshot_count; ++i) {
         const uint32_t slot = world->moved_slots[i];
         if (slot >= world->body_capacity ||
@@ -617,27 +618,29 @@ static void pairs_update(sl_world *world)
             query_root(world, slot, SL_TREE_ROOT_DYNAMIC, &dropped);
         }
         if (dropped) {
-            world->moved_next_slots[next_count] = slot;
-            next_count += 1u;
+            world->moved[dense] = SL_PROXY_RETRY;
         }
     }
 
+    /* Queries are finished, so flags can now be cleared and retries packed
+     * into the same queue without changing duplicate suppression or order.
+     * next_count never exceeds i: writes cannot overwrite unread slots. */
+    uint32_t next_count = 0u;
     for (uint32_t i = 0u; i < snapshot_count; ++i) {
         const uint32_t slot = world->moved_slots[i];
-        if (slot < world->body_capacity &&
-            world->slots[slot].dense != SL_BODY_DENSE_NONE) {
-            world->moved[world->slots[slot].dense] = 0u;
+        if (slot >= world->body_capacity ||
+            world->slots[slot].dense == SL_BODY_DENSE_NONE) {
+            continue;
+        }
+        const uint32_t dense = world->slots[slot].dense;
+        if (world->moved[dense] == SL_PROXY_RETRY) {
+            world->moved_slots[next_count] = slot;
+            next_count += 1u;
+            world->moved[dense] = SL_PROXY_MOVED;
+        } else {
+            world->moved[dense] = 0u;
         }
     }
-    for (uint32_t i = 0u; i < next_count; ++i) {
-        const uint32_t slot = world->moved_next_slots[i];
-        if (world->slots[slot].dense != SL_BODY_DENSE_NONE) {
-            world->moved[world->slots[slot].dense] = 1u;
-        }
-    }
-    uint32_t *swap = world->moved_slots;
-    world->moved_slots = world->moved_next_slots;
-    world->moved_next_slots = swap;
     world->moved_count = next_count;
 }
 

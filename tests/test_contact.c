@@ -270,6 +270,51 @@ static void saturation_retries_without_new_motion(void)
     sl_world_destroy(&world);
 }
 
+static void saturation_preserves_retry_order_and_pair_uniqueness(void)
+{
+    enum { PAIR_COUNT = 4 };
+    const sl_world_config config = {
+        .body_capacity = 2u * PAIR_COUNT,
+        .contact_capacity = 1u,
+    };
+    sl_world world = { 0 };
+    SL_EXPECT(sl_world_init(&world, &config));
+    const sl_shape circle = circle_make(1.0f);
+    sl_body_handle bodies[2u * PAIR_COUNT];
+    for (uint32_t i = 0u; i < PAIR_COUNT; ++i) {
+        /* Fat proxies overlap, but the shapes are beyond speculative range.
+         * No solver motion can requeue a body and mask a lost retry. */
+        bodies[2u * i] =
+            body_make(&world, SL_BODY_DYNAMIC,
+                      sl_vec2_make(5.0f * (float)i, 0.0f), &circle, 0.0f, 0.0f);
+        bodies[2u * i + 1u] = body_make(
+            &world, SL_BODY_DYNAMIC, sl_vec2_make(5.0f * (float)i + 2.1f, 0.0f),
+            &circle, 0.0f, 0.0f);
+    }
+
+    for (uint32_t i = 0u; i < PAIR_COUNT; ++i) {
+        for (uint32_t repeat = 0u; repeat < 2u; ++repeat) {
+            step_once(&world);
+            SL_EXPECT_INT_EQ(sl_world_contact_count(&world), 1u);
+            SL_EXPECT_INT_EQ(sl_world_contact_drop_count(&world),
+                             PAIR_COUNT - 1u - i);
+            const sl_contact *contact = sl_world_contact_at(&world, 0u);
+            SL_EXPECT(contact_has_body(contact, bodies[2u * i]));
+            SL_EXPECT(contact_has_body(contact, bodies[2u * i + 1u]));
+            SL_EXPECT(!contact->touching);
+        }
+        /* Body removal also swap-removes packed rows while later pairs
+         * still await capacity; retries must retain stable slot ownership. */
+        sl_world_body_destroy(&world, bodies[2u * i]);
+        sl_world_body_destroy(&world, bodies[2u * i + 1u]);
+    }
+    step_once(&world);
+    SL_EXPECT_INT_EQ(sl_world_contact_count(&world), 0u);
+    SL_EXPECT_INT_EQ(sl_world_contact_drop_count(&world), 0u);
+    SL_EXPECT_INT_EQ(world.moved_count, 0u);
+    sl_world_destroy(&world);
+}
+
 static void capacity_config_and_deterministic_snapshot(void)
 {
     const sl_world_config defaults = { .body_capacity = 8u };
@@ -379,6 +424,8 @@ static const sl_test_case k_cases[] = {
     { "stale contact and slot reuse", stale_contact_reaps_before_slot_reuse },
     { "materials and persistence", materials_and_feature_impulses_refresh },
     { "saturation retry", saturation_retries_without_new_motion },
+    { "saturation retry order and uniqueness",
+      saturation_preserves_retry_order_and_pair_uniqueness },
     { "capacity and determinism", capacity_config_and_deterministic_snapshot },
     { "pair hash churn", pair_hash_churn_preserves_all_live_pairs },
 };
