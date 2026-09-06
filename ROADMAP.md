@@ -44,7 +44,8 @@ and rotational integration — everything Phase 3 collision consumes.
 
 Phase 3 implementation is merged: collision detection and response, materials,
 broad-phase, the first joints, and a deterministic performance baseline, on a
-Soft Step substepped solver. SIMD and threading remain deferred.
+Soft Step substepped solver. The 0.3.0 implementation is scalar and
+single-threaded.
 
 - [x] Math: robust rotation integration and composition, 2x2 solve, AABB set operations, and segment distance ([issue #28](https://github.com/nisarsyed/silk/issues/28); [PR #42](https://github.com/nisarsyed/silk/pull/42), merged)
 - [x] Rigid-body state: stored rotations, substepped integration, per-body friction and restitution, and bounded speed controls ([issues #29](https://github.com/nisarsyed/silk/issues/29), [#32](https://github.com/nisarsyed/silk/issues/32); [PRs #43](https://github.com/nisarsyed/silk/pull/43), [#47](https://github.com/nisarsyed/silk/pull/47), merged)
@@ -55,10 +56,48 @@ Soft Step substepped solver. SIMD and threading remain deferred.
 - [x] Benchmark: deterministic pyramid and rain scenes with warm-up, per-step timing, and a state checksum ([issue #35](https://github.com/nisarsyed/silk/issues/35); [PR #51](https://github.com/nisarsyed/silk/pull/51), merged)
 - [x] Wrap: version 0.3.0, README, roadmap, attribution, and release verification ([issue #38](https://github.com/nisarsyed/silk/issues/38); [PR #55](https://github.com/nisarsyed/silk/pull/55))
 
-The remaining limits are explicit: no CCD/bullets, sleeping/islands, sensors,
-contact callbacks, joint limits/motors/user-facing springs, SIMD, or threading.
+The 0.3.0 implementation limits are explicit: no CCD/bullets, sleeping/islands,
+sensors, contact callbacks, joint limits/motors/user-facing springs, SIMD, or
+threading.
 Contacts are read-only snapshots valid only until the next non-const world
-operation. These are deferred capabilities, not part of Phase 3's delivery.
+operation. These describe Phase 3's delivered state; future scope is recorded
+below.
+
+## Milestone 4 — 2D engine maturity
+
+Phase 4 targets 0.4.0. Correctness, API cleanup, diagnostics, and performance
+are complementary workstreams; performance is one part of engine maturity.
+The [Phase 4 milestone](https://github.com/nisarsyed/silk/milestone/2) and
+[execution tracker #56](https://github.com/nisarsyed/silk/issues/56) track the
+work, dependencies, and short gh-stack PR chains. Merges remain with the
+maintainer; items are checked only after their implementation reaches `main`.
+
+- [ ] Correctness: deterministic replay and mutation regression coverage ([#57](https://github.com/nisarsyed/silk/issues/57))
+- [ ] Measurement: deterministic work counters, exact memory diagnostics, expanded benchmark workloads, and developer-tool CI ([#58](https://github.com/nisarsyed/silk/issues/58), [#59](https://github.com/nisarsyed/silk/issues/59), [#60](https://github.com/nisarsyed/silk/issues/60))
+- [ ] Public API: separate world ownership from private storage and add bounded spatial queries ([#61](https://github.com/nisarsyed/silk/issues/61), [#62](https://github.com/nisarsyed/silk/issues/62))
+- [ ] Activation: deterministic constraint islands, opt-in sleeping, and complete wake propagation ([#63](https://github.com/nisarsyed/silk/issues/63), [#64](https://github.com/nisarsyed/silk/issues/64))
+- [ ] Measured optimization round: investigate algorithmic cost, memory access, compiler vectorization, targeted SIMD, and solver ordering; assess threading feasibility ([#65](https://github.com/nisarsyed/silk/issues/65), [#66](https://github.com/nisarsyed/silk/issues/66))
+- [ ] Diagnostics and consumption: public-API sandbox diagnostics and a tested, documented C17 consumer contract ([#67](https://github.com/nisarsyed/silk/issues/67), [#68](https://github.com/nisarsyed/silk/issues/68))
+- [ ] Wrap: version 0.4.0, documentation, migration notes, and release verification ([#69](https://github.com/nisarsyed/silk/issues/69))
+
+The measured optimization round follows the expanded benchmarks and
+islands/sleeping work, and precedes the 0.4.0 release. Adopt changes only with
+repeatable performance evidence while preserving correctness, determinism,
+and physical quality. SIMD investigation is in scope; shipping SIMD is not
+mandatory. Assess threading feasibility here and scope substantial threading
+implementation separately. A documented decision to retain the current
+implementation is a valid investigation outcome.
+
+Preserve the portable C17 scalar implementation. Any platform-specific
+acceleration requires an explicit design decision consistent with the
+repository's portability, dependency, and bounded-work constraints; this plan
+does not authorize nonportable core code or speculative backend/dispatch
+layers.
+
+CCD/bullets, sensors/contact events, joint limits/motors/user-facing springs,
+serialization, and WASM implementation remain outside Phase 4's committed
+scope. SIMD investigation and threading feasibility are in scope under the
+decision gates above; neither is a required production backend for 0.4.0.
 
 ## Phase Progression
 
@@ -69,19 +108,43 @@ Condensed from the technical specification. Near-term phases stay itemized; late
 | 1 | Foundation | Milestone 1 above |
 | 2 | Basic simulation *(complete)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
 | 3 | 2D rigid-body physics *(complete)* | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
-| 4 | 2D engine maturity *(next)* | Determinism hardening; memory & data-oriented optimization; debug rendering; profiling & benchmarking; public engine API |
-| 5 | WebAssembly | WASM build target; C ↔ JavaScript API boundary; browser demo infrastructure & web debug visualization |
-| 6 | GPU foundation | GPU buffer/memory model; compute pipeline abstraction; GPU particle simulation as the first workload |
-| 7 | WebGPU | WebGPU backend & compute pipelines; browser GPU particles; broad-phase/constraint experiments — stays outside the portable core |
+| 4 | 2D engine maturity *(next)* | Correctness & determinism; public API cleanup & queries; islands/sleeping; diagnostics; benchmarks followed by a measured optimization round |
+| 5 | WebAssembly | WASM build target; C ↔ JavaScript API boundary; browser demos & debug visualization; measure and optimize the actual WASM/browser build |
+| 6 | GPU foundation | Select a concrete particle-based simulation workload; build and optimize GPU memory/compute infrastructure for its demonstrated requirements |
+| 7 | WebGPU | WebGPU execution and browser demonstrations of the selected workload; optimize suitable GPU workloads; broad-phase/constraint experiments stay outside the portable core |
 | 8 | 3D foundation | 3D math & quaternions; rigid bodies, orientation & angular dynamics; shapes, collision & CCD; joints; spatial acceleration |
 | 9 | Native GPU | Vulkan/Metal backends behind the GPU abstraction; GPU parallel solvers; CPU/GPU scheduling |
-| 10 | Production core | Serialization & scene management; physics debugger; record/replay; cross-platform runtime; validation & optimization |
+| 10 | Production core | Serialization & scene management; physics debugger; record/replay; cross-platform runtime; broader production validation & optimization |
+
+Optimization recurs as execution targets and workloads change. Phase 4's
+native CPU evidence is a baseline for Phase 5, which measures the actual
+WASM/browser build. Phases 6–7 optimize workloads suited to GPU/WebGPU
+execution. Phase 10 broadens validation and optimization across production
+scenarios. Each round needs evidence from its own target and workload;
+earlier results do not establish performance on later backends.
 
 ## Future Simulation Modules
 
-Intentionally outside the primary progression; built on the core without coupling to it:
+These are staged planning opportunities, not committed module deliveries.
+They build on the core without coupling optional modules into it. Neither
+cloth versus fluids nor a solver algorithm is selected here.
 
-Soft bodies (PBD / XPBD / FEM) · cloth (rigid-body collision, self-collision, GPU) · fluids (SPH, FLIP/PIC hybrids, grid-based, GPU) · rope & hair · ragdolls & articulated bodies · destruction/fracture · particle effects, smoke, fire · buoyancy & aerodynamics
+- **After Phase 4:** small CPU 2D prototypes could explore a net or a fluid
+  simulation and later become browser demonstrations. A 2D net can explore
+  constrained particles and interaction in a plane; it is not full cloth
+  simulation, including 3D deformation and self-collision.
+- **When planning Phases 6–7:** select one concrete particle-based simulation
+  workload so GPU infrastructure serves an actual requirement. GPU particles
+  describe an execution workload; they do not by themselves constitute a
+  fluid solver. Choose the physical model and algorithm only when that
+  workload's requirements are understood.
+- **After the Phase 8 3D foundation:** consider full 3D cloth/fluid interaction
+  with rigid bodies, including the additional collision and coupling work
+  required by the chosen module.
+
+Other possible modules remain soft bodies, rope and hair, ragdolls and
+articulated bodies, destruction/fracture, particle effects, smoke and fire,
+and buoyancy/aerodynamics. Their scope and delivery stages are undecided.
 
 ## Execution Backends & Distribution
 
