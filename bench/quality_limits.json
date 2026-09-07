@@ -1,0 +1,9 @@
+{
+  "pyramid": {"maximum": {"penetration_max": 0.01, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "support_ratio": [0.95, 1.05]},
+  "rain": {"maximum": {"penetration_max": 0.07, "translation_drift_max": 0.005, "rotation_drift_max": 0.01, "linear_speed_max": 0.005, "angular_speed_max": 0.01}, "support_ratio": [0.95, 1.05]},
+  "piles": {"maximum": {"penetration_max": 0.01, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.02, "angular_speed_max": 0.02}, "support_ratio": [0.95, 1.05]},
+  "chains": {"maximum": {"penetration_max": 0.01, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.01, "angular_speed_max": 0.02, "joint_error_max": 0.01}},
+  "churn": {"maximum": {"penetration_max": 0.2, "translation_drift_max": 0.15, "rotation_drift_max": 0.01, "linear_speed_max": 0.5, "angular_speed_max": 0.01}},
+  "table": {"maximum": {"penetration_max": 0.005, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "support_ratio": [0.95, 1.05]},
+  "inverted": {"maximum": {"penetration_max": 0.04, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "support_ratio": [0.95, 1.05]}
+}

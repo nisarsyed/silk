@@ -123,6 +123,12 @@ aid for the same platform and build, not a cross-platform numerical guarantee.
 The harness rejects unavailable, invalid, or backward clock samples. It is a
 developer tool and is not registered as a CTest test.
 
+The expanded matrix adds disconnected piles, chains, churn, a table and an
+inverted-mass stack. Use `--scene all --format json` or the standard-library
+`bench/report.py` repeat-run tool. Reports include work/memory diagnostics,
+percentiles and physical-quality metrics; see [benchmark documentation](docs/benchmarks.md)
+for bounded options, schema, fixtures, quality limits and profiling commands.
+
 ## Use as a CMake subproject
 
 Silk currently exports its target from the source tree:
