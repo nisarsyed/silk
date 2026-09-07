@@ -411,8 +411,8 @@ sl_joint_handle sl_world_joint_create(sl_world *world,
     const uint32_t dense = world->joint_count;
     world->joint_free_count -= 1u;
     world->joint_count += 1u;
-    if (world->joint_count > world->stats.joint_count_high) {
-        world->stats.joint_count_high = world->joint_count;
+    if (world->joint_count > world->joint_count_high) {
+        world->joint_count_high = world->joint_count;
     }
     world->joint_slots[slot].dense = dense;
     world->joint_slot_of[dense] = slot;

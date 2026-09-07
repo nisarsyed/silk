@@ -208,7 +208,7 @@ void sl_world_step(sl_world *world, float dt)
     completed.substep_count = world->substep_count;
     completed.contact_constraint_count = world->contact_constraint_count;
     completed.joint_constraint_count = world->joint_constraint_count;
-    world->stats.step = completed;
+    world->step_stats = completed;
 }
 
 bool sl_stepper_init(sl_stepper *stepper, float timestep)

@@ -117,11 +117,11 @@ static void saturation_and_empty_step(void)
     const sl_world_config config = { .body_capacity = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
-    world.stats.cumulative.proxy_creates = UINT64_MAX;
+    world.work_total.proxy_creates = UINT64_MAX;
     (void)ball(&world, 0.0f);
     SL_EXPECT(sl_world_get_stats(&world).cumulative.proxy_creates ==
               UINT64_MAX);
-    world.stats.cumulative.proxy_moves = UINT64_MAX;
+    world.work_total.proxy_moves = UINT64_MAX;
     const sl_body_handle body = sl_world_body_at(&world, 0u);
     SL_EXPECT(
         sl_world_body_set_velocity(&world, body, (sl_vec2){ 20.0f, 0.0f }));

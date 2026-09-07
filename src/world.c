@@ -559,7 +559,11 @@ void sl_world_reset(sl_world *world)
 
     sl_joint_world_reset(world);
     sl_contact_world_reset(world);
-    memset(&world->stats, 0, sizeof(world->stats));
+    memset(&world->step_stats, 0, sizeof(world->step_stats));
+    memset(&world->work_total, 0, sizeof(world->work_total));
+    world->body_count_high = 0u;
+    world->contact_count_high = 0u;
+    world->joint_count_high = 0u;
     memset(&world->step_work, 0, sizeof(world->step_work));
     world->stats_stepping = false;
     world->contact_constraint_count = 0u;
@@ -599,8 +603,8 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
 
     const uint32_t dense = world->body_count;
     world->body_count++;
-    if (world->body_count > world->stats.body_count_high) {
-        world->stats.body_count_high = world->body_count;
+    if (world->body_count > world->body_count_high) {
+        world->body_count_high = world->body_count;
     }
 
     world->slots[slot_id].dense = dense;
@@ -1123,7 +1127,13 @@ bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
 sl_world_stats sl_world_get_stats(const sl_world *world)
 {
     SL_ASSERT(world != NULL);
-    sl_world_stats result = world->stats;
+    sl_world_stats result = {
+        .step = world->step_stats,
+        .cumulative = world->work_total,
+        .body_count_high = world->body_count_high,
+        .contact_count_high = world->contact_count_high,
+        .joint_count_high = world->joint_count_high,
+    };
     result.body_count = world->body_count;
     result.body_capacity = world->body_capacity;
     result.contact_count = world->contact_count;

@@ -285,8 +285,12 @@ typedef struct sl_world {
     void *joint_constraints;
 
     /* Fixed diagnostic storage; never participates in physics decisions. */
-    sl_world_stats stats;
+    sl_world_step_stats step_stats;
+    sl_world_work work_total;
     sl_world_work step_work;
+    uint32_t body_count_high;
+    uint32_t contact_count_high;
+    uint32_t joint_count_high;
     bool stats_stepping;
 
     void *memory; /* backing block carved into every array above */

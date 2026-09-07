@@ -573,8 +573,8 @@ static bool contact_create(sl_world *world, uint32_t slot_a, uint32_t slot_b)
     contact->body_b = (sl_body_handle){ high, world->slots[high].generation };
     contact_refresh(world, contact);
     world->contact_count += 1u;
-    if (world->contact_count > world->stats.contact_count_high) {
-        world->stats.contact_count_high = world->contact_count;
+    if (world->contact_count > world->contact_count_high) {
+        world->contact_count_high = world->contact_count;
     }
     return true;
 }

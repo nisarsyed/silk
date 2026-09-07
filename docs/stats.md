@@ -31,8 +31,10 @@ configuration leaves the output unchanged. Joint bytes include adjacency and
 constraint scratch and are zero when joints are disabled.
 
 The arena layout/allocation is unchanged. On the measured arm64 ABI, the world
-shell grows by 248 bytes (480 to 728): a 184-byte stats record, 56-byte step work,
-a one-byte stepping flag and alignment. No per-body diagnostic arrays or step
+shell grows by 208 bytes (480 to 688): 80 bytes of completed-step state, two
+56-byte work counters, three 4-byte high-water marks, a one-byte stepping flag
+and alignment. Current counts/capacities are assembled by the getter rather
+than stored a second time in an otherwise-unused snapshot. No per-body diagnostic arrays or step
 allocations are added. Per-step cost is bounded by existing loops and capacity;
 no diagnostic value changes a simulation decision. Tests pin minimum/maximum
 budgets, odd-capacity padding, optional joints and counter saturation. Body
@@ -40,9 +42,8 @@ payload is 169 bytes per capacity slot (16 ownership + 32 vectors + 16 rotations
 + 32 scalars + 1 type + 72 shape); padding is additional.
 
 The five-run [overhead record](../bench/reports/stats-overhead.json) contains
-raw metadata/settings/results and revisions. Median average step times were
-0.234457→0.233698 ms (pyramid) and 0.966595→0.942335 ms (rain). Both legacy
-checksums matched in every run. These sequential batches on one host are not
-an isolated causal speed measurement: noise, scheduling and code placement
-can explain small negative overhead. The result supports affordable counters,
-not an optimization claim. No CI timing threshold follows from this report.
+raw metadata/settings/results and exact source revisions. It measures the
+instrumentation using the same harness on both sides. Sequential batches on one
+host cannot isolate small timing changes from scheduling/code-placement noise;
+there is no CI timing threshold. The saved measurements are evidence, not an
+alternate executable or a supported output schema.
