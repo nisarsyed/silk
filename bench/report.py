@@ -70,7 +70,7 @@ def validate(report):
     require(type(results) is list and 1 <= len(results) <= len(SCENES), 'invalid results count')
     seen = set()
     for row in results:
-        fields(row, ('scene', 'settings', 'timing_ms', 'legacy_checksum', 'semantic_digest',
+        fields(row, ('scene', 'settings', 'timing_ms', 'semantic_digest',
                      'drops', 'counts', 'step', 'cumulative_work', 'memory_bytes', 'quality'), 'result')
         scene = row['scene']
         require(type(scene) is str and scene in SCENES and scene not in seen, 'invalid/duplicate scene')
@@ -96,8 +96,7 @@ def validate(report):
         for key, value in timing.items():
             number(value, 0, 1e12, f'timing.{key}')
         require(timing['median'] <= timing['p95'] <= timing['max'] and timing['average'] <= timing['max'], 'timing order')
-        for key in ('legacy_checksum', 'semantic_digest'):
-            require(type(row[key]) is str and re.fullmatch(r'[0-9a-f]{16}', row[key]), f'invalid {key}')
+        require(type(row['semantic_digest']) is str and re.fullmatch(r'[0-9a-f]{16}', row['semantic_digest']), 'invalid semantic_digest')
         number(row['drops'], 0, 0, 'unexpected contact drops', True)
         counts = row['counts']
         fields(counts, ('bodies', 'contacts', 'joints', 'pairs', 'pair_capacity',
@@ -191,7 +190,7 @@ def main():
     run.add_argument('executable', type=Path)
     run.add_argument('--output', type=Path, required=True)
     run.add_argument('--repeat', type=bounded(1, 20), default=5)
-    run.add_argument('--scene', choices=('all', 'baseline') + SCENES, default='all')
+    run.add_argument('--scene', choices=('all',) + SCENES, default='all')
     run.add_argument('--warmup', type=bounded(0, 10000), default=120)
     run.add_argument('--steps', type=bounded(1, 10000), default=600)
     run.add_argument('--quality', action='store_true')
@@ -214,7 +213,7 @@ def main():
         else:
             args.output.mkdir(parents=True, exist_ok=True)
             command = [str(args.executable.resolve()), '--scene', args.scene, '--warmup', str(args.warmup),
-                       '--steps', str(args.steps), '--format', 'json']
+                       '--steps', str(args.steps)]
             reports = []
             for i in range(args.repeat):
                 result = subprocess.run(command, text=True, capture_output=True, timeout=600, check=False)
@@ -222,7 +221,7 @@ def main():
                 (args.output / f'run-{i+1}.stderr.txt').write_text(result.stderr)
                 require(result.returncode == 0, f'benchmark exited {result.returncode}: {result.stderr}')
                 report = validate(decode(result.stdout))
-                expected = SCENES if args.scene == 'all' else SCENES[:2] if args.scene == 'baseline' else (args.scene,)
+                expected = SCENES if args.scene == 'all' else (args.scene,)
                 require(tuple(r['scene'] for r in report['results']) == expected, 'missing requested scene')
                 if args.quality:
                     quality_check(report)

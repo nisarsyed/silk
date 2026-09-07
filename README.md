@@ -17,7 +17,7 @@ Silk 0.3.0 provides the Phase 3 2D rigid-body engine:
 - Soft Step sequential impulses with warm starting, an unbiased relax pass,
   per-body Coulomb friction, and restitution
 - distance and revolute joints with optional connected-body collision suppression
-- a raylib collision sandbox and deterministic pyramid/rain benchmark executable
+- a raylib collision sandbox and deterministic seven-fixture benchmark executable
 
 See [ROADMAP.md](ROADMAP.md) for the merged implementation trail and next phase.
 
@@ -109,25 +109,17 @@ cmake --build --preset release
 ./build/release/bin/sl_bench
 ```
 
-`sl_bench` runs a 20-row box pyramid and a seeded 2,000-circle rain scene.
-Each scene uses 120 warm-up steps followed by 600 measured steps at 1/60 s
-with four substeps. It reports average and maximum time per complete step,
-body/contact capacities, final contact count, dropped contacts, compiler/build/
-host metadata, and an FNV-1a checksum of binary32 body position, angle, and
-linear/angular velocity in ascending body-slot order.
+`sl_bench` runs seven fixed fixtures: pyramid, rain, disconnected piles,
+chains, churn, a table and an inverted-mass stack. Each uses 120 warm-up steps
+and 600 measured steps at 1/60 s with four substeps. JSON reports include step
+timing, work/memory diagnostics, physical-quality metrics and a semantic digest
+of public body, contact and joint state.
 
-Run the same executable again to compare checksums. Timing surrounds engine
-calls and never enters simulation state; wall-clock results vary with the host
-and scheduling. Checksums require IEEE-754 binary32 floats and are a regression
-aid for the same platform and build, not a cross-platform numerical guarantee.
-The harness rejects unavailable, invalid, or backward clock samples. It is a
-developer tool and is not registered as a CTest test.
-
-The expanded matrix adds disconnected piles, chains, churn, a table and an
-inverted-mass stack. Use `--scene all --format json` or the standard-library
-`bench/report.py` repeat-run tool. Reports include work/memory diagnostics,
-percentiles and physical-quality metrics; see [benchmark documentation](docs/benchmarks.md)
-for bounded options, schema, fixtures, quality limits and profiling commands.
+Use `--scene`, `--warmup` and `--steps` to select a bounded workload.
+The standard-library `bench/report.py` tool repeats runs and validates reports.
+Digests check determinism within the same platform and build; physical-quality
+limits assess cross-build results. See [benchmark documentation](docs/benchmarks.md)
+for the schema, fixtures, quality limits and profiling commands.
 
 ## Use as a CMake subproject
 

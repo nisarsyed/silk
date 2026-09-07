@@ -1,10 +1,6 @@
-/* Deterministic rigid-body performance baseline.
- *
- * Scene construction and stepping depend only on committed constants and the
- * PRNG below. Wall-clock samples surround complete sl_world_step calls and
- * never enter simulation state. The checksum hashes six IEEE-754 binary32
- * fields per body (position, angle, linear velocity, angular velocity), in
- * ascending body-slot order captured while each scene is built. */
+/* Deterministic benchmark matrix. Timing surrounds complete world steps and
+ * never enters simulation state. One semantic digest covers public state;
+ * JSON is the report format for every invocation. */
 
 #include <float.h>
 #include <inttypes.h>
@@ -55,7 +51,6 @@ typedef struct bench_options {
     const char *scene;
     uint32_t warmup;
     uint32_t steps;
-    bool json;
 } bench_options;
 typedef struct bench_quality {
     float penetration_max;
@@ -75,10 +70,8 @@ typedef struct bench_result {
     double p95_ms;
     double maximum_ms;
     double mutation_average_ms;
-    uint64_t checksum;
     uint64_t digest;
     uint64_t dropped_contact_count;
-    uint32_t contact_count;
     sl_world_stats stats;
     sl_world_memory_breakdown memory;
     bench_quality quality;
@@ -124,16 +117,9 @@ static bool scene_body_add(bench_scene *scene, const sl_body_desc *desc)
 }
 
 static bool scene_world_init(bench_scene *scene, const char *name,
-                             uint32_t body_capacity, uint32_t contact_capacity,
-                             uint32_t seed)
+                             sl_world_config config, uint32_t seed)
 {
     memset(scene, 0, sizeof(*scene));
-    const sl_world_config config = {
-        .body_capacity = body_capacity,
-        .contact_capacity = contact_capacity,
-        .gravity = k_gravity,
-        .substep_count = k_substep_count,
-    };
     if (!sl_world_init(&scene->world, &config)) {
         return false;
     }
@@ -145,7 +131,12 @@ static bool scene_world_init(bench_scene *scene, const char *name,
 
 static bool pyramid_build(bench_scene *scene)
 {
-    if (!scene_world_init(scene, "pyramid", BENCH_PYRAMID_BODY_COUNT, 0u, 0u)) {
+    if (!scene_world_init(
+            scene, "pyramid",
+            (sl_world_config){ .body_capacity = BENCH_PYRAMID_BODY_COUNT,
+                               .gravity = k_gravity,
+                               .substep_count = k_substep_count },
+            0u)) {
         return false;
     }
 
@@ -188,8 +179,13 @@ static bool pyramid_build(bench_scene *scene)
 
 static bool rain_build(bench_scene *scene)
 {
-    if (!scene_world_init(scene, "rain", BENCH_RAIN_BODY_COUNT,
-                          BENCH_RAIN_CONTACT_CAPACITY, BENCH_RAIN_SEED)) {
+    if (!scene_world_init(
+            scene, "rain",
+            (sl_world_config){ .body_capacity = BENCH_RAIN_BODY_COUNT,
+                               .contact_capacity = BENCH_RAIN_CONTACT_CAPACITY,
+                               .gravity = k_gravity,
+                               .substep_count = k_substep_count },
+            BENCH_RAIN_SEED)) {
         return false;
     }
 
@@ -255,22 +251,6 @@ static bool rain_build(bench_scene *scene)
     return scene->body_count == BENCH_RAIN_BODY_COUNT;
 }
 
-/* Additional fixtures use explicit bounded configurations. Existing pyramid
- * and rain builders above retain their original byte-for-byte constants. */
-static bool fixture_init(bench_scene *scene, const char *name, uint32_t bodies,
-                         uint32_t contacts, uint32_t joints, bool gravity)
-{
-    memset(scene, 0, sizeof(*scene));
-    scene->config =
-        (sl_world_config){ .body_capacity = bodies,
-                           .contact_capacity = contacts,
-                           .joint_capacity = joints,
-                           .gravity = { 0.0f, gravity ? -9.81f : 0.0f },
-                           .substep_count = 4u };
-    scene->name = name;
-    scene->seed = UINT32_C(0x59B3AC01);
-    return sl_world_init(&scene->world, &scene->config);
-}
 static bool fixture_body(bench_scene *scene, sl_shape *shape, float x, float y,
                          float mass)
 {
@@ -284,7 +264,13 @@ static bool fixture_body(bench_scene *scene, sl_shape *shape, float x, float y,
 }
 static bool piles_build(bench_scene *scene)
 {
-    if (!fixture_init(scene, "piles", 161u, 2048u, 0u, true)) {
+    if (!scene_world_init(scene, "piles",
+                          (sl_world_config){ .body_capacity = 161u,
+                                             .contact_capacity = 2048u,
+                                             .joint_capacity = 0u,
+                                             .gravity = { 0.0f, -9.81f },
+                                             .substep_count = k_substep_count },
+                          UINT32_C(0x59B3AC01))) {
         return false;
     }
     sl_shape ground = sl_shape_none(), box = sl_shape_none();
@@ -305,7 +291,13 @@ static bool piles_build(bench_scene *scene)
 }
 static bool chains_build(bench_scene *scene)
 {
-    if (!fixture_init(scene, "chains", 104u, 1024u, 96u, true)) {
+    if (!scene_world_init(scene, "chains",
+                          (sl_world_config){ .body_capacity = 104u,
+                                             .contact_capacity = 1024u,
+                                             .joint_capacity = 96u,
+                                             .gravity = { 0.0f, -9.81f },
+                                             .substep_count = k_substep_count },
+                          UINT32_C(0x59B3AC01))) {
         return false;
     }
     sl_shape box = sl_shape_none();
@@ -342,7 +334,13 @@ static bool chains_build(bench_scene *scene)
 }
 static bool churn_build(bench_scene *scene)
 {
-    if (!fixture_init(scene, "churn", 128u, 2048u, 0u, false)) {
+    if (!scene_world_init(scene, "churn",
+                          (sl_world_config){ .body_capacity = 128u,
+                                             .contact_capacity = 2048u,
+                                             .joint_capacity = 0u,
+                                             .gravity = { 0.0f, 0.0f },
+                                             .substep_count = k_substep_count },
+                          UINT32_C(0x59B3AC01))) {
         return false;
     }
     sl_shape circle = sl_shape_none();
@@ -359,7 +357,13 @@ static bool churn_build(bench_scene *scene)
 }
 static bool table_build(bench_scene *scene)
 {
-    if (!fixture_init(scene, "table", 5u, 64u, 0u, true)) {
+    if (!scene_world_init(scene, "table",
+                          (sl_world_config){ .body_capacity = 5u,
+                                             .contact_capacity = 64u,
+                                             .joint_capacity = 0u,
+                                             .gravity = { 0.0f, -9.81f },
+                                             .substep_count = k_substep_count },
+                          UINT32_C(0x59B3AC01))) {
         return false;
     }
     sl_shape ground = sl_shape_none(), leg = sl_shape_none(),
@@ -376,7 +380,13 @@ static bool table_build(bench_scene *scene)
 }
 static bool inverted_build(bench_scene *scene)
 {
-    if (!fixture_init(scene, "inverted", 7u, 128u, 0u, true)) {
+    if (!scene_world_init(scene, "inverted",
+                          (sl_world_config){ .body_capacity = 7u,
+                                             .contact_capacity = 128u,
+                                             .joint_capacity = 0u,
+                                             .gravity = { 0.0f, -9.81f },
+                                             .substep_count = k_substep_count },
+                          UINT32_C(0x59B3AC01))) {
         return false;
     }
     sl_shape ground = sl_shape_none(), box = sl_shape_none();
@@ -459,34 +469,6 @@ static bool timer_elapsed_ms(const struct timespec *start,
     }
     *out = elapsed_ms;
     return true;
-}
-
-static uint64_t checksum_float(uint64_t hash, float value)
-{
-    uint32_t bits = 0u;
-    memcpy(&bits, &value, sizeof(bits));
-    return (hash ^ (uint64_t)bits) * UINT64_C(1099511628211);
-}
-
-static uint64_t scene_checksum(const bench_scene *scene)
-{
-    uint64_t hash = UINT64_C(14695981039346656037);
-    for (uint32_t i = 0u; i < scene->body_count; ++i) {
-        const sl_body_handle body = scene->bodies[i];
-        const sl_vec2 position =
-            sl_world_body_get_position(&scene->world, body);
-        const sl_vec2 velocity =
-            sl_world_body_get_velocity(&scene->world, body);
-        hash = checksum_float(hash, position.x);
-        hash = checksum_float(hash, position.y);
-        hash =
-            checksum_float(hash, sl_world_body_get_angle(&scene->world, body));
-        hash = checksum_float(hash, velocity.x);
-        hash = checksum_float(hash, velocity.y);
-        hash = checksum_float(
-            hash, sl_world_body_get_angular_velocity(&scene->world, body));
-    }
-    return hash;
 }
 
 static int sample_compare(const void *a, const void *b)
@@ -638,11 +620,9 @@ static bool scene_run(bench_scene *scene, const bench_options *options,
         result->p95_ms = samples[(95u * options->steps + 99u) / 100u - 1u];
         result->maximum_ms = samples[options->steps - 1u];
         result->mutation_average_ms = mutation_ms / (double)options->steps;
-        result->checksum = scene_checksum(scene);
         result->digest =
             sl_bench_digest(&scene->world, scene->bodies, scene->body_count);
         result->stats = sl_world_get_stats(&scene->world);
-        result->contact_count = result->stats.contact_count;
         valid =
             sl_world_memory_breakdown_get(&scene->config, &result->memory) &&
             isfinite(result->average_ms) &&
@@ -651,59 +631,6 @@ static bool scene_run(bench_scene *scene, const bench_options *options,
     }
     free(samples);
     return valid;
-}
-
-static const char *metadata_or_none(const char *value)
-{
-    return value[0] == '\0' ? "(none)" : value;
-}
-
-static void metadata_print(void)
-{
-    printf("silk rigid-body benchmark\n");
-    printf("compiler: %s %s\n", SL_BENCH_COMPILER_ID,
-           SL_BENCH_COMPILER_VERSION);
-    printf("build_mode: %s\n", metadata_or_none(SL_BENCH_BUILD_MODE));
-    printf("revision: %s\n", SL_BENCH_REVISION);
-    printf("cmake_c_flags: %s\n", metadata_or_none(SL_BENCH_C_FLAGS));
-    printf("target_warning_flags: %s\n",
-           metadata_or_none(SL_BENCH_WARNING_FLAGS));
-    printf("host: %s %s (%s)\n", SL_BENCH_HOST_SYSTEM, SL_BENCH_HOST_VERSION,
-           SL_BENCH_HOST_PROCESSOR);
-    printf("checksum: FNV-1a over binary32 position/angle/velocity, "
-           "ascending body-slot order\n");
-}
-
-static void result_print(const bench_scene *scene, const bench_result *result,
-                         const bench_options *options)
-{
-    printf("scene: %s\n", scene->name);
-    printf("  seed: 0x%08" PRIx32 "\n", scene->seed);
-    printf("  timestep_seconds: %.9g\n", (double)k_timestep);
-    printf("  substeps: %" PRIu32 "\n", k_substep_count);
-    printf("  gravity: (%.9g, %.9g)\n", (double)scene->config.gravity.x,
-           (double)scene->config.gravity.y);
-    printf("  body_count: %" PRIu32 "\n", scene->body_count);
-    printf("  body_capacity: %" PRIu32 "\n",
-           sl_world_body_capacity(&scene->world));
-    printf("  contact_capacity: %" PRIu32 "\n",
-           sl_world_contact_capacity(&scene->world));
-    printf("  final_contact_count: %" PRIu32 "\n", result->contact_count);
-    printf("  dropped_contacts_all_steps: %" PRIu64 "\n",
-           result->dropped_contact_count);
-    printf("  warmup_steps: %" PRIu32 "\n", options->warmup);
-    printf("  measured_steps: %" PRIu32 "\n", options->steps);
-    printf("  average_ms_per_step: %.6f\n", result->average_ms);
-    printf("  maximum_ms_per_step: %.6f\n", result->maximum_ms);
-    printf("  checksum: 0x%016" PRIx64 "\n", result->checksum);
-    printf("  median_ms_per_step: %.6f\n  p95_ms_per_step: %.6f\n",
-           result->median_ms, result->p95_ms);
-    printf("  mutation_average_ms: %.6f\n  arena_bytes: %zu\n",
-           result->mutation_average_ms, result->memory.arena_bytes);
-    printf("  semantic_digest: %016" PRIx64 "\n", result->digest);
-    printf("  penetration_max: %.9g\n  joint_error_max: %.9g\n",
-           (double)result->quality.penetration_max,
-           (double)result->quality.joint_error_max);
 }
 
 static bool binary32_supported(void)
@@ -770,9 +697,8 @@ static void result_json(const bench_scene *scene, const bench_result *r,
            "\"max\":%.9g,\"mutation_average\":%.9g}",
            r->average_ms, r->median_ms, r->p95_ms, r->maximum_ms,
            r->mutation_average_ms);
-    printf(",\"legacy_checksum\":\"%016" PRIx64
-           "\",\"semantic_digest\":\"%016" PRIx64 "\",\"drops\":%" PRIu64,
-           r->checksum, r->digest, r->dropped_contact_count);
+    printf(",\"semantic_digest\":\"%016" PRIx64 "\",\"drops\":%" PRIu64,
+           r->digest, r->dropped_contact_count);
     printf(",\"counts\":{\"bodies\":%" PRIu32 ",\"contacts\":%" PRIu32
            ",\"joints\":%" PRIu32 ",\"pairs\":%" PRIu32
            ",\"pair_capacity\":%" PRIu32 ",\"body_high\":%" PRIu32
@@ -834,19 +760,18 @@ static bool count_parse(const char *s, uint32_t *out, bool zero)
 }
 static bool options_parse(int argc, char **argv, bench_options *o)
 {
-    *o = (bench_options){ .scene = "baseline",
+    *o = (bench_options){ .scene = "all",
                           .warmup = k_warmup_step_count,
                           .steps = k_measured_step_count };
     uint32_t seen = 0u;
-    if (argc > 9 || (argc & 1) == 0) {
+    if (argc > 7 || (argc & 1) == 0) {
         return false;
     }
     for (int i = 1; i < argc; i += 2) {
         uint32_t bit = 0u;
         if (strcmp(argv[i], "--scene") == 0) {
             bit = 1u;
-            bool found = strcmp(argv[i + 1], "all") == 0 ||
-                         strcmp(argv[i + 1], "baseline") == 0;
+            bool found = strcmp(argv[i + 1], "all") == 0;
             for (uint32_t j = 0u; j < BENCH_FIXTURE_COUNT; ++j) {
                 if (strcmp(argv[i + 1], k_fixtures[j].name) == 0) {
                     found = true;
@@ -866,13 +791,6 @@ static bool options_parse(int argc, char **argv, bench_options *o)
             if (!count_parse(argv[i + 1], &o->steps, false)) {
                 return false;
             }
-        } else if (strcmp(argv[i], "--format") == 0) {
-            bit = 8u;
-            if (strcmp(argv[i + 1], "json") == 0) {
-                o->json = true;
-            } else if (strcmp(argv[i + 1], "text") != 0) {
-                return false;
-            }
         } else {
             return false;
         }
@@ -887,41 +805,34 @@ int main(int argc, char **argv)
 {
     bench_options options;
     if (!options_parse(argc, argv, &options) || !binary32_supported()) {
-        fprintf(
-            stderr,
-            "usage: sl_bench [--scene "
-            "baseline|all|pyramid|rain|piles|chains|churn|table|inverted] "
-            "[--warmup 0..10000] [--steps 1..10000] [--format text|json]\n");
+        fprintf(stderr, "usage: sl_bench [--scene "
+                        "all|pyramid|rain|piles|chains|churn|table|inverted] "
+                        "[--warmup 0..10000] [--steps 1..10000]\n");
         return EXIT_FAILURE;
     }
-    if (options.json) {
-        printf("{\"schema_version\":1,\"metadata\":{\"compiler\":");
-        json_string(SL_BENCH_COMPILER_ID);
-        printf(",\"compiler_version\":");
-        json_string(SL_BENCH_COMPILER_VERSION);
-        printf(",\"build\":");
-        json_string(SL_BENCH_BUILD_MODE);
-        printf(",\"flags\":");
-        json_string(SL_BENCH_C_FLAGS);
-        printf(",\"warnings\":");
-        json_string(SL_BENCH_WARNING_FLAGS);
-        printf(",\"host\":");
-        json_string(SL_BENCH_HOST_SYSTEM);
-        printf(",\"host_version\":");
-        json_string(SL_BENCH_HOST_VERSION);
-        printf(",\"processor\":");
-        json_string(SL_BENCH_HOST_PROCESSOR);
-        printf(",\"revision\":");
-        json_string(SL_BENCH_REVISION);
-        printf("},\"results\":[");
-    } else {
-        metadata_print();
-    }
+    printf("{\"schema_version\":1,\"metadata\":{\"compiler\":");
+    json_string(SL_BENCH_COMPILER_ID);
+    printf(",\"compiler_version\":");
+    json_string(SL_BENCH_COMPILER_VERSION);
+    printf(",\"build\":");
+    json_string(SL_BENCH_BUILD_MODE);
+    printf(",\"flags\":");
+    json_string(SL_BENCH_C_FLAGS);
+    printf(",\"warnings\":");
+    json_string(SL_BENCH_WARNING_FLAGS);
+    printf(",\"host\":");
+    json_string(SL_BENCH_HOST_SYSTEM);
+    printf(",\"host_version\":");
+    json_string(SL_BENCH_HOST_VERSION);
+    printf(",\"processor\":");
+    json_string(SL_BENCH_HOST_PROCESSOR);
+    printf(",\"revision\":");
+    json_string(SL_BENCH_REVISION);
+    printf("},\"results\":[");
     bool first = true;
     for (uint32_t i = 0u; i < BENCH_FIXTURE_COUNT; ++i) {
         if (strcmp(options.scene, "all") != 0 &&
-            strcmp(options.scene, k_fixtures[i].name) != 0 &&
-            !(strcmp(options.scene, "baseline") == 0 && i < 2u)) {
+            strcmp(options.scene, k_fixtures[i].name) != 0) {
             continue;
         }
         bench_scene *scene = calloc(1u, sizeof(*scene));
@@ -932,14 +843,10 @@ int main(int argc, char **argv)
         const bool valid =
             k_fixtures[i].build(scene) && scene_run(scene, &options, &result);
         if (valid) {
-            if (options.json) {
-                if (!first) {
-                    putchar(',');
-                }
-                result_json(scene, &result, &options);
-            } else {
-                result_print(scene, &result, &options);
+            if (!first) {
+                putchar(',');
             }
+            result_json(scene, &result, &options);
         }
         sl_world_destroy(&scene->world);
         free(scene);
@@ -952,8 +859,6 @@ int main(int argc, char **argv)
         }
         first = false;
     }
-    if (options.json) {
-        printf("]}\n");
-    }
+    printf("]}\n");
     return EXIT_SUCCESS;
 }

@@ -6,7 +6,7 @@ verify the independent quality geometry. The benchmark and its check executable
 use only public Silk headers and remain separate from CTest.
 
 ```sh
-# Original 120 warm-up / 600 measured step pyramid and rain configurations:
+# Full matrix with 120 warm-up / 600 measured steps:
 build/release/bin/sl_bench
 # Full matrix, five independent runs, schema/replay/physical-quality checks:
 python3 bench/report.py run build/release/bin/sl_bench --output build/reports --quality
@@ -17,9 +17,8 @@ python3 bench/report.py compare build/reports/run-1.json build/reports/run-2.jso
 ```
 
 Windows multi-config executables are under `build/windows/bin/Debug/` and end
-in `.exe`. No Python package is required. `--scene` accepts `baseline` (default
-in the executable), `all` (default in report.py), or one fixture below.
-`--warmup` accepts 0–10000 and `--steps` 1–10000. `--format` is `text` or `json`.
+in `.exe`. No Python package is required. `--scene` accepts `all` (the default) or one fixture below.
+`--warmup` accepts 0–10000 and `--steps` 1–10000. Output is always JSON.
 Unknown/duplicate options, missing values, signs, trailing characters, overflowing
 counts and extra arguments fail. Report repetitions are bounded to 1–20 (default
 5), each child process has a 600-second timeout, and input reports are limited
@@ -68,11 +67,7 @@ The machine output is one JSON object, validated strictly by `bench/report.py`:
   and average mutation time (zero except churn). Samples are allocated before
   stepping; warm-up, setup, quality measurement, stats, sorting and output are
   excluded. Unavailable/backward/non-finite clock samples fail the run.
-- `legacy_checksum`: 16 lowercase hex digits using the original word-wise
-  binary32 hash of position x/y, angle, velocity x/y and angular velocity in
-  ascending body-slot order. Its historical label is FNV-1a; it combines 32-bit
-  words, not an interoperable byte-stream FNV serialization format.
-- `semantic_digest`: separately named 16-digit hash including public body
+- `semantic_digest`: 16-digit word-wise binary32 hash including public body
   identities/transforms/velocities/mass/inertia/inverses/torque/material/type,
   active shapes and proxy bounds; ordered contact handles/materials/features/
   anchors/impulses; and joint handles/descriptors/reported impulses. This is
@@ -135,14 +130,11 @@ compiler flags, revision, scene and invocation with any optimization decision.
 
 The recorded development host is an Apple M4 Pro (arm64), Darwin 25.6.0,
 AppleClang 21.0.0.21000101, Release `-O3 -DNDEBUG`. The
-[original 0.3.0 record](../bench/reports/phase3-baseline.json) was built from a
-clean `git archive ac033bd`; unavailable counters/quality fields are explicitly
-null. The [stats overhead record](../bench/reports/stats-overhead.json) compares
-the actual post-#70 parent with instrumentation using the old harness. Expanded
-matrix reports identify their own committed benchmark revision.
+[stats overhead record](../bench/reports/stats-overhead.json) preserves the
+matched parent/instrumented measurement and its exact harness revisions.
+It is historical measurement evidence, not an input to the current validator.
 
-The [expanded five-run summary](../bench/reports/matrix/summary.json) links by
-filename to its sibling raw run reports. These use clean source revision
-`6ae5dad86fb2bc288a904dfa80275f0a0d1731bd`, pass full-profile quality gates and
-match deterministic fields across all five executions. Both original scene
-checksums also match all five unmodified 0.3.0 runs on this build/platform.
+The [five-run summary](../bench/reports/matrix/summary.json) links by filename
+to sibling raw reports. Each report records its measured source revision.
+All seven fixtures pass full-profile quality gates and match deterministic
+fields across the five executions.
