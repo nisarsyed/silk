@@ -38,3 +38,11 @@ no diagnostic value changes a simulation decision. Tests pin minimum/maximum
 budgets, odd-capacity padding, optional joints and counter saturation. Body
 payload is 169 bytes per capacity slot (16 ownership + 32 vectors + 16 rotations
 + 32 scalars + 1 type + 72 shape); padding is additional.
+
+The five-run [overhead record](../bench/reports/stats-overhead.json) contains
+raw metadata/settings/results and revisions. Median average step times were
+0.234457→0.233698 ms (pyramid) and 0.966595→0.942335 ms (rain). Both legacy
+checksums matched in every run. These sequential batches on one host are not
+an isolated causal speed measurement: noise, scheduling and code placement
+can explain small negative overhead. The result supports affordable counters,
+not an optimization claim. No CI timing threshold follows from this report.
