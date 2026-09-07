@@ -2,7 +2,6 @@
 """Developer-tool contract checks; no timing thresholds and no CTest entry."""
 import argparse
 import copy
-import json
 import math
 from pathlib import Path
 import subprocess
@@ -114,7 +113,8 @@ class ReportTests(unittest.TestCase):
             self.skipTest('pass --executable for live CLI checks')
         cases = [('--steps', '0'), ('--steps', '10001'), ('--steps', '-1'),
                  ('--steps', '99999999999999999'), ('--steps', '1x'), ('--warmup',),
-                 ('--scene', 'bogus'), ('--format', 'csv'), ('--unknown', '1'),
+                 ('--scene', 'bogus'), ('--scene', 'baseline'),
+                 ('--format', 'json'), ('--format', 'text'), ('--unknown', '1'),
                  ('--steps', '1', '--steps', '2'), ('--warmup', '+2')]
         for args in cases:
             with self.subTest(args=args):
@@ -124,9 +124,18 @@ class ReportTests(unittest.TestCase):
     def test_minimum_profile(self):
         if EXE is None:
             self.skipTest('pass --executable for live CLI checks')
-        result = subprocess.run([str(EXE), '--scene', 'table', '--warmup', '0', '--steps', '1',
-                                 '--format', 'json'], capture_output=True, text=True, timeout=30, check=True)
+        result = subprocess.run([str(EXE), '--scene', 'table', '--warmup', '0', '--steps', '1'], capture_output=True, text=True, timeout=30, check=True)
         report.validate(report.decode(result.stdout))
+
+    def test_default_scene_selection(self):
+        if EXE is None:
+            self.skipTest('pass --executable for live CLI checks')
+        result = subprocess.run([str(EXE), '--warmup', '0', '--steps', '1'],
+                                capture_output=True, text=True, timeout=30, check=True)
+        value = report.decode(result.stdout)
+        report.validate(value)
+        self.assertEqual({row['scene'] for row in value['results']},
+                         {'pyramid', 'rain', 'piles', 'chains', 'churn', 'table', 'inverted'})
 
 
 if __name__ == '__main__':
