@@ -14,5 +14,7 @@ typedef struct sl_replay_mismatch {
 } sl_replay_mismatch;
 bool sl_replay_compare(const sl_world *a, const sl_world *b,
                        sl_replay_mismatch *out);
-void sl_replay_report(const sl_replay_mismatch *mismatch);
+/* Compare and print the first mismatch with fixture context on failure. */
+bool sl_replay_check(const sl_world *a, const sl_world *b, const char *fixture,
+                     uint32_t seed, uint32_t operation);
 #endif

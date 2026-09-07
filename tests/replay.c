@@ -200,11 +200,19 @@ bool sl_replay_compare(const sl_world *a, const sl_world *b,
      * contribute their next-free link and height marker. */
     return tree_compare(a->tree, b->tree, out);
 }
-void sl_replay_report(const sl_replay_mismatch *m)
+bool sl_replay_check(const sl_world *a, const sl_world *b, const char *fixture,
+                     uint32_t seed, uint32_t operation)
 {
+    sl_replay_mismatch m = { .fixture = fixture,
+                             .seed = seed,
+                             .operation = operation };
+    if (sl_replay_compare(a, b, &m)) {
+        return true;
+    }
     fprintf(stderr,
             "%s seed=0x%08" PRIx32 " operation=%" PRIu32 " entity=%" PRIu32
             " field=%s a=0x%016" PRIx64 " b=0x%016" PRIx64 "\n",
-            m->fixture, m->seed, m->operation, m->entity, m->field_name,
-            m->value_a, m->value_b);
+            m.fixture, m.seed, m.operation, m.entity, m.field_name, m.value_a,
+            m.value_b);
+    return false;
 }

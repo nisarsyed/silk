@@ -1,3 +1,4 @@
+#include "replay.h"
 #include "silk_test.h"
 #include "suites.h"
 
@@ -662,54 +663,6 @@ static void test_advance_ignores_garbage_frame_time(void)
     sl_world_destroy(&world);
 }
 
-/* Whole-record bitwise compare. sl_shape carries no padding (pinned by
- * the layout assert in shape.c) and every constructor zeroes the unused
- * arm of the union, so two records for the same shape agree byte for
- * byte -- tail included. A field-wise compare would skip that tail,
- * which is precisely where record drift hides. */
-static bool shapes_match(const sl_shape *a, const sl_shape *b)
-{
-    return memcmp(a, b, sizeof(*a)) == 0;
-}
-
-/* Full SoA state of two worlds compared bitwise, row by row. Every
- * packed array belongs here -- a missing array hides swap-remove drift
- * from the churn stress below. */
-static bool twin_worlds_in_sync(const sl_world *a, const sl_world *b)
-{
-    if (a->body_count != b->body_count || a->free_count != b->free_count) {
-        return false;
-    }
-    for (uint32_t i = 0u; i < a->body_count; ++i) {
-        const bool rows_match =
-            a->positions[i].x == b->positions[i].x &&
-            a->positions[i].y == b->positions[i].y &&
-            a->velocities[i].x == b->velocities[i].x &&
-            a->velocities[i].y == b->velocities[i].y &&
-            a->forces[i].x == b->forces[i].x &&
-            a->forces[i].y == b->forces[i].y && a->masses[i] == b->masses[i] &&
-            a->inv_masses[i] == b->inv_masses[i] &&
-            a->delta_positions[i].x == b->delta_positions[i].x &&
-            a->delta_positions[i].y == b->delta_positions[i].y &&
-            a->rotations[i].c == b->rotations[i].c &&
-            a->rotations[i].s == b->rotations[i].s &&
-            a->delta_rotations[i].c == b->delta_rotations[i].c &&
-            a->delta_rotations[i].s == b->delta_rotations[i].s &&
-            a->angular_velocities[i] == b->angular_velocities[i] &&
-            a->torques[i] == b->torques[i] &&
-            a->inertias[i] == b->inertias[i] &&
-            a->inv_inertias[i] == b->inv_inertias[i] &&
-            a->frictions[i] == b->frictions[i] &&
-            a->restitutions[i] == b->restitutions[i] &&
-            a->types[i] == b->types[i] &&
-            shapes_match(&a->shapes[i], &b->shapes[i]);
-        if (!rows_match) {
-            return false;
-        }
-    }
-    return true;
-}
-
 static void test_determinism_identical_sequences_bitwise(void)
 {
     sl_world_config config = { .body_capacity = 8u,
@@ -781,7 +734,7 @@ static void test_determinism_identical_sequences_bitwise(void)
 
         SL_EXPECT_INT_EQ(sl_world_advance(&a, &sa, 0.25f),
                          sl_world_advance(&b, &sb, 0.25f));
-        SL_EXPECT(twin_worlds_in_sync(&a, &b));
+        SL_EXPECT(sl_replay_check(&a, &b, "advance replay", 0u, round));
     }
 
     /* Finish with capped advances shedding debt identically. */
@@ -791,7 +744,7 @@ static void test_determinism_identical_sequences_bitwise(void)
         SL_EXPECT_INT_EQ(steps_a, steps_b);
         SL_EXPECT_INT_EQ(steps_a, SL_STEP_COUNT_MAX);
         SL_EXPECT(sa.remainder == 0.0f && sb.remainder == 0.0f);
-        SL_EXPECT(twin_worlds_in_sync(&a, &b));
+        SL_EXPECT(sl_replay_check(&a, &b, "capped advance replay", 0u, i));
     }
 
     sl_world_destroy(&a);
@@ -1162,7 +1115,9 @@ static void test_churn_step_stress_matches_model(void)
                         sl_world_body_get_velocity(&world, probe));
             }
         }
-        twins_in_sync = twins_in_sync && twin_worlds_in_sync(&world, &twin);
+        twins_in_sync =
+            twins_in_sync &&
+            sl_replay_check(&world, &twin, "step churn", CHURN_SEED, op);
     }
 
     SL_EXPECT(counts_match);
@@ -1585,7 +1540,9 @@ static void test_churn_mixed_types_stress_matches_model(void)
                                  position.y == start[i].y;
             }
         }
-        twins_in_sync = twins_in_sync && twin_worlds_in_sync(&world, &twin);
+        twins_in_sync =
+            twins_in_sync &&
+            sl_replay_check(&world, &twin, "mixed step churn", MIXED_SEED, op);
     }
 
     SL_EXPECT(counts_match);

@@ -8,19 +8,6 @@
 #define REPLAY_SEED UINT32_C(0x57D37E12)
 static const float k_dt = 1.0f / 60.0f;
 
-static bool checkpoint(const sl_world *a, const sl_world *b, uint32_t op)
-{
-    sl_replay_mismatch mismatch = { .fixture = "mixed",
-                                    .seed = REPLAY_SEED,
-                                    .operation = op };
-    const bool equal = sl_replay_compare(a, b, &mismatch);
-    if (!equal) {
-        sl_replay_report(&mismatch);
-    }
-    SL_EXPECT(equal);
-    return equal;
-}
-
 static uint32_t random_next(uint32_t *state)
 {
     *state ^= *state << 13u;
@@ -121,13 +108,15 @@ static void mixed_replay(void)
         const uint64_t result_a = operation_apply(&a, kind, value);
         const uint64_t result_b = operation_apply(&b, kind, value);
         SL_EXPECT(result_a == result_b);
-        if (!checkpoint(&a, &b, op)) {
+        if (!sl_replay_check(&a, &b, "mixed", REPLAY_SEED, op)) {
+            SL_EXPECT(false);
             break;
         }
         if (op % 257u == 256u) {
             sl_world_reset(&a);
             sl_world_reset(&b);
-            if (!checkpoint(&a, &b, op)) {
+            if (!sl_replay_check(&a, &b, "mixed", REPLAY_SEED, op)) {
+                SL_EXPECT(false);
                 break;
             }
         }
@@ -158,7 +147,7 @@ static void rejection_and_diagnostic(void)
         SL_EXPECT(!sl_world_body_apply_force(&a, body,
                                              (sl_vec2){ invalid[i], 0.0f }));
         SL_EXPECT(!sl_world_body_apply_torque(&a, body, invalid[i]));
-        SL_EXPECT(checkpoint(&a, &b, i));
+        SL_EXPECT(sl_replay_check(&a, &b, "rejection", REPLAY_SEED, i));
     }
     SL_EXPECT(!sl_world_body_set_mass(&a, body, -1.0f));
     SL_EXPECT(!sl_world_body_set_position(
@@ -168,7 +157,7 @@ static void rejection_and_diagnostic(void)
     sl_world_step(&a, 0.0f);
     sl_world_step(&a, 0x1p-149f);
 #endif
-    SL_EXPECT(checkpoint(&a, &b, 4u));
+    SL_EXPECT(sl_replay_check(&a, &b, "rejection", REPLAY_SEED, 4u));
     sl_replay_mismatch mismatch = { .fixture = "perturbation",
                                     .seed = REPLAY_SEED,
                                     .operation = 5u };
@@ -236,12 +225,14 @@ static void capacity_recovery(void)
             SL_EXPECT_INT_EQ(sl_world_contact_drop_count(&worlds[w]),
                              3u - pair);
         }
-        SL_EXPECT(checkpoint(&worlds[0], &worlds[1], pair));
+        SL_EXPECT(sl_replay_check(&worlds[0], &worlds[1], "capacity recovery",
+                                  0u, pair));
         for (uint32_t w = 0u; w < 2u; ++w) {
             sl_world_body_destroy(&worlds[w], handles[w][2u * pair]);
             sl_world_body_destroy(&worlds[w], handles[w][2u * pair + 1u]);
         }
-        SL_EXPECT(checkpoint(&worlds[0], &worlds[1], pair));
+        SL_EXPECT(sl_replay_check(&worlds[0], &worlds[1], "capacity recovery",
+                                  0u, pair));
     }
     sl_world_destroy(&worlds[0]);
     sl_world_destroy(&worlds[1]);
@@ -285,7 +276,8 @@ static void coupled_long_run(void)
         for (uint32_t w = 0u; w < 2u; ++w) {
             sl_world_step(&worlds[w], k_dt);
         }
-        if (!checkpoint(&worlds[0], &worlds[1], op)) {
+        if (!sl_replay_check(&worlds[0], &worlds[1], "coupled", 0u, op)) {
+            SL_EXPECT(false);
             break;
         }
         SL_EXPECT_INT_EQ(sl_world_contact_drop_count(&worlds[0]), 0u);

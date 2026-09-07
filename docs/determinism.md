@@ -13,7 +13,9 @@ handles, materials, manifold normals, features, anchors and cached impulses;
 joint slots, descriptors, cached impulses and adjacency; tree roots, allocated
 nodes and free-list links. Inactive shape payload, addresses, struct padding,
 unused queue tails and solver/query scratch overwritten before use are excluded.
-The older normalized-shape-byte tests remain separate representation tests.
+Shape constructor/body normalization tests independently cover inactive-byte
+normalization. Step/advance churn uses the same replay comparator; there is no
+second partial body-only comparator to maintain.
 
 Failures identify fixture, seed, operation, entity, field and values (float bits
 in hex). Deliberate signed-zero and joint-cache perturbations test the comparator
