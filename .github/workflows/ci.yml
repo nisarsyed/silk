@@ -18,7 +18,7 @@ jobs:
       # Pinned to match .clang-format expectations; output differs across
       # major versions, so an unpinned runner would fail valid PRs.
       - run: pipx install clang-format==22.1.3
-      - run: clang-format --dry-run --Werror include/silk/*.h src/*.c tests/*.h tests/*.c examples/sandbox/*.c
+      - run: python3 tools/check_format.py
 
   linux:
     name: ${{ matrix.cc }} / ubuntu
@@ -31,9 +31,22 @@ jobs:
       CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@v7
-      - run: cmake --preset debug
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: cmake --preset debug -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset debug
       - run: ctest --preset debug
+      - run: build/debug/bin/sl_bench_check
+      - run: python bench/test_report.py --executable build/debug/bin/sl_bench
+      - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
+          path: build/bench-reports/
+          retention-days: 14
+          if-no-files-found: warn
 
   linux-release:
     name: ${{ matrix.cc }} / release / ubuntu
@@ -46,29 +59,68 @@ jobs:
       CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
       # Execute the tests with NDEBUG; compiling the release sandbox alone
       # does not exercise release behavior.
-      - run: cmake --preset release
+      - run: cmake --preset release -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset release
       - run: ctest --preset release
+      - run: build/release/bin/sl_bench_check
+      - run: python bench/test_report.py --executable build/release/bin/sl_bench
+      - run: python bench/report.py run build/release/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
+          path: build/bench-reports/
+          retention-days: 14
+          if-no-files-found: warn
 
   macos:
     name: clang / macos
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - run: cmake --preset debug
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: cmake --preset debug -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset debug
       - run: ctest --preset debug
+      - run: build/debug/bin/sl_bench_check
+      - run: python bench/test_report.py --executable build/debug/bin/sl_bench
+      - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ github.job }}-${{ github.sha }}
+          path: build/bench-reports/
+          retention-days: 14
+          if-no-files-found: warn
 
   windows:
     name: msvc / windows
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v7
-      - run: cmake --preset windows
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: cmake --preset windows -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset windows
       - run: ctest --preset windows
+      - run: build/windows/bin/Debug/sl_bench_check.exe
+      - run: python bench/test_report.py --executable build/windows/bin/Debug/sl_bench.exe
+      - run: python bench/report.py run build/windows/bin/Debug/sl_bench.exe --output build/bench-reports --repeat 2 --warmup 2 --steps 8
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ github.job }}-${{ github.sha }}
+          path: build/bench-reports/
+          retention-days: 14
+          if-no-files-found: warn
 
   sanitize:
     name: asan+ubsan / ubuntu
@@ -92,14 +144,14 @@ jobs:
         # inside one -- the side effect silently stops happening -- nor a
         # parameter or local the assert was its only reader, which
         # -Werror=unused-parameter then rejects. Neither shows up in the
-        # library jobs above: this is the only place main.c is compiled.
+        # library jobs above: this compiles the interactive example.
         preset: [sandbox, sandbox-release]
     steps:
       - uses: actions/checkout@v7
       # Raylib's GLFW build needs the X11/GL dev headers even for a
       # compile-only check; audio (miniaudio) loads its backends at
-      # runtime, so no ALSA dev package. This job is the only place
-      # main.c compiles against the public headers.
+      # runtime, so no ALSA dev package. The sandbox is compiled
+      # against public headers in both assertion modes.
       - run: >
           sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev
           libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev
