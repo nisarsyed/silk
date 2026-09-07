@@ -6,9 +6,7 @@
     "--warmup",
     "120",
     "--steps",
-    "600",
-    "--format",
-    "json"
+    "600"
   ],
   "repetitions": 5,
   "metadata": {
@@ -20,99 +18,99 @@
     "host": "Darwin",
     "host_version": "25.6.0",
     "processor": "arm64",
-    "revision": "6ae5dad86fb2bc288a904dfa80275f0a0d1731bd"
+    "revision": "d2afe80c51cd294da00f3b7916be2a3c1c386214"
   },
   "scenes": [
     {
       "scene": "pyramid",
       "average_ms_runs": [
-        0.226555,
-        0.22627,
-        0.22721,
-        0.225365,
-        0.23036
+        0.234098333,
+        0.218595,
+        0.217563333,
+        0.219925,
+        0.220235
       ],
-      "median_average_ms": 0.226555,
-      "minimum_average_ms": 0.225365,
-      "maximum_average_ms": 0.23036
+      "median_average_ms": 0.219925,
+      "minimum_average_ms": 0.217563333,
+      "maximum_average_ms": 0.234098333
     },
     {
       "scene": "rain",
       "average_ms_runs": [
-        0.936748333,
-        0.944476667,
-        0.943105,
-        0.932161667,
-        0.940325
+        0.931763333,
+        0.919906667,
+        0.921961667,
+        0.921851667,
+        0.919531667
       ],
-      "median_average_ms": 0.940325,
-      "minimum_average_ms": 0.932161667,
-      "maximum_average_ms": 0.944476667
+      "median_average_ms": 0.921851667,
+      "minimum_average_ms": 0.919531667,
+      "maximum_average_ms": 0.931763333
     },
     {
       "scene": "piles",
       "average_ms_runs": [
-        0.07011,
-        0.0700083333,
-        0.069935,
-        0.070825,
-        0.0720983333
+        0.066515,
+        0.06699,
+        0.068355,
+        0.0671066667,
+        0.0669016667
       ],
-      "median_average_ms": 0.07011,
-      "minimum_average_ms": 0.069935,
-      "maximum_average_ms": 0.0720983333
+      "median_average_ms": 0.06699,
+      "minimum_average_ms": 0.066515,
+      "maximum_average_ms": 0.068355
     },
     {
       "scene": "chains",
       "average_ms_runs": [
-        0.0153433333,
-        0.0151833333,
-        0.0147683333,
-        0.0152383333,
-        0.0146483333
+        0.014675,
+        0.0147033333,
+        0.0146766667,
+        0.014735,
+        0.01466
       ],
-      "median_average_ms": 0.0151833333,
-      "minimum_average_ms": 0.0146483333,
-      "maximum_average_ms": 0.0153433333
+      "median_average_ms": 0.0146766667,
+      "minimum_average_ms": 0.01466,
+      "maximum_average_ms": 0.014735
     },
     {
       "scene": "churn",
       "average_ms_runs": [
-        0.00961666667,
-        0.009725,
-        0.00957,
-        0.00963166667,
-        0.009605
+        0.008815,
+        0.00941333333,
+        0.00913166667,
+        0.00950166667,
+        0.00948333333
       ],
-      "median_average_ms": 0.00961666667,
-      "minimum_average_ms": 0.00957,
-      "maximum_average_ms": 0.009725
+      "median_average_ms": 0.00941333333,
+      "minimum_average_ms": 0.008815,
+      "maximum_average_ms": 0.00950166667
     },
     {
       "scene": "table",
       "average_ms_runs": [
-        0.001835,
-        0.00175666667,
-        0.001765,
-        0.00174666667,
-        0.00182166667
+        0.00152666667,
+        0.002,
+        0.00191166667,
+        0.00171666667,
+        0.00201333333
       ],
-      "median_average_ms": 0.001765,
-      "minimum_average_ms": 0.00174666667,
-      "maximum_average_ms": 0.001835
+      "median_average_ms": 0.00191166667,
+      "minimum_average_ms": 0.00152666667,
+      "maximum_average_ms": 0.00201333333
     },
     {
       "scene": "inverted",
       "average_ms_runs": [
-        0.00262666667,
-        0.002585,
-        0.002615,
-        0.00275666667,
-        0.002545
+        0.00244166667,
+        0.00248833333,
+        0.00242833333,
+        0.002515,
+        0.00246166667
       ],
-      "median_average_ms": 0.002615,
-      "minimum_average_ms": 0.002545,
-      "maximum_average_ms": 0.00275666667
+      "median_average_ms": 0.00246166667,
+      "minimum_average_ms": 0.00242833333,
+      "maximum_average_ms": 0.002515
     }
   ]
 }
