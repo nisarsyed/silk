@@ -52,15 +52,29 @@ static unsigned char *carve(unsigned char *base, size_t *offset,
 /* Single source for init's allocation and the public budget query:
  * one slot array, two index arrays, four vec2 arrays, two rotation arrays,
  * eight float arrays, one type byte, and one shape record per body. */
+static size_t world_body_layout(size_t capacity, size_t *payload)
+{
+    size_t total = 0u;
+    *payload = 0u;
+#define BODY_SLICE(number, type)                                               \
+    do {                                                                       \
+        total += (number) * slice_bytes(capacity, sizeof(type));               \
+        *payload += (number) * capacity * sizeof(type);                        \
+    } while (false)
+    BODY_SLICE(1u, sl_body_slot);
+    BODY_SLICE(2u, uint32_t);
+    BODY_SLICE(4u, sl_vec2);
+    BODY_SLICE(2u, sl_rotation);
+    BODY_SLICE(8u, float);
+    BODY_SLICE(1u, uint8_t);
+    BODY_SLICE(1u, sl_shape);
+#undef BODY_SLICE
+    return total;
+}
 static size_t world_memory_bytes_for(size_t capacity)
 {
-    return slice_bytes(capacity, sizeof(sl_body_slot)) +
-           2u * slice_bytes(capacity, sizeof(uint32_t)) +
-           4u * slice_bytes(capacity, sizeof(sl_vec2)) +
-           2u * slice_bytes(capacity, sizeof(sl_rotation)) +
-           8u * slice_bytes(capacity, sizeof(float)) +
-           slice_bytes(capacity, sizeof(uint8_t)) +
-           slice_bytes(capacity, sizeof(sl_shape));
+    size_t payload = 0u;
+    return world_body_layout(capacity, &payload);
 }
 
 static bool world_config_resolve(const sl_world_config *config,
@@ -156,28 +170,41 @@ static bool world_config_resolve(const sl_world_config *config,
     return true;
 }
 
-size_t sl_world_memory_bytes(const sl_world_config *config)
+bool sl_world_memory_breakdown_get(const sl_world_config *config,
+                                   sl_world_memory_breakdown *out)
 {
     sl_world_config resolved;
-    if (!world_config_resolve(config, &resolved)) {
-        return 0u;
+    if (out == NULL || !world_config_resolve(config, &resolved)) {
+        return false;
     }
-    const size_t body_bytes =
-        world_memory_bytes_for((size_t)config->body_capacity);
-    const size_t contact_bytes = sl_contact_world_memory_bytes(
-        config->body_capacity, resolved.contact_capacity);
-    const size_t solver_bytes =
-        sl_solver_memory_bytes(resolved.contact_capacity);
-    const size_t joint_bytes =
-        sl_joint_memory_bytes(config->body_capacity, resolved.joint_capacity);
-    if (contact_bytes == 0u || solver_bytes == 0u ||
-        (resolved.joint_capacity > 0u && joint_bytes == 0u) ||
-        body_bytes > SIZE_MAX - contact_bytes ||
-        body_bytes + contact_bytes > SIZE_MAX - solver_bytes ||
-        body_bytes + contact_bytes + solver_bytes > SIZE_MAX - joint_bytes) {
-        return 0u;
+    sl_world_memory_breakdown result = { 0 };
+    const size_t body =
+        world_body_layout(resolved.body_capacity, &result.body_bytes);
+    const size_t contact = sl_contact_world_memory_layout(
+        resolved.body_capacity, resolved.contact_capacity, &result);
+    const size_t solver = sl_solver_memory_bytes(resolved.contact_capacity);
+    const size_t joint = sl_joint_memory_layout(
+        resolved.body_capacity, resolved.joint_capacity, &result.joint_bytes);
+    if (contact == 0u || solver == 0u ||
+        (resolved.joint_capacity > 0u && joint == 0u) ||
+        body > SIZE_MAX - contact || body + contact > SIZE_MAX - solver ||
+        body + contact + solver > SIZE_MAX - joint) {
+        return false;
     }
-    return body_bytes + contact_bytes + solver_bytes + joint_bytes;
+    /* Solver records are pinned to an 8-byte multiple in solver.c. */
+    result.contact_solver_bytes = solver;
+    result.padding_bytes +=
+        body - result.body_bytes + joint - result.joint_bytes;
+    result.arena_bytes = body + contact + solver + joint;
+    result.world_bytes = sizeof(sl_world);
+    *out = result;
+    return true;
+}
+size_t sl_world_memory_bytes(const sl_world_config *config)
+{
+    sl_world_memory_breakdown result;
+    return sl_world_memory_breakdown_get(config, &result) ? result.arena_bytes
+                                                          : 0u;
 }
 
 /* Generation counters are 1-based; a bump that lands on 0 skips to 1 so
@@ -532,6 +559,9 @@ void sl_world_reset(sl_world *world)
 
     sl_joint_world_reset(world);
     sl_contact_world_reset(world);
+    memset(&world->stats, 0, sizeof(world->stats));
+    memset(&world->step_work, 0, sizeof(world->step_work));
+    world->stats_stepping = false;
     world->contact_constraint_count = 0u;
     world->body_count = 0u;
     world->free_count = world->body_capacity;
@@ -569,6 +599,9 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
 
     const uint32_t dense = world->body_count;
     world->body_count++;
+    if (world->body_count > world->stats.body_count_high) {
+        world->stats.body_count_high = world->body_count;
+    }
 
     world->slots[slot_id].dense = dense;
     world->slot_of[dense] = slot_id;
@@ -1085,4 +1118,19 @@ bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
     world->forces[dense] = force_sum;
     world->torques[dense] = torque_sum;
     return true;
+}
+
+sl_world_stats sl_world_get_stats(const sl_world *world)
+{
+    SL_ASSERT(world != NULL);
+    sl_world_stats result = world->stats;
+    result.body_count = world->body_count;
+    result.body_capacity = world->body_capacity;
+    result.contact_count = world->contact_count;
+    result.contact_capacity = world->contact_capacity;
+    result.joint_count = world->joint_count;
+    result.joint_capacity = world->joint_capacity;
+    result.pair_count = world->contact_count;
+    result.pair_capacity = world->pair_capacity;
+    return result;
 }

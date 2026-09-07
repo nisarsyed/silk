@@ -79,8 +79,10 @@ static unsigned char *carve(unsigned char *base, size_t *offset, size_t count,
     return slice;
 }
 
-size_t sl_joint_memory_bytes(uint32_t body_capacity, uint32_t joint_capacity)
+size_t sl_joint_memory_layout(uint32_t body_capacity, uint32_t joint_capacity,
+                              size_t *payload)
 {
+    *payload = 0u;
     if (body_capacity < 1u || body_capacity > SL_BODY_COUNT_MAX ||
         joint_capacity > SL_JOINT_COUNT_MAX) {
         return 0u;
@@ -97,6 +99,7 @@ size_t sl_joint_memory_bytes(uint32_t body_capacity, uint32_t joint_capacity)
             !size_add(total, slice, &total)) {                                 \
             return 0u;                                                         \
         }                                                                      \
+        *payload += (size_t)(count) * sizeof(type);                            \
     } while (false)
 
     ADD_SLICE(joint_capacity, sl_joint_slot);
@@ -120,6 +123,12 @@ size_t sl_joint_memory_bytes(uint32_t body_capacity, uint32_t joint_capacity)
 
 #undef ADD_SLICE
     return total;
+}
+
+size_t sl_joint_memory_bytes(uint32_t body_capacity, uint32_t joint_capacity)
+{
+    size_t payload = 0u;
+    return sl_joint_memory_layout(body_capacity, joint_capacity, &payload);
 }
 
 bool sl_joint_world_init(sl_world *world, void *memory, size_t memory_bytes)
@@ -402,6 +411,9 @@ sl_joint_handle sl_world_joint_create(sl_world *world,
     const uint32_t dense = world->joint_count;
     world->joint_free_count -= 1u;
     world->joint_count += 1u;
+    if (world->joint_count > world->stats.joint_count_high) {
+        world->stats.joint_count_high = world->joint_count;
+    }
     world->joint_slots[slot].dense = dense;
     world->joint_slot_of[dense] = slot;
     world->joint_kinds[dense] = (uint8_t)desc->kind;

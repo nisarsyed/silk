@@ -33,6 +33,7 @@ typedef struct sl_tree_node {
 typedef struct sl_tree_query_result {
     uint32_t count; /* total matches, possibly greater than output capacity */
     bool overflow;
+    uint32_t node_visits; /* bounded by node_capacity per query */
 } sl_tree_query_result;
 
 /* Internal owning view over caller-provided memory. All three roots share

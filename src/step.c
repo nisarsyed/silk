@@ -104,6 +104,8 @@ void sl_world_step(sl_world *world, float dt)
     const float angular_drag_scale = 1.0f / (1.0f + h * world->angular_drag);
     const float angular_speed_max = SL_ROTATION_PER_STEP_MAX * inverse_dt;
 
+    memset(&world->step_work, 0, sizeof(world->step_work));
+    world->stats_stepping = true;
     sl_contact_step_begin(world);
     sl_joint_prepare(world, h, inverse_h);
     sl_solver_prepare(world, h, inverse_h);
@@ -185,7 +187,12 @@ void sl_world_step(sl_world *world, float dt)
     sl_joint_store(world);
     sl_solver_store(world);
 
+    sl_world_step_stats completed = { 0 };
     for (uint32_t i = 0u; i < world->body_count; ++i) {
+        completed.dynamic_body_count +=
+            world->types[i] == (uint8_t)SL_BODY_DYNAMIC ? 1u : 0u;
+        completed.kinematic_body_count +=
+            world->types[i] == (uint8_t)SL_BODY_KINEMATIC ? 1u : 0u;
         world->positions[i] =
             sl_vec2_add(world->positions[i], world->delta_positions[i]);
         world->rotations[i] = sl_rotation_normalize(
@@ -196,6 +203,12 @@ void sl_world_step(sl_world *world, float dt)
         world->torques[i] = 0.0f;
     }
     sl_contact_step_end(world);
+    world->stats_stepping = false;
+    completed.work = world->step_work;
+    completed.substep_count = world->substep_count;
+    completed.contact_constraint_count = world->contact_constraint_count;
+    completed.joint_constraint_count = world->joint_constraint_count;
+    world->stats.step = completed;
 }
 
 bool sl_stepper_init(sl_stepper *stepper, float timestep)

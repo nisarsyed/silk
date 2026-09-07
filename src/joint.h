@@ -9,6 +9,8 @@
 
 #define SL_JOINT_EDGE_NONE UINT32_MAX
 
+size_t sl_joint_memory_layout(uint32_t body_capacity, uint32_t joint_capacity,
+                              size_t *payload);
 size_t sl_joint_memory_bytes(uint32_t body_capacity, uint32_t joint_capacity);
 bool sl_joint_world_init(sl_world *world, void *memory, size_t memory_bytes);
 void sl_joint_world_reset(sl_world *world);
