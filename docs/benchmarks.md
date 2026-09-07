@@ -140,3 +140,9 @@ clean `git archive ac033bd`; unavailable counters/quality fields are explicitly
 null. The [stats overhead record](../bench/reports/stats-overhead.json) compares
 the actual post-#70 parent with instrumentation using the old harness. Expanded
 matrix reports identify their own committed benchmark revision.
+
+The [expanded five-run summary](../bench/reports/matrix/summary.json) links by
+filename to its sibling raw run reports. These use clean source revision
+`6ae5dad86fb2bc288a904dfa80275f0a0d1731bd`, pass full-profile quality gates and
+match deterministic fields across all five executions. Both original scene
+checksums also match all five unmodified 0.3.0 runs on this build/platform.
