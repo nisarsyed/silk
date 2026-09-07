@@ -6,6 +6,7 @@ int main(void)
 {
     int failures = 0;
 
+    failures += sl_replay_suite();
     failures += sl_core_suite();
     failures += sl_math_suite();
     failures += sl_shape_suite();

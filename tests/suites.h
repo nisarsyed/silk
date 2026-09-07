@@ -3,6 +3,7 @@
 #ifndef SILK_SUITES_H
 #define SILK_SUITES_H
 
+int sl_replay_suite(void);
 int sl_core_suite(void);
 int sl_math_suite(void);
 int sl_shape_suite(void);
