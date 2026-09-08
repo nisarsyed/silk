@@ -1,5 +1,7 @@
 add_executable(sl_tests
     sl_tests.c
+    replay.c
+    test_replay.c
     test_core.c
     test_math.c
     test_shape.c
