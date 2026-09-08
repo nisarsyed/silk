@@ -134,3 +134,7 @@ explicit developer work; machine speed cannot fail ordinary PR checks.
 Download raw reports and comparison artifacts from the workflow run within
 14 days. Their metadata identifies the tested revision, including the combined
 PR/base checkout. Failed validation retains raw output when available.
+
+The [world-storage comparison](../bench/reports/world-storage.json) records the
+schema-1 to schema-2 measurement, including preserved parent reports. Historical
+reports are evidence only; the current validator accepts schema 2.

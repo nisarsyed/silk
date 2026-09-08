@@ -1,0 +1,151 @@
+{
+  "purpose": "matched private-world storage measurement",
+  "before": "world-storage-parent/summary.json",
+  "after": "matrix/summary.json",
+  "schema_transition": "1 to 2; compare shared result fields, account for moved world metadata separately; no schema-1 runtime reader",
+  "before_revision": "cb05a39966fc0180f1a90c8793ec9c31f29125a5",
+  "after_revision": "27df2d27a63b16b3c04ae06a322b0bebc95dc659",
+  "interpretation": "Sequential batches on one host; timing spread is not a portable performance guarantee. Shell 688 to 8 bytes; allocation +680 bytes; total unchanged on this ABI.",
+  "scenes": [
+    {
+      "scene": "pyramid",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        0.25444,
+        0.24796,
+        0.248395,
+        0.247823333,
+        0.248423333
+      ],
+      "after_average_ms": [
+        0.247026667,
+        0.235588333,
+        0.236568333,
+        0.235376667,
+        0.23449
+      ],
+      "median_change_percent": -5.155766823003683,
+      "combined_memory_delta_bytes": 0
+    },
+    {
+      "scene": "rain",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        1.07040667,
+        1.01084333,
+        1.01206333,
+        1.00404667,
+        0.993938333
+      ],
+      "after_average_ms": [
+        0.967355,
+        0.968573333,
+        0.968011667,
+        0.968345,
+        0.967235
+      ],
+      "median_change_percent": -4.237220717477552,
+      "combined_memory_delta_bytes": 0
+    },
+    {
+      "scene": "piles",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        0.116428333,
+        0.0756566667,
+        0.0765166667,
+        0.0761433333,
+        0.0745983333
+      ],
+      "after_average_ms": [
+        0.0720816667,
+        0.071815,
+        0.07365,
+        0.0727,
+        0.0720866667
+      ],
+      "median_change_percent": -5.327671411516743,
+      "combined_memory_delta_bytes": 0
+    },
+    {
+      "scene": "chains",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        0.016835,
+        0.0160933333,
+        0.01636,
+        0.01629,
+        0.0159966667
+      ],
+      "after_average_ms": [
+        0.0157416667,
+        0.0156683333,
+        0.01556,
+        0.0153766667,
+        0.0156966667
+      ],
+      "median_change_percent": -3.8162473910374417,
+      "combined_memory_delta_bytes": 0
+    },
+    {
+      "scene": "churn",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        0.0105383333,
+        0.010135,
+        0.0101233333,
+        0.01,
+        0.00981
+      ],
+      "after_average_ms": [
+        0.00970333333,
+        0.00970833333,
+        0.00974666667,
+        0.00966166667,
+        0.00970333333
+      ],
+      "median_change_percent": -4.148830800621783,
+      "combined_memory_delta_bytes": 0
+    },
+    {
+      "scene": "table",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        0.00189333333,
+        0.00191166667,
+        0.00188,
+        0.00186333333,
+        0.00188333333
+      ],
+      "after_average_ms": [
+        0.00191333333,
+        0.00184166667,
+        0.001655,
+        0.00183166667,
+        0.00185666667
+      ],
+      "median_change_percent": -2.2123890304644123,
+      "combined_memory_delta_bytes": 0
+    },
+    {
+      "scene": "inverted",
+      "deterministic_fields_equal": true,
+      "before_average_ms": [
+        0.00281833333,
+        0.00282333333,
+        0.00283166667,
+        0.00271,
+        0.00276833333
+      ],
+      "after_average_ms": [
+        0.00279166667,
+        0.00268,
+        0.00242333333,
+        0.002675,
+        0.00266666667
+      ],
+      "median_change_percent": -5.08574796580219,
+      "combined_memory_delta_bytes": 0
+    }
+  ]
+}
