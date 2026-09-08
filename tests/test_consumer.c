@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include <silk/query.h>
 #include <silk/step.h>
 #include <silk/world.h>
 
@@ -28,6 +29,12 @@ static void public_lifecycle(void)
     sl_world_step(&world, 1.0f / 60.0f);
     SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_position(&world, a)));
     SL_EXPECT_INT_EQ(sl_world_get_stats(&world).joint_count, 1u);
+    sl_query_result matches;
+    sl_body_handle found[2];
+    SL_EXPECT(sl_world_query_aabb(&world,
+                                  (sl_aabb){ { -2.0f, -2.0f }, { 2.0f, 2.0f } },
+                                  0u, found, 2u, &matches));
+    SL_EXPECT_INT_EQ(matches.count, 2u);
     sl_world_reset(&world);
     SL_EXPECT(!sl_world_body_is_valid(&world, a));
     SL_EXPECT(!sl_world_joint_is_valid(&world, joint));

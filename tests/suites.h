@@ -18,5 +18,6 @@ int sl_world_suite(void);
 int sl_step_suite(void);
 
 int sl_consumer_suite(void);
+int sl_query_suite(void);
 
 #endif /* SILK_SUITES_H */

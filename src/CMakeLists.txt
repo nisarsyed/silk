@@ -1,6 +1,7 @@
 add_library(silk STATIC
     silk.c
     world.c
+    query.c
     step.c
     shape.c
     solver.c

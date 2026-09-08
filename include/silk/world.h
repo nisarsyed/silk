@@ -258,7 +258,8 @@ sl_vec2 sl_world_joint_get_linear_impulse(const sl_world *world,
 
 /* Contact-table snapshots are packed in deterministic processing order.
  * contact_at asserts row < contact_count. Its pointer is conservatively valid
- * only until the next non-const world operation. */
+ * only until the next non-const world operation. Const spatial queries reuse
+ * scratch without invalidating these snapshots. */
 uint32_t sl_world_contact_count(const sl_world *world);
 uint32_t sl_world_contact_capacity(const sl_world *world);
 uint32_t sl_world_contact_drop_count(const sl_world *world);
