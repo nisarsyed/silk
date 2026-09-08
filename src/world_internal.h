@@ -123,8 +123,8 @@ typedef struct sl_world_state {
 
     /* Fixed diagnostic storage; never participates in physics decisions.
      * Cost: one step snapshot + two work counters + three uint32_t + bool and
-     * ABI padding. Measured arm64 diagnostic cost: 208 bytes;
-     * arena size and per-entity storage are unaffected. */
+     * ABI padding. Measured arm64 diagnostic cost: 208 bytes within this
+     * allocation-owned metadata; no per-entity diagnostic arrays. */
     sl_world_step_stats step_stats;
     sl_world_work work_total;
     sl_world_work step_work;
