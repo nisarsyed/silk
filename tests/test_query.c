@@ -235,6 +235,15 @@ static void boundaries_order_and_snapshots(void)
     SL_EXPECT(sl_world_query_ray(
         &world, (sl_ray){ { -2.0f, 1.0f }, { 4.0f, 0.0f } }, 0u, &hit));
     SL_EXPECT(hit.hit); /* grazing */
+    SL_EXPECT(sl_world_query_ray(
+        &world,
+        (sl_ray){ { -SL_QUERY_RAY_COORDINATE_MAX, 0.0f },
+                  { 2.0f * SL_QUERY_RAY_COORDINATE_MAX, 0.0f } },
+        0u, &hit));
+    SL_EXPECT(hit.hit);
+    same_handle(hit.body, handles[0]);
+    SL_EXPECT_NEAR(hit.geometry.point.x, -1.0f, SL_EPSILON);
+    SL_EXPECT_NEAR(hit.geometry.normal.x, -1.0f, SL_EPSILON);
     sl_world_body_destroy(&world, handles[0]);
     sl_world_body_destroy(&twin, handles[0]);
     const sl_body_desc replacement = { .mass = 1.0f, .shape = &shape };
