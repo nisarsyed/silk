@@ -17,70 +17,50 @@ python3 bench/report.py compare build/reports/run-1.json build/reports/run-2.jso
 ```
 
 Windows multi-config executables are under `build/windows/bin/Debug/` and end
-in `.exe`. No Python package is required. `--scene` accepts `all` (the default) or one fixture below.
+in `.exe`. No Python package is required. `--scene` accepts `all` (the default)
+or one fixture below.
 `--warmup` accepts 0–10000 and `--steps` 1–10000. Output is always JSON.
-Unknown/duplicate options, missing values, signs, trailing characters, overflowing
-counts and extra arguments fail. Report repetitions are bounded to 1–20 (default
-5), each child process has a 600-second timeout, and input reports are limited
-to 1 MiB. The runner preserves raw stdout/stderr when validation fails.
+The runner preserves raw stdout/stderr when validation fails. Use
+`python3 bench/report.py --help` for validation and comparison subcommands.
 
-## Committed fixtures (version 1)
+## Choose a fixture
 
-Every fixture uses dt = binary32(1/60), four substeps, zero drag and sleeping
-disabled. Solver/speed settings resolve to the public defaults and appear in
-JSON. All new fixtures use seed `0x59B3AC01` as their identity; construction is
-analytic and uses no random draws. The original rain xorshift seed is unchanged.
-Box dimensions below are half extents. All new bodies have friction 0.6 and
-restitution 0; static mass is zero, dynamic mass is 1 unless stated otherwise.
+Every fixture stays awake and uses dt = binary32(1/60), four substeps and zero
+drag. [Fixture builders](../bench/main.c) define geometry, seeds, materials and
+capacities; each report's `settings` records the resolved workload.
 
-| Fixture | Construction | Body/contact/joint capacity |
-|---|---|---|
-| pyramid | Original 20-row unit-box pyramid, spacing 1.01, ground (12, 0.5); friction 0.6 | 211 / 844 / 0 |
-| rain | Original 2,000 radius-0.15 circles, mass 0.1, 40 columns, spacing 0.38, original jitter/walls; friction 0.4, restitution 0.1, seed 0xC001D00D | 2003 / 16384 / 0 |
-| piles | 16 ten-box columns, x = 3×(column−7.5), y = 0.5+row, shared ground (26, 0.5) | 161 / 2048 / 0 |
-| chains | Eight vertical chains at x = 4×chain; static anchor y=14 plus twelve (0.25, 0.4) boxes at unit spacing; alternating distance/revolute links | 104 / 1024 / 96 |
-| churn | 128 radius-0.25 circles in 16 columns at spacing 0.6; zero gravity | 128 / 2048 / 0 |
-| table | Ground (8, 0.5); two (0.4, 1) legs at (±2, 1); mass-2 top (3, 0.2) at (0, 2.2); mass-5 load (0.5, 0.5) at (0, 2.9) | 5 / 64 / 0 |
-| inverted | Six unit boxes at y=0.5+row, masses 0.25, 0.5, 1, 2, 4, 8; ground (8, 0.5) | 7 / 128 / 0 |
+| Scene | Workload |
+|---|---|
+| `pyramid` | 20-row box pyramid settling on static ground |
+| `rain` | Seeded 2,000-circle rain inside static walls |
+| `piles` | 16 disconnected ten-box columns on shared ground |
+| `chains` | Eight anchored chains with alternating distance/revolute joints |
+| `churn` | Continuous bounded destruction, slot reuse and proxy movement |
+| `table` | Load transfer through a tabletop and two legs |
+| `inverted` | Six-box stack with mass increasing toward the top |
 
-Chain local anchors are (0, −0.4)/(0, 0.6), distance target 0.005, collision
-between connected neighbors disabled. Churn destroys/recreates four slots
-`(4×step+j)%128` every warm-up/measured step, restores their grid location, then
-moves x by ±0.15 according to step parity. LIFO reuse preserves ascending slot
-order while generations advance; unaffected circles retain motion. These
-teleports deliberately create overlaps. This is an active churn fixture, not
-a settled physical equilibrium.
+Churn deliberately creates overlaps by teleporting bodies; its quality limits
+account for ongoing motion rather than expecting settled equilibrium.
 
 ## Schema 1 and metric meanings
 
-The machine output is one JSON object, validated strictly by `bench/report.py`:
+[report.py](../bench/report.py) validates schema 1; a
+[committed report](../bench/reports/matrix/run-1.json) shows every field.
+Reconfigure after source changes to refresh build/revision metadata. Source
+archives can supply `-DSL_BENCH_REVISION=<revision>`; Git builds record their
+revision and a tracked-change `-dirty` suffix.
 
-- `schema_version`: integer 1.
-- `metadata`: strings for compiler/version, build mode, compiler/warning flags,
-  host OS/version/processor and configured source revision. Reconfigure after
-  source changes. Source archives can supply `-DSL_BENCH_REVISION=<revision>`;
-  otherwise Git supplies the revision and a tracked-change `-dirty` suffix.
-- `results`: 1–7 unique scene records. `settings` contains fixture version,
-  material values, seed, warm-up/measured counts, dt, substeps, capacities,
-  gravity, drags, speed/solver defaults and the disabled sleep flag.
-- `timing_ms`: average, median, nearest-rank p95, maximum complete-step time,
-  and average mutation time (zero except churn). Samples are allocated before
-  stepping; warm-up, setup, quality measurement, stats, sorting and output are
-  excluded. Unavailable/backward/non-finite clock samples fail the run.
-- `semantic_digest`: 16-digit word-wise binary32 hash including public body
-  identities/transforms/velocities/mass/inertia/inverses/torque/material/type,
-  active shapes and proxy bounds; ordered contact handles/materials/features/
-  anchors/impulses; and joint handles/descriptors/reported impulses. This is
-  a public snapshot digest, not the complete private replay comparison or a
-  rollback format. It excludes addresses, padding and inactive shape fields.
-- `counts`, `step`, `cumulative_work`: copied diagnostics with the definitions
-  in [stats.md](stats.md). `drops` includes warm-up and measured steps and must
-  be zero. Byte categories in `memory_bytes` sum to `arena`; `world` is separate.
-- `quality`: geometry penetration and cached penetration maxima, joint error,
-  translation/rotation drift, residual linear/angular speed, average static
-  contact support force and total dynamic weight. `window_steps` is min(60,
-  measured steps). Lengths are world units, rotation radians, speed units/s
-  and radians/s, and force kg×units/s².
+- `timing_ms` measures complete steps (average/median/nearest-rank p95/maximum)
+  and churn mutations separately. Setup, warm-up, quality evaluation, diagnostics,
+  sorting and reporting are outside the timing regions. Invalid or backward
+  clock samples fail the run.
+- `semantic_digest` hashes live public body/contact/joint state in stable order.
+  See [the digest implementation](../bench/quality.c) for the exact fields.
+  It is a public snapshot check, not the complete private replay comparison.
+- Counts, work and memory follow the contracts in [world.h](../include/silk/world.h).
+  `drops` covers warm-up and measured steps and must be zero.
+- Quality lengths are world units, rotations radians, speeds units/s or radians/s,
+  and forces kg×units/s². The final measurement window is min(60, measured steps).
 
 Penetration uses independent projection/SAT geometry at current transforms for
 persistent contact pairs, including circle/polygon closest-vertex axes. It does
@@ -98,7 +78,7 @@ total dynamic mass times downward gravity. Table/pyramid/rain/piles/inverted
 require mean force/weight in [0.95, 1.05]. The table therefore checks load
 transfer through its top and legs, not just whether bodies look stationary.
 
-`quality_limits.json` pins full-profile limits from the unoptimized awake
+[quality_limits.json](../bench/quality_limits.json) pins full-profile limits from the unoptimized awake
 measurements, before later experiments. The measured penetration maxima were
 0.00614 pyramid, 0.05388 rain, 0.00641 piles, 0 chains, 0.16702 churn,
 0.00125 table and 0.03250 inverted. Bounds retain those distinct workload
@@ -128,13 +108,14 @@ Linux) around a release invocation; inspect step, pair maintenance and solver
 stacks. Keep profiling code/timers out of the library. Record the exact machine,
 compiler flags, revision, scene and invocation with any optimization decision.
 
-The recorded development host is an Apple M4 Pro (arm64), Darwin 25.6.0,
-AppleClang 21.0.0.21000101, Release `-O3 -DNDEBUG`. The
-[stats overhead record](../bench/reports/stats-overhead.json) preserves the
-matched parent/instrumented measurement and its exact harness revisions.
-It is historical measurement evidence, not an input to the current validator.
+## Recorded evidence
 
-The [five-run summary](../bench/reports/matrix/summary.json) links by filename
-to sibling raw reports. Each report records its measured source revision.
-All seven fixtures pass full-profile quality gates and match deterministic
-fields across the five executions.
+The [five-run summary](../bench/reports/matrix/summary.json) and sibling raw
+reports record the measured revision, toolchain, host, settings and timing spread.
+Use those records for exact values; the full matrix passes quality gates and
+matches deterministic fields across all five executions.
+
+The [stats overhead record](../bench/reports/stats-overhead.json) preserves a
+matched parent/instrumented measurement with its own harness revisions. It is
+historical evidence, not an input to the current validator. Small timing deltas
+within the run-to-run spread do not establish a speedup or slowdown.
