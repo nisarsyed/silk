@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 
 #include <float.h>
 #include <stdbool.h>
@@ -150,13 +151,13 @@ static void proxy_fat_aabb_lifecycle_and_reset(void)
     sl_world_reset(&world);
     SL_EXPECT_INT_EQ(sl_world_body_count(&world), 0u);
     SL_EXPECT_INT_EQ(sl_world_contact_count(&world), 0u);
-    SL_EXPECT_INT_EQ(world.moved_count, 0u);
+    SL_EXPECT_INT_EQ(world.state->moved_count, 0u);
     const sl_body_handle after = body_make(
         &world, SL_BODY_DYNAMIC, sl_vec2_make(0.0f, 0.0f), &circle, 0.0f, 0.0f);
     SL_EXPECT(sl_world_body_get_proxy_aabb(&world, after, &moved));
-    SL_EXPECT_INT_EQ(world.moved_count, 1u);
+    SL_EXPECT_INT_EQ(world.state->moved_count, 1u);
     sl_world_body_destroy(&world, after);
-    SL_EXPECT_INT_EQ(world.moved_count, 0u);
+    SL_EXPECT_INT_EQ(world.state->moved_count, 0u);
     const sl_body_handle reused = body_make(
         &world, SL_BODY_DYNAMIC, sl_vec2_make(4.0f, 0.0f), &circle, 0.0f, 0.0f);
     SL_EXPECT_INT_EQ(reused.index, after.index);
@@ -209,10 +210,10 @@ static void materials_and_feature_impulses_refresh(void)
         &world, SL_BODY_DYNAMIC, sl_vec2_make(1.5f, 0.0f), &circle, 9.0f, 0.7f);
     step_once(&world);
     SL_EXPECT_INT_EQ(sl_world_contact_count(&world), 1u);
-    SL_EXPECT_NEAR(world.contacts[0].friction, 6.0f, 1e-6f);
-    SL_EXPECT_NEAR(world.contacts[0].restitution, 0.7f, 1e-6f);
-    world.contacts[0].manifold.points[0].normal_impulse = 3.0f;
-    world.contacts[0].manifold.points[0].tangent_impulse = -1.0f;
+    SL_EXPECT_NEAR(world.state->contacts[0].friction, 6.0f, 1e-6f);
+    SL_EXPECT_NEAR(world.state->contacts[0].restitution, 0.7f, 1e-6f);
+    world.state->contacts[0].manifold.points[0].normal_impulse = 3.0f;
+    world.state->contacts[0].manifold.points[0].tangent_impulse = -1.0f;
 
     SL_EXPECT(sl_world_body_set_friction(&world, a, 0.25f));
     SL_EXPECT(sl_world_body_set_friction(&world, b, 16.0f));
@@ -253,7 +254,7 @@ static void saturation_retries_without_new_motion(void)
     step_once(&world);
     SL_EXPECT_INT_EQ(sl_world_contact_count(&world), 1u);
     SL_EXPECT(sl_world_contact_drop_count(&world) > 0u);
-    SL_EXPECT(world.moved_count > 0u);
+    SL_EXPECT(world.state->moved_count > 0u);
 
     const sl_contact *first = sl_world_contact_at(&world, 0u);
     const sl_body_handle victim =
@@ -311,7 +312,7 @@ static void saturation_preserves_retry_order_and_pair_uniqueness(void)
     step_once(&world);
     SL_EXPECT_INT_EQ(sl_world_contact_count(&world), 0u);
     SL_EXPECT_INT_EQ(sl_world_contact_drop_count(&world), 0u);
-    SL_EXPECT_INT_EQ(world.moved_count, 0u);
+    SL_EXPECT_INT_EQ(world.state->moved_count, 0u);
     sl_world_destroy(&world);
 }
 
@@ -337,7 +338,7 @@ static void capacity_config_and_deterministic_snapshot(void)
     SL_EXPECT_INT_EQ(sl_world_memory_bytes(&invalid), 0u);
     sl_world rejected = { 0 };
     SL_EXPECT(!sl_world_init(&rejected, &invalid));
-    SL_EXPECT(rejected.memory == NULL);
+    SL_EXPECT(rejected.state == NULL);
 
     const sl_shape circle = circle_make(0.75f);
     for (uint32_t i = 0u; i < 3u; ++i) {
@@ -348,9 +349,11 @@ static void capacity_config_and_deterministic_snapshot(void)
     }
     step_once(&left);
     step_once(&right);
-    SL_EXPECT_INT_EQ(left.contact_count, right.contact_count);
-    SL_EXPECT_INT_EQ(left.contact_drop_count, right.contact_drop_count);
-    for (uint32_t i = 0u; i < left.contact_count; ++i) {
+    SL_EXPECT_INT_EQ(sl_world_contact_count(&left),
+                     sl_world_contact_count(&right));
+    SL_EXPECT_INT_EQ(left.state->contact_drop_count,
+                     right.state->contact_drop_count);
+    for (uint32_t i = 0u; i < sl_world_contact_count(&left); ++i) {
         const sl_contact *a = sl_world_contact_at(&left, i);
         const sl_contact *b = sl_world_contact_at(&right, i);
         SL_EXPECT_INT_EQ(a->body_a.index, b->body_a.index);

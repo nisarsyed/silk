@@ -1,4 +1,5 @@
 #include "joint.h"
+#include "world_internal.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -131,7 +132,8 @@ size_t sl_joint_memory_bytes(uint32_t body_capacity, uint32_t joint_capacity)
     return sl_joint_memory_layout(body_capacity, joint_capacity, &payload);
 }
 
-bool sl_joint_world_init(sl_world *world, void *memory, size_t memory_bytes)
+bool sl_joint_world_init(sl_world_state *world, void *memory,
+                         size_t memory_bytes)
 {
     SL_ASSERT(world != NULL);
     if (world->joint_capacity == 0u) {
@@ -211,7 +213,7 @@ static uint32_t generation_bump(uint32_t generation)
     return (generation == 0u) ? 1u : generation;
 }
 
-void sl_joint_world_reset(sl_world *world)
+void sl_joint_world_reset(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     if (world->joint_capacity == 0u) {
@@ -249,12 +251,12 @@ static bool anchor_valid(sl_vec2 anchor)
            sl_abs(anchor.y) <= SL_SHAPE_EXTENT_MAX;
 }
 
-static float axial_mass_make(const sl_world *world, uint32_t dense_a,
+static float axial_mass_make(const sl_world_state *world, uint32_t dense_a,
                              uint32_t dense_b, sl_vec2 anchor_a,
                              sl_vec2 anchor_b, sl_vec2 axis);
-static sl_mat2 effective_matrix_make(const sl_world *world, uint32_t dense_a,
-                                     uint32_t dense_b, sl_vec2 anchor_a,
-                                     sl_vec2 anchor_b);
+static sl_mat2 effective_matrix_make(const sl_world_state *world,
+                                     uint32_t dense_a, uint32_t dense_b,
+                                     sl_vec2 anchor_a, sl_vec2 anchor_b);
 
 static bool effective_matrix_solvable(sl_mat2 matrix)
 {
@@ -263,8 +265,8 @@ static bool effective_matrix_solvable(sl_mat2 matrix)
            sl_mat2_solve(matrix, sl_vec2_make(0.0f, 1.0f), &column);
 }
 
-static void edge_link(sl_world *world, uint32_t joint_slot, uint32_t endpoint,
-                      uint32_t body_slot)
+static void edge_link(sl_world_state *world, uint32_t joint_slot,
+                      uint32_t endpoint, uint32_t body_slot)
 {
     const uint32_t edge = 2u * joint_slot + endpoint;
     const uint32_t head = world->body_joint_heads[body_slot];
@@ -277,8 +279,8 @@ static void edge_link(sl_world *world, uint32_t joint_slot, uint32_t endpoint,
     world->body_joint_counts[body_slot] += 1u;
 }
 
-static void edge_unlink(sl_world *world, uint32_t joint_slot, uint32_t endpoint,
-                        uint32_t body_slot)
+static void edge_unlink(sl_world_state *world, uint32_t joint_slot,
+                        uint32_t endpoint, uint32_t body_slot)
 {
     const uint32_t edge = 2u * joint_slot + endpoint;
     const uint32_t previous = world->joint_edge_prevs[edge];
@@ -298,8 +300,8 @@ static void edge_unlink(sl_world *world, uint32_t joint_slot, uint32_t endpoint,
     world->body_joint_counts[body_slot] -= 1u;
 }
 
-bool sl_joint_pair_should_collide(const sl_world *world, uint32_t body_slot_a,
-                                  uint32_t body_slot_b)
+bool sl_joint_pair_should_collide(const sl_world_state *world,
+                                  uint32_t body_slot_a, uint32_t body_slot_b)
 {
     SL_ASSERT(world != NULL);
     if (world->joint_capacity == 0u || body_slot_a >= world->body_capacity ||
@@ -333,7 +335,7 @@ bool sl_joint_pair_should_collide(const sl_world *world, uint32_t body_slot_a,
     return true;
 }
 
-bool sl_world_joint_is_valid(const sl_world *world, sl_joint_handle handle)
+bool sl_joint_is_valid(const sl_world_state *world, sl_joint_handle handle)
 {
     SL_ASSERT(world != NULL);
     if (handle.generation == 0u || handle.index >= world->joint_capacity) {
@@ -344,15 +346,17 @@ bool sl_world_joint_is_valid(const sl_world *world, sl_joint_handle handle)
            slot->dense != SL_BODY_DENSE_NONE;
 }
 
-sl_joint_handle sl_world_joint_create(sl_world *world,
+sl_joint_handle sl_world_joint_create(sl_world *owner,
                                       const sl_joint_desc *desc)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     SL_ASSERT(desc != NULL);
     if (world->joint_capacity == 0u || world->joint_free_count == 0u ||
         !joint_kind_valid(desc->kind) ||
-        !sl_world_body_is_valid(world, desc->body_a) ||
-        !sl_world_body_is_valid(world, desc->body_b) ||
+        !sl_body_is_valid(world, desc->body_a) ||
+        !sl_body_is_valid(world, desc->body_b) ||
         desc->body_a.index == desc->body_b.index ||
         !anchor_valid(desc->local_anchor_a) ||
         !anchor_valid(desc->local_anchor_b)) {
@@ -435,10 +439,10 @@ sl_joint_handle sl_world_joint_create(sl_world *world,
     return (sl_joint_handle){ slot, world->joint_slots[slot].generation };
 }
 
-void sl_world_joint_destroy(sl_world *world, sl_joint_handle handle)
+void sl_joint_destroy(sl_world_state *world, sl_joint_handle handle)
 {
     SL_ASSERT(world != NULL);
-    if (!sl_world_joint_is_valid(world, handle)) {
+    if (!sl_joint_is_valid(world, handle)) {
         return;
     }
     sl_joint_slot *slot = &world->joint_slots[handle.index];
@@ -484,7 +488,7 @@ void sl_world_joint_destroy(sl_world *world, sl_joint_handle handle)
     }
 }
 
-void sl_joint_body_destroy(sl_world *world, uint32_t body_slot)
+void sl_joint_body_destroy(sl_world_state *world, uint32_t body_slot)
 {
     SL_ASSERT(world != NULL);
     if (world->joint_capacity == 0u || body_slot >= world->body_capacity) {
@@ -495,11 +499,11 @@ void sl_joint_body_destroy(sl_world *world, uint32_t body_slot)
         const sl_joint_handle handle = {
             joint_slot, world->joint_slots[joint_slot].generation
         };
-        sl_world_joint_destroy(world, handle);
+        sl_joint_destroy(world, handle);
     }
 }
 
-void sl_joint_body_cache_clear(sl_world *world, uint32_t body_slot)
+void sl_joint_body_cache_clear(sl_world_state *world, uint32_t body_slot)
 {
     SL_ASSERT(world != NULL);
     if (world->joint_capacity == 0u || body_slot >= world->body_capacity) {
@@ -519,31 +523,37 @@ void sl_joint_body_cache_clear(sl_world *world, uint32_t body_slot)
     }
 }
 
-uint32_t sl_world_joint_count(const sl_world *world)
+uint32_t sl_world_joint_count(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->joint_count;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->joint_count : 0u;
 }
 
-uint32_t sl_world_joint_capacity(const sl_world *world)
+uint32_t sl_world_joint_capacity(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->joint_capacity;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->joint_capacity : 0u;
 }
 
-sl_joint_handle sl_world_joint_at(const sl_world *world, uint32_t row)
+sl_joint_handle sl_world_joint_at(const sl_world *owner, uint32_t row)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     SL_ASSERT(row < world->joint_count);
     const uint32_t slot = world->joint_slot_of[row];
     return (sl_joint_handle){ slot, world->joint_slots[slot].generation };
 }
 
-sl_joint_desc sl_world_joint_get_desc(const sl_world *world,
+sl_joint_desc sl_world_joint_get_desc(const sl_world *owner,
                                       sl_joint_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_joint_is_valid(world, handle));
+    SL_ASSERT(sl_joint_is_valid(world, handle));
     const uint32_t dense = world->joint_slots[handle.index].dense;
     sl_joint_desc desc;
     memset(&desc, 0, sizeof(desc));
@@ -559,11 +569,13 @@ sl_joint_desc sl_world_joint_get_desc(const sl_world *world,
     return desc;
 }
 
-sl_vec2 sl_world_joint_get_linear_impulse(const sl_world *world,
+sl_vec2 sl_world_joint_get_linear_impulse(const sl_world *owner,
                                           sl_joint_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_joint_is_valid(world, handle));
+    SL_ASSERT(sl_joint_is_valid(world, handle));
     return world->joint_linear_impulses[world->joint_slots[handle.index].dense];
 }
 
@@ -581,7 +593,8 @@ typedef struct sl_joint_velocity_pair {
 } sl_joint_velocity_pair;
 
 static sl_joint_velocity_pair
-velocity_pair_load(const sl_world *world, const sl_joint_constraint *constraint)
+velocity_pair_load(const sl_world_state *world,
+                   const sl_joint_constraint *constraint)
 {
     const uint32_t dense_a = constraint->dense_a;
     const uint32_t dense_b = constraint->dense_b;
@@ -600,7 +613,7 @@ velocity_pair_load(const sl_world *world, const sl_joint_constraint *constraint)
     return pair;
 }
 
-static void velocity_pair_store(sl_world *world,
+static void velocity_pair_store(sl_world_state *world,
                                 const sl_joint_constraint *constraint,
                                 const sl_joint_velocity_pair *pair)
 {
@@ -655,7 +668,7 @@ static sl_vec2 relative_velocity(const sl_joint_velocity_pair *pair,
     return sl_vec2_sub(velocity_b, velocity_a);
 }
 
-static sl_vec2 separation_current(const sl_world *world,
+static sl_vec2 separation_current(const sl_world_state *world,
                                   const sl_joint_constraint *constraint);
 
 static sl_joint_softness softness_make(float hertz, float damping_ratio,
@@ -683,7 +696,7 @@ static sl_joint_softness softness_make(float hertz, float damping_ratio,
     return valid ? softness : (sl_joint_softness){ 0.0f, 1.0f, 0.0f };
 }
 
-static float axial_mass_make(const sl_world *world, uint32_t dense_a,
+static float axial_mass_make(const sl_world_state *world, uint32_t dense_a,
                              uint32_t dense_b, sl_vec2 anchor_a,
                              sl_vec2 anchor_b, sl_vec2 axis)
 {
@@ -700,9 +713,9 @@ static float axial_mass_make(const sl_world *world, uint32_t dense_a,
     return (sl_is_finite(mass) && mass > 0.0f) ? mass : 0.0f;
 }
 
-static sl_mat2 effective_matrix_make(const sl_world *world, uint32_t dense_a,
-                                     uint32_t dense_b, sl_vec2 anchor_a,
-                                     sl_vec2 anchor_b)
+static sl_mat2 effective_matrix_make(const sl_world_state *world,
+                                     uint32_t dense_a, uint32_t dense_b,
+                                     sl_vec2 anchor_a, sl_vec2 anchor_b)
 {
     const float inverse_mass =
         world->inv_masses[dense_a] + world->inv_masses[dense_b];
@@ -725,7 +738,7 @@ static sl_mat2 effective_matrix_make(const sl_world *world, uint32_t dense_a,
     return matrix;
 }
 
-void sl_joint_prepare(sl_world *world, float h, float inverse_h)
+void sl_joint_prepare(sl_world_state *world, float h, float inverse_h)
 {
     SL_ASSERT(world != NULL);
     if (world->joint_capacity == 0u) {
@@ -787,7 +800,7 @@ void sl_joint_prepare(sl_world *world, float h, float inverse_h)
     world->joint_constraint_count = world->joint_count;
 }
 
-void sl_joint_warm_start(sl_world *world)
+void sl_joint_warm_start(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_joint_constraint *constraints = world->joint_constraints;
@@ -819,7 +832,7 @@ void sl_joint_warm_start(sl_world *world)
     }
 }
 
-static sl_vec2 separation_current(const sl_world *world,
+static sl_vec2 separation_current(const sl_world_state *world,
                                   const sl_joint_constraint *constraint)
 {
     const sl_vec2 anchor_a = sl_rotation_apply(
@@ -834,7 +847,7 @@ static sl_vec2 separation_current(const sl_world *world,
                         anchor_a)));
 }
 
-static void distance_solve(const sl_world *world,
+static void distance_solve(const sl_world_state *world,
                            sl_joint_constraint *constraint,
                            sl_joint_velocity_pair *pair, bool use_bias)
 {
@@ -884,7 +897,7 @@ static void distance_solve(const sl_world *world,
     constraint->step_impulse = step_impulse;
 }
 
-static void revolute_solve(const sl_world *world,
+static void revolute_solve(const sl_world_state *world,
                            sl_joint_constraint *constraint,
                            sl_joint_velocity_pair *pair, bool use_bias)
 {
@@ -925,7 +938,7 @@ static void revolute_solve(const sl_world *world,
     constraint->step_impulse = step_impulse;
 }
 
-void sl_joint_solve(sl_world *world, bool use_bias)
+void sl_joint_solve(sl_world_state *world, bool use_bias)
 {
     SL_ASSERT(world != NULL);
     sl_joint_constraint *constraints = world->joint_constraints;
@@ -944,7 +957,7 @@ void sl_joint_solve(sl_world *world, bool use_bias)
     }
 }
 
-void sl_joint_store(sl_world *world)
+void sl_joint_store(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_joint_constraint *constraints = world->joint_constraints;
@@ -965,4 +978,16 @@ void sl_joint_store(sl_world *world)
         world->joint_linear_impulses[constraint->joint_row] =
             valid ? constraint->step_impulse : sl_vec2_make(0.0f, 0.0f);
     }
+}
+
+bool sl_world_joint_is_valid(const sl_world *world, sl_joint_handle handle)
+{
+    SL_ASSERT(world != NULL);
+    return world->state != NULL && sl_joint_is_valid(world->state, handle);
+}
+void sl_world_joint_destroy(sl_world *world, sl_joint_handle handle)
+{
+    SL_ASSERT(world != NULL);
+    if (world->state != NULL)
+        sl_joint_destroy(world->state, handle);
 }

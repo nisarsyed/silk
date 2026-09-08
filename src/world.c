@@ -1,4 +1,5 @@
 #include "silk/world.h"
+#include "world_internal.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +21,7 @@
 
 _Static_assert((SL_CARVE_ALIGN & (SL_CARVE_ALIGN - 1u)) == 0u,
                "arena alignment must be a power of two");
+SL_CARVE_ALIGNMENT_ASSERT(sl_world_state);
 SL_CARVE_ALIGNMENT_ASSERT(sl_body_slot);
 SL_CARVE_ALIGNMENT_ASSERT(uint32_t);
 SL_CARVE_ALIGNMENT_ASSERT(sl_vec2);
@@ -195,7 +197,11 @@ bool sl_world_memory_breakdown_get(const sl_world_config *config,
     result.contact_solver_bytes = solver;
     result.padding_bytes +=
         body - result.body_bytes + joint - result.joint_bytes;
-    result.arena_bytes = body + contact + solver + joint;
+    result.world_state_bytes = sizeof(sl_world_state);
+    result.padding_bytes +=
+        align_up(sizeof(sl_world_state)) - sizeof(sl_world_state);
+    result.arena_bytes =
+        align_up(sizeof(sl_world_state)) + body + contact + solver + joint;
     result.world_bytes = sizeof(sl_world);
     *out = result;
     return true;
@@ -370,7 +376,8 @@ static bool body_desc_valid(const sl_body_desc *desc)
 }
 
 /* inertias and inv_inertias only ever move together. */
-static void body_write_inertia(sl_world *world, uint32_t dense, float inertia)
+static void body_write_inertia(sl_world_state *world, uint32_t dense,
+                               float inertia)
 {
     world->inertias[dense] = inertia;
     world->inv_inertias[dense] = inverse_or_zero(inertia);
@@ -379,8 +386,8 @@ static void body_write_inertia(sl_world *world, uint32_t dense, float inertia)
 /* Both accumulator writers ask the same question: does adding this
  * much keep the sum, and the acceleration the stepper derives from it,
  * finite? On success *out carries the value to bank. */
-static bool force_sum_ok(const sl_world *world, uint32_t dense, sl_vec2 force,
-                         sl_vec2 *out)
+static bool force_sum_ok(const sl_world_state *world, uint32_t dense,
+                         sl_vec2 force, sl_vec2 *out)
 {
     const sl_vec2 summed = sl_vec2_add(world->forces[dense], force);
     /* The stepper consumes force * inv_mass, so a finite accumulation
@@ -394,8 +401,8 @@ static bool force_sum_ok(const sl_world *world, uint32_t dense, sl_vec2 force,
     return true;
 }
 
-static bool torque_sum_ok(const sl_world *world, uint32_t dense, float torque,
-                          float *out)
+static bool torque_sum_ok(const sl_world_state *world, uint32_t dense,
+                          float torque, float *out)
 {
     const float summed = world->torques[dense] + torque;
     /* Mirror of the linear guard. Zero inertia means infinite
@@ -408,22 +415,22 @@ static bool torque_sum_ok(const sl_world *world, uint32_t dense, float torque,
     return true;
 }
 
-static sl_body_handle handle_for(const sl_world *world, uint32_t dense)
+static sl_body_handle handle_for(const sl_world_state *world, uint32_t dense)
 {
     sl_body_handle h = { world->slot_of[dense],
                          world->slots[world->slot_of[dense]].generation };
     return h;
 }
 
-bool sl_world_init(sl_world *world, const sl_world_config *config)
+bool sl_world_init(sl_world *owner, const sl_world_config *config)
 {
-    SL_ASSERT(world != NULL);
+    SL_ASSERT(owner != NULL);
     SL_ASSERT(config != NULL);
     /* A live world carries an arena pointer that init would drop on the
      * floor; zero-init makes the read defined and the misuse loud. */
-    SL_ASSERT(world->memory == NULL);
+    SL_ASSERT(owner->state == NULL);
 
-    memset(world, 0, sizeof(*world));
+    owner->state = NULL;
 
     sl_world_config resolved;
     if (!world_config_resolve(config, &resolved)) {
@@ -438,8 +445,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
         sl_solver_memory_bytes(resolved.contact_capacity);
     const size_t joint_bytes =
         sl_joint_memory_bytes(config->body_capacity, resolved.joint_capacity);
-    const size_t total_bytes =
-        body_bytes + contact_bytes + solver_bytes + joint_bytes;
+    const size_t total_bytes = align_up(sizeof(sl_world_state)) + body_bytes +
+                               contact_bytes + solver_bytes + joint_bytes;
 
     unsigned char *base = malloc(total_bytes);
     if (base == NULL) {
@@ -452,7 +459,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
 
     /* Carved in declaration order; the closing assert fires if an array
      * joins one list but not the other. */
-    size_t offset = 0;
+    sl_world_state *world = (sl_world_state *)base;
+    size_t offset = align_up(sizeof(*world));
     world->slots =
         (sl_body_slot *)carve(base, &offset, capacity, sizeof(sl_body_slot));
     world->slot_of =
@@ -484,7 +492,7 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     world->types = (uint8_t *)carve(base, &offset, capacity, sizeof(uint8_t));
     world->shapes =
         (sl_shape *)carve(base, &offset, capacity, sizeof(sl_shape));
-    SL_ASSERT(offset == body_bytes);
+    SL_ASSERT(offset == align_up(sizeof(*world)) + body_bytes);
 
     world->body_count = 0u;
     world->body_capacity = config->body_capacity;
@@ -513,13 +521,13 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     void *contact_memory = carve(base, &offset, contact_bytes, 1u);
     if (!sl_contact_world_init(world, contact_memory, contact_bytes)) {
         free(base);
-        memset(world, 0, sizeof(*world));
+        owner->state = NULL;
         return false;
     }
     void *solver_memory = carve(base, &offset, solver_bytes, 1u);
     if (!sl_solver_init(world, solver_memory, solver_bytes)) {
         free(base);
-        memset(world, 0, sizeof(*world));
+        owner->state = NULL;
         return false;
     }
     void *joint_memory = NULL;
@@ -529,10 +537,9 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     SL_ASSERT(offset == total_bytes);
     if (!sl_joint_world_init(world, joint_memory, joint_bytes)) {
         free(base);
-        memset(world, 0, sizeof(*world));
+        owner->state = NULL;
         return false;
     }
-    world->memory = base;
 
     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
         /* Descending push => LIFO pops hand out slots 0,1,2,... */
@@ -542,19 +549,21 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
         world->slot_of[i] = SL_BODY_DENSE_NONE;
     }
 
+    owner->state = world;
     return true;
 }
 
 void sl_world_destroy(sl_world *world)
 {
     SL_ASSERT(world != NULL);
-
-    free(world->memory);
-    memset(world, 0, sizeof(*world));
+    free(world->state);
+    world->state = NULL;
 }
 
-void sl_world_reset(sl_world *world)
+void sl_world_reset(sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
 
     sl_joint_world_reset(world);
@@ -579,8 +588,10 @@ void sl_world_reset(sl_world *world)
     }
 }
 
-sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
+sl_body_handle sl_world_body_create(sl_world *owner, const sl_body_desc *desc)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     SL_ASSERT(desc != NULL);
 
@@ -636,14 +647,16 @@ sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc)
 
     const sl_body_handle handle = handle_for(world, dense);
     if (!sl_contact_body_create(world, dense, slot_id)) {
-        sl_world_body_destroy(world, handle);
+        sl_world_body_destroy(owner, handle);
         return sl_body_handle_null();
     }
     return handle;
 }
 
-void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
+void sl_world_body_destroy(sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
 
     /* Tolerant contract: null, malformed, and stale handles all land here
@@ -698,7 +711,7 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle)
     world->free_count++;
 }
 
-bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle)
+bool sl_body_is_valid(const sl_world_state *world, sl_body_handle handle)
 {
     SL_ASSERT(world != NULL);
 
@@ -711,50 +724,64 @@ bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle)
            slot->dense != SL_BODY_DENSE_NONE;
 }
 
-uint32_t sl_world_body_count(const sl_world *world)
+uint32_t sl_world_body_count(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->body_count;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->body_count : 0u;
 }
 
-uint32_t sl_world_body_capacity(const sl_world *world)
+uint32_t sl_world_body_capacity(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->body_capacity;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->body_capacity : 0u;
 }
 
-sl_vec2 sl_world_get_gravity(const sl_world *world)
+sl_vec2 sl_world_get_gravity(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     return world->gravity;
 }
 
-float sl_world_get_linear_drag(const sl_world *world)
+float sl_world_get_linear_drag(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     return world->linear_drag;
 }
 
-float sl_world_get_angular_drag(const sl_world *world)
+float sl_world_get_angular_drag(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     return world->angular_drag;
 }
 
-uint32_t sl_world_get_substep_count(const sl_world *world)
+uint32_t sl_world_get_substep_count(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     return world->substep_count;
 }
 
-float sl_world_get_linear_speed_max(const sl_world *world)
+float sl_world_get_linear_speed_max(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     return world->linear_speed_max;
 }
 
-sl_body_handle sl_world_body_first(const sl_world *world)
+sl_body_handle sl_world_body_first(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
 
     if (world->body_count == 0u) {
@@ -763,10 +790,12 @@ sl_body_handle sl_world_body_first(const sl_world *world)
     return handle_for(world, 0u);
 }
 
-sl_body_handle sl_world_body_next(const sl_world *world, sl_body_handle current)
+sl_body_handle sl_world_body_next(const sl_world *owner, sl_body_handle current)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, current));
+    SL_ASSERT(sl_body_is_valid(world, current));
 
     const uint32_t next_dense = world->slots[current.index].dense + 1u;
     if (next_dense >= world->body_count) {
@@ -775,124 +804,156 @@ sl_body_handle sl_world_body_next(const sl_world *world, sl_body_handle current)
     return handle_for(world, next_dense);
 }
 
-sl_body_handle sl_world_body_at(const sl_world *world, uint32_t row)
+sl_body_handle sl_world_body_at(const sl_world *owner, uint32_t row)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     SL_ASSERT(row < world->body_count);
     return handle_for(world, row);
 }
 
-sl_vec2 sl_world_body_get_position(const sl_world *world, sl_body_handle handle)
+sl_vec2 sl_world_body_get_position(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->positions[world->slots[handle.index].dense];
 }
 
-sl_vec2 sl_world_body_get_velocity(const sl_world *world, sl_body_handle handle)
+sl_vec2 sl_world_body_get_velocity(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->velocities[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_mass(const sl_world *world, sl_body_handle handle)
+float sl_world_body_get_mass(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->masses[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_inv_mass(const sl_world *world, sl_body_handle handle)
+float sl_world_body_get_inv_mass(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->inv_masses[world->slots[handle.index].dense];
 }
 
-sl_body_type sl_world_body_get_type(const sl_world *world,
+sl_body_type sl_world_body_get_type(const sl_world *owner,
                                     sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return (sl_body_type)world->types[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_angle(const sl_world *world, sl_body_handle handle)
+float sl_world_body_get_angle(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return sl_rotation_angle(
         world->rotations[world->slots[handle.index].dense]);
 }
 
-float sl_world_body_get_angular_velocity(const sl_world *world,
+float sl_world_body_get_angular_velocity(const sl_world *owner,
                                          sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->angular_velocities[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_inertia(const sl_world *world, sl_body_handle handle)
+float sl_world_body_get_inertia(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->inertias[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_inv_inertia(const sl_world *world,
+float sl_world_body_get_inv_inertia(const sl_world *owner,
                                     sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->inv_inertias[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_torque(const sl_world *world, sl_body_handle handle)
+float sl_world_body_get_torque(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->torques[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_friction(const sl_world *world, sl_body_handle handle)
+float sl_world_body_get_friction(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->frictions[world->slots[handle.index].dense];
 }
 
-float sl_world_body_get_restitution(const sl_world *world,
+float sl_world_body_get_restitution(const sl_world *owner,
                                     sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->restitutions[world->slots[handle.index].dense];
 }
 
-const sl_shape *sl_world_body_get_shape(const sl_world *world,
+const sl_shape *sl_world_body_get_shape(const sl_world *owner,
                                         sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return &world->shapes[world->slots[handle.index].dense];
 }
 
-sl_transform sl_world_body_get_transform(const sl_world *world,
+sl_transform sl_world_body_get_transform(const sl_world *owner,
                                          sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
     return sl_transform_make(world->positions[dense], world->rotations[dense]);
 }
 
-bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_position(sl_world *owner, sl_body_handle handle,
                                 sl_vec2 position)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     if (!position_valid(position)) {
         return false;
     }
@@ -905,11 +966,13 @@ bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_velocity(sl_world *owner, sl_body_handle handle,
                                 sl_vec2 velocity)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     if (!sl_vec2_is_finite(velocity)) {
         return false;
     }
@@ -924,11 +987,13 @@ bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_angle(sl_world *owner, sl_body_handle handle,
                              float angle)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     if (!sl_is_finite(angle)) {
         return false;
     }
@@ -941,11 +1006,13 @@ bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_set_angular_velocity(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_angular_velocity(sl_world *owner, sl_body_handle handle,
                                         float angular_velocity)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     if (!sl_is_finite(angular_velocity)) {
         return false;
     }
@@ -958,11 +1025,13 @@ bool sl_world_body_set_angular_velocity(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_set_friction(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_friction(sl_world *owner, sl_body_handle handle,
                                 float friction)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     if (!sl_is_finite(friction) || friction < 0.0f) {
         return false;
     }
@@ -970,11 +1039,13 @@ bool sl_world_body_set_friction(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_set_restitution(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_restitution(sl_world *owner, sl_body_handle handle,
                                    float restitution)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     if (!sl_is_finite(restitution) || restitution < 0.0f ||
         restitution > 1.0f) {
         return false;
@@ -983,10 +1054,12 @@ bool sl_world_body_set_restitution(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass)
+bool sl_world_body_set_mass(sl_world *owner, sl_body_handle handle, float mass)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
     if (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC ||
         !body_mass_valid(mass)) {
@@ -1015,11 +1088,13 @@ bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass)
     return true;
 }
 
-bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
+bool sl_world_body_set_shape(sl_world *owner, sl_body_handle handle,
                              const sl_shape *shape)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
 
     if (shape != NULL && !sl_shape_is_valid(shape)) {
         return false;
@@ -1053,11 +1128,13 @@ bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
+bool sl_world_body_apply_force(sl_world *owner, sl_body_handle handle,
                                sl_vec2 force)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
     if (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC) {
         return false;
@@ -1071,18 +1148,22 @@ bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-sl_vec2 sl_world_body_get_force(const sl_world *world, sl_body_handle handle)
+sl_vec2 sl_world_body_get_force(const sl_world *owner, sl_body_handle handle)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     return world->forces[world->slots[handle.index].dense];
 }
 
-bool sl_world_body_apply_torque(sl_world *world, sl_body_handle handle,
+bool sl_world_body_apply_torque(sl_world *owner, sl_body_handle handle,
                                 float torque)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
     if (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC) {
         return false;
@@ -1096,11 +1177,13 @@ bool sl_world_body_apply_torque(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
+bool sl_world_body_apply_force_at_point(sl_world *owner, sl_body_handle handle,
                                         sl_vec2 force, sl_vec2 point)
 {
+    SL_ASSERT(owner != NULL);
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
     if (world->types[dense] != (uint8_t)SL_BODY_DYNAMIC) {
         return false;
@@ -1124,8 +1207,10 @@ bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
     return true;
 }
 
-sl_world_stats sl_world_get_stats(const sl_world *world)
+sl_world_stats sl_world_get_stats(const sl_world *owner)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     sl_world_stats result = {
         .step = world->step_stats,
@@ -1143,4 +1228,10 @@ sl_world_stats sl_world_get_stats(const sl_world *world)
     result.pair_count = world->contact_count;
     result.pair_capacity = world->pair_capacity;
     return result;
+}
+
+bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle)
+{
+    SL_ASSERT(world != NULL);
+    return world->state != NULL && sl_body_is_valid(world->state, handle);
 }

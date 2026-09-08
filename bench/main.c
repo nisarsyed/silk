@@ -718,12 +718,13 @@ static void result_json(const bench_scene *scene, const bench_result *r,
     printf("},\"cumulative_work\":");
     work_print(&r->stats.cumulative);
     const sl_world_memory_breakdown *m = &r->memory;
-    printf(",\"memory_bytes\":{\"body\":%zu,\"broadphase\":%zu,\"contact\":%zu,"
+    printf(",\"memory_bytes\":{\"world_state\":%zu,\"body\":%zu,\"broadphase\":"
+           "%zu,\"contact\":%zu,"
            "\"pair\":%zu,\"contact_solver\":%zu,\"joint\":%zu,\"padding\":%zu,"
            "\"arena\":%zu,\"world\":%zu}",
-           m->body_bytes, m->broadphase_bytes, m->contact_bytes, m->pair_bytes,
-           m->contact_solver_bytes, m->joint_bytes, m->padding_bytes,
-           m->arena_bytes, m->world_bytes);
+           m->world_state_bytes, m->body_bytes, m->broadphase_bytes,
+           m->contact_bytes, m->pair_bytes, m->contact_solver_bytes,
+           m->joint_bytes, m->padding_bytes, m->arena_bytes, m->world_bytes);
     const bench_quality *q = &r->quality;
     printf(",\"quality\":{\"window_steps\":%" PRIu32
            ",\"penetration_max\":%.9g,\"cached_penetration_max\":%.9g"
@@ -810,7 +811,7 @@ int main(int argc, char **argv)
                         "[--warmup 0..10000] [--steps 1..10000]\n");
         return EXIT_FAILURE;
     }
-    printf("{\"schema_version\":1,\"metadata\":{\"compiler\":");
+    printf("{\"schema_version\":2,\"metadata\":{\"compiler\":");
     json_string(SL_BENCH_COMPILER_ID);
     printf(",\"compiler_version\":");
     json_string(SL_BENCH_COMPILER_VERSION);

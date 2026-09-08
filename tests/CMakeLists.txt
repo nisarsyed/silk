@@ -22,3 +22,8 @@ target_include_directories(sl_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 # One entry: the runner has no per-suite filter, so per-suite registrations
 # would each re-execute the whole binary.
 add_test(NAME all COMMAND sl_tests)
+
+# Compile the public consumer independently: no private src include directory.
+add_library(sl_consumer OBJECT test_consumer.c)
+target_link_libraries(sl_consumer PRIVATE silk silk_warnings)
+target_sources(sl_tests PRIVATE $<TARGET_OBJECTS:sl_consumer>)

@@ -1,4 +1,5 @@
 #include "solver.h"
+#include "world_internal.h"
 
 #include <float.h>
 #include <math.h>
@@ -67,7 +68,7 @@ size_t sl_solver_memory_bytes(uint32_t contact_capacity)
     return (bytes + SL_SOLVER_CARVE_ALIGN - 1u) & ~(SL_SOLVER_CARVE_ALIGN - 1u);
 }
 
-bool sl_solver_init(sl_world *world, void *memory, size_t memory_bytes)
+bool sl_solver_init(sl_world_state *world, void *memory, size_t memory_bytes)
 {
     SL_ASSERT(world != NULL);
     const size_t required = sl_solver_memory_bytes(world->contact_capacity);
@@ -81,7 +82,7 @@ bool sl_solver_init(sl_world *world, void *memory, size_t memory_bytes)
     return true;
 }
 
-static sl_contact_constraint *world_constraints(sl_world *world)
+static sl_contact_constraint *world_constraints(sl_world_state *world)
 {
     return (sl_contact_constraint *)world->contact_constraints;
 }
@@ -121,7 +122,7 @@ static sl_contact_softness softness_make(float hertz, float damping_ratio,
     return softness;
 }
 
-static float effective_mass(const sl_world *world, uint32_t dense_a,
+static float effective_mass(const sl_world_state *world, uint32_t dense_a,
                             uint32_t dense_b, sl_vec2 anchor_a,
                             sl_vec2 anchor_b, sl_vec2 axis)
 {
@@ -152,10 +153,11 @@ static float effective_mass(const sl_world *world, uint32_t dense_a,
     return (sl_is_finite(mass) && mass > 0.0f) ? mass : 0.0f;
 }
 
-static float effective_mass_coupling(const sl_world *world, uint32_t dense_a,
-                                     uint32_t dense_b, sl_vec2 anchor_a_1,
-                                     sl_vec2 anchor_b_1, sl_vec2 anchor_a_2,
-                                     sl_vec2 anchor_b_2, sl_vec2 axis)
+static float effective_mass_coupling(const sl_world_state *world,
+                                     uint32_t dense_a, uint32_t dense_b,
+                                     sl_vec2 anchor_a_1, sl_vec2 anchor_b_1,
+                                     sl_vec2 anchor_a_2, sl_vec2 anchor_b_2,
+                                     sl_vec2 axis)
 {
     const float cross_a_1 = sl_vec2_cross(anchor_a_1, axis);
     const float cross_b_1 = sl_vec2_cross(anchor_b_1, axis);
@@ -187,7 +189,7 @@ typedef struct sl_velocity_pair {
 } sl_velocity_pair;
 
 static sl_velocity_pair
-velocity_pair_load(const sl_world *world,
+velocity_pair_load(const sl_world_state *world,
                    const sl_contact_constraint *constraint)
 {
     const uint32_t dense_a = constraint->dense_a;
@@ -207,7 +209,7 @@ velocity_pair_load(const sl_world *world,
     return pair;
 }
 
-static void velocity_pair_store(sl_world *world,
+static void velocity_pair_store(sl_world_state *world,
                                 const sl_contact_constraint *constraint,
                                 const sl_velocity_pair *pair)
 {
@@ -264,7 +266,7 @@ static bool impulse_apply(sl_velocity_pair *pair, sl_vec2 anchor_a,
     return true;
 }
 
-void sl_solver_prepare(sl_world *world, float h, float inverse_h)
+void sl_solver_prepare(sl_world_state *world, float h, float inverse_h)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(sl_is_finite(h) && h > 0.0f);
@@ -342,7 +344,7 @@ void sl_solver_prepare(sl_world *world, float h, float inverse_h)
     world->contact_constraint_count = constraint_count;
 }
 
-void sl_solver_warm_start(sl_world *world)
+void sl_solver_warm_start(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
@@ -362,7 +364,7 @@ void sl_solver_warm_start(sl_world *world)
     }
 }
 
-static float separation_current(const sl_world *world,
+static float separation_current(const sl_world_state *world,
                                 const sl_contact_constraint *constraint,
                                 const sl_contact_constraint_point *point)
 {
@@ -389,7 +391,7 @@ static float speculative_bias(float separation, float inverse_h)
     return separation * inverse_h;
 }
 
-static float penetration_bias(const sl_world *world, float separation,
+static float penetration_bias(const sl_world_state *world, float separation,
                               float bias_rate)
 {
     if (separation >= 0.0f) {
@@ -409,7 +411,7 @@ typedef struct sl_normal_terms {
 } sl_normal_terms;
 
 static sl_normal_terms normal_terms_make(
-    const sl_world *world, const sl_contact_constraint *constraint,
+    const sl_world_state *world, const sl_contact_constraint *constraint,
     const sl_contact_constraint_point *point, float inverse_h, bool use_bias)
 {
     sl_normal_terms terms = { 0.0f, 1.0f, 0.0f };
@@ -429,7 +431,7 @@ static sl_normal_terms normal_terms_make(
     return terms;
 }
 
-static void normal_solve(const sl_world *world,
+static void normal_solve(const sl_world_state *world,
                          sl_contact_constraint *constraint,
                          sl_contact_constraint_point *point,
                          sl_velocity_pair *pair, float inverse_h, bool use_bias,
@@ -488,7 +490,7 @@ static bool normal_block_apply(sl_velocity_pair *pair,
  * enumerating the four possible active sets removes that artificial point
  * ordering. Soft penetration adds diagonal regularization; speculative rows
  * use the unregularized matrix. */
-static bool normal_block_solve(const sl_world *world,
+static bool normal_block_solve(const sl_world_state *world,
                                sl_contact_constraint *constraint,
                                sl_velocity_pair *pair, float inverse_h)
 {
@@ -607,8 +609,9 @@ static void friction_solve(sl_contact_constraint *constraint,
     point->tangent_impulse = next_impulse;
 }
 
-static void constraint_solve(sl_world *world, sl_contact_constraint *constraint,
-                             float inverse_h, bool use_bias)
+static void constraint_solve(sl_world_state *world,
+                             sl_contact_constraint *constraint, float inverse_h,
+                             bool use_bias)
 {
     sl_velocity_pair pair = velocity_pair_load(world, constraint);
     /* The biased pass gets the exact two-point normal LCP. The later unbiased
@@ -633,7 +636,7 @@ static void constraint_solve(sl_world *world, sl_contact_constraint *constraint,
     velocity_pair_store(world, constraint, &pair);
 }
 
-void sl_solver_solve(sl_world *world, float inverse_h, bool use_bias)
+void sl_solver_solve(sl_world_state *world, float inverse_h, bool use_bias)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
@@ -642,7 +645,7 @@ void sl_solver_solve(sl_world *world, float inverse_h, bool use_bias)
     }
 }
 
-void sl_solver_restitution(sl_world *world)
+void sl_solver_restitution(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
@@ -685,7 +688,7 @@ void sl_solver_restitution(sl_world *world)
     }
 }
 
-void sl_solver_store(sl_world *world)
+void sl_solver_store(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);

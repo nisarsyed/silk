@@ -1,4 +1,5 @@
 #include "contact_world.h"
+#include "world_internal.h"
 
 #include <float.h>
 #include <math.h>
@@ -147,12 +148,13 @@ size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
                                           &ignored);
 }
 
-static sl_tree *world_tree(sl_world *world)
+static sl_tree *world_tree(sl_world_state *world)
 {
     return (sl_tree *)world->tree;
 }
 
-bool sl_contact_world_init(sl_world *world, void *memory, size_t memory_bytes)
+bool sl_contact_world_init(sl_world_state *world, void *memory,
+                           size_t memory_bytes)
 {
     SL_ASSERT(world != NULL);
     const size_t required = sl_contact_world_memory_bytes(
@@ -207,7 +209,7 @@ static sl_tree_root_kind body_root(uint8_t type)
     return SL_TREE_ROOT_STATIC;
 }
 
-static sl_aabb body_tight_aabb(const sl_world *world, uint32_t dense)
+static sl_aabb body_tight_aabb(const sl_world_state *world, uint32_t dense)
 {
     const sl_transform transform =
         sl_transform_make(world->positions[dense], world->rotations[dense]);
@@ -215,7 +217,7 @@ static sl_aabb body_tight_aabb(const sl_world *world, uint32_t dense)
                           SL_SPECULATIVE_DISTANCE);
 }
 
-static void moved_mark(sl_world *world, uint32_t dense, uint32_t slot)
+static void moved_mark(sl_world_state *world, uint32_t dense, uint32_t slot)
 {
     if (world->moved[dense] != 0u) {
         return;
@@ -229,7 +231,7 @@ static void moved_mark(sl_world *world, uint32_t dense, uint32_t slot)
     world->moved_count += 1u;
 }
 
-static void moved_remove(sl_world *world, uint32_t dense, uint32_t slot)
+static void moved_remove(sl_world_state *world, uint32_t dense, uint32_t slot)
 {
     if (world->moved[dense] == 0u) {
         return;
@@ -245,7 +247,8 @@ static void moved_remove(sl_world *world, uint32_t dense, uint32_t slot)
     world->moved[dense] = 0u;
 }
 
-bool sl_contact_body_create(sl_world *world, uint32_t dense, uint32_t slot)
+bool sl_contact_body_create(sl_world_state *world, uint32_t dense,
+                            uint32_t slot)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(dense < world->body_count);
@@ -272,7 +275,8 @@ bool sl_contact_body_create(sl_world *world, uint32_t dense, uint32_t slot)
     return true;
 }
 
-void sl_contact_body_destroy(sl_world *world, uint32_t dense, uint32_t slot)
+void sl_contact_body_destroy(sl_world_state *world, uint32_t dense,
+                             uint32_t slot)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(dense < world->body_count);
@@ -289,7 +293,8 @@ void sl_contact_body_destroy(sl_world *world, uint32_t dense, uint32_t slot)
     world->proxies[dense] = SL_TREE_NODE_NONE;
 }
 
-bool sl_contact_body_update(sl_world *world, uint32_t dense, uint32_t slot)
+bool sl_contact_body_update(sl_world_state *world, uint32_t dense,
+                            uint32_t slot)
 {
     SL_ASSERT(world != NULL);
     SL_ASSERT(dense < world->body_count);
@@ -323,7 +328,7 @@ bool sl_contact_body_update(sl_world *world, uint32_t dense, uint32_t slot)
     return true;
 }
 
-void sl_contact_world_reset(sl_world *world)
+void sl_contact_world_reset(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_tree *tree = world_tree(world);
@@ -362,7 +367,7 @@ static uint32_t pair_hash(uint64_t key)
     return (uint32_t)key;
 }
 
-static bool pair_find(sl_world *world, uint64_t key, uint32_t *out)
+static bool pair_find(sl_world_state *world, uint64_t key, uint32_t *out)
 {
     SL_ASSERT(key != 0u);
     const uint32_t mask = world->pair_capacity - 1u;
@@ -387,7 +392,7 @@ static bool pair_find(sl_world *world, uint64_t key, uint32_t *out)
     return false;
 }
 
-static bool pair_insert(sl_world *world, uint64_t key)
+static bool pair_insert(sl_world_state *world, uint64_t key)
 {
     uint32_t index = 0u;
     if (pair_find(world, key, &index)) {
@@ -397,7 +402,7 @@ static bool pair_insert(sl_world *world, uint64_t key)
     return true;
 }
 
-static void pair_remove(sl_world *world, uint64_t key)
+static void pair_remove(sl_world_state *world, uint64_t key)
 {
     uint32_t index = 0u;
     const bool found = pair_find(world, key, &index);
@@ -453,7 +458,7 @@ static void manifold_persist(sl_manifold *manifold, const sl_manifold *previous)
     }
 }
 
-static void contact_refresh(sl_world *world, sl_contact *contact)
+static void contact_refresh(sl_world_state *world, sl_contact *contact)
 {
     const uint32_t dense_a = world->slots[contact->body_a.index].dense;
     const uint32_t dense_b = world->slots[contact->body_b.index].dense;
@@ -472,7 +477,7 @@ static void contact_refresh(sl_world *world, sl_contact *contact)
     contact->touching = contact->manifold.point_count > 0u;
 }
 
-static void contact_remove(sl_world *world, uint32_t row)
+static void contact_remove(sl_world_state *world, uint32_t row)
 {
     SL_ASSERT(row < world->contact_count);
     const sl_contact *contact = &world->contacts[row];
@@ -484,7 +489,8 @@ static void contact_remove(sl_world *world, uint32_t row)
     world->contact_count = last;
 }
 
-void sl_contact_pair_destroy(sl_world *world, uint32_t slot_a, uint32_t slot_b)
+void sl_contact_pair_destroy(sl_world_state *world, uint32_t slot_a,
+                             uint32_t slot_b)
 {
     SL_ASSERT(world != NULL);
     if (slot_a == slot_b || slot_a >= world->body_capacity ||
@@ -507,7 +513,7 @@ void sl_contact_pair_destroy(sl_world *world, uint32_t slot_a, uint32_t slot_b)
     SL_ASSERT(false);
 }
 
-void sl_contact_body_mark_moved(sl_world *world, uint32_t slot)
+void sl_contact_body_mark_moved(sl_world_state *world, uint32_t slot)
 {
     SL_ASSERT(world != NULL);
     if (slot >= world->body_capacity ||
@@ -520,10 +526,11 @@ void sl_contact_body_mark_moved(sl_world *world, uint32_t slot)
     }
 }
 
-static bool contact_is_live(const sl_world *world, const sl_contact *contact)
+static bool contact_is_live(const sl_world_state *world,
+                            const sl_contact *contact)
 {
-    if (!sl_world_body_is_valid(world, contact->body_a) ||
-        !sl_world_body_is_valid(world, contact->body_b)) {
+    if (!sl_body_is_valid(world, contact->body_a) ||
+        !sl_body_is_valid(world, contact->body_b)) {
         return false;
     }
     const uint32_t dense_a = world->slots[contact->body_a.index].dense;
@@ -540,7 +547,7 @@ static bool contact_is_live(const sl_world *world, const sl_contact *contact)
                             world->proxy_aabbs[dense_b]);
 }
 
-static void contacts_update(sl_world *world)
+static void contacts_update(sl_world_state *world)
 {
     uint32_t row = 0u;
     while (row < world->contact_count) {
@@ -554,7 +561,8 @@ static void contacts_update(sl_world *world)
     }
 }
 
-static bool contact_create(sl_world *world, uint32_t slot_a, uint32_t slot_b)
+static bool contact_create(sl_world_state *world, uint32_t slot_a,
+                           uint32_t slot_b)
 {
     SL_ASSERT(slot_a != slot_b);
     if (world->contact_count >= world->contact_capacity) {
@@ -579,8 +587,8 @@ static bool contact_create(sl_world *world, uint32_t slot_a, uint32_t slot_b)
     return true;
 }
 
-static void pair_candidate(sl_world *world, uint32_t slot, uint32_t other_slot,
-                           bool *dropped)
+static void pair_candidate(sl_world_state *world, uint32_t slot,
+                           uint32_t other_slot, bool *dropped)
 {
     if (other_slot == slot || other_slot >= world->body_capacity ||
         world->slots[other_slot].dense == SL_BODY_DENSE_NONE) {
@@ -608,8 +616,8 @@ static void pair_candidate(sl_world *world, uint32_t slot, uint32_t other_slot,
     }
 }
 
-static void query_root(sl_world *world, uint32_t slot, sl_tree_root_kind root,
-                       bool *dropped)
+static void query_root(sl_world_state *world, uint32_t slot,
+                       sl_tree_root_kind root, bool *dropped)
 {
     const uint32_t dense = world->slots[slot].dense;
     const sl_tree_query_result result =
@@ -626,7 +634,7 @@ static void query_root(sl_world *world, uint32_t slot, sl_tree_root_kind root,
     }
 }
 
-static void pairs_update(sl_world *world)
+static void pairs_update(sl_world_state *world)
 {
     const uint32_t snapshot_count = world->moved_count;
     for (uint32_t i = 0u; i < snapshot_count; ++i) {
@@ -675,7 +683,7 @@ static void pairs_update(sl_world *world)
     world->moved_count = next_count;
 }
 
-void sl_contact_step_begin(sl_world *world)
+void sl_contact_step_begin(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     world->contact_drop_count = 0u;
@@ -683,7 +691,7 @@ void sl_contact_step_begin(sl_world *world)
     pairs_update(world);
 }
 
-void sl_contact_step_end(sl_world *world)
+void sl_contact_step_end(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     for (uint32_t dense = 0u; dense < world->body_count; ++dense) {
@@ -694,37 +702,44 @@ void sl_contact_step_end(sl_world *world)
     }
 }
 
-uint32_t sl_world_contact_count(const sl_world *world)
+uint32_t sl_world_contact_count(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->contact_count;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->contact_count : 0u;
 }
 
-uint32_t sl_world_contact_capacity(const sl_world *world)
+uint32_t sl_world_contact_capacity(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->contact_capacity;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->contact_capacity : 0u;
 }
 
-uint32_t sl_world_contact_drop_count(const sl_world *world)
+uint32_t sl_world_contact_drop_count(const sl_world *owner)
 {
-    SL_ASSERT(world != NULL);
-    return world->contact_drop_count;
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    return world != NULL ? world->contact_drop_count : 0u;
 }
 
-const sl_contact *sl_world_contact_at(const sl_world *world, uint32_t row)
+const sl_contact *sl_world_contact_at(const sl_world *owner, uint32_t row)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     SL_ASSERT(row < world->contact_count);
     return &world->contacts[row];
 }
 
-bool sl_world_body_get_proxy_aabb(const sl_world *world, sl_body_handle handle,
+bool sl_world_body_get_proxy_aabb(const sl_world *owner, sl_body_handle handle,
                                   sl_aabb *out)
 {
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     SL_ASSERT(out != NULL);
-    SL_ASSERT(sl_world_body_is_valid(world, handle));
+    SL_ASSERT(sl_body_is_valid(world, handle));
     const uint32_t dense = world->slots[handle.index].dense;
     if (world->proxies[dense] == SL_TREE_NODE_NONE) {
         return false;

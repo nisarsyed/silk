@@ -1,5 +1,6 @@
 #include "replay.h"
 #include "tree.h"
+#include "world_internal.h"
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
@@ -72,9 +73,11 @@ static bool tree_compare(const sl_tree *a, const sl_tree *b,
     }
     return true;
 }
-bool sl_replay_compare(const sl_world *a, const sl_world *b,
+bool sl_replay_compare(const sl_world *owner_a, const sl_world *owner_b,
                        sl_replay_mismatch *out)
 {
+    const sl_world_state *a = owner_a->state;
+    const sl_world_state *b = owner_b->state;
     uint32_t i = 0u;
     U(body_count);
     U(body_capacity);

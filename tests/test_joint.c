@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 
 #include <math.h>
 #include <stdbool.h>
@@ -99,9 +100,9 @@ static void config_and_descriptor_validation_are_atomic(void)
     };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
-    SL_EXPECT_NEAR(world.joint_hertz, SL_JOINT_HERTZ_DEFAULT, 0.0f);
-    SL_EXPECT_NEAR(world.joint_damping_ratio, SL_JOINT_DAMPING_RATIO_DEFAULT,
-                   0.0f);
+    SL_EXPECT_NEAR(world.state->joint_hertz, SL_JOINT_HERTZ_DEFAULT, 0.0f);
+    SL_EXPECT_NEAR(world.state->joint_damping_ratio,
+                   SL_JOINT_DAMPING_RATIO_DEFAULT, 0.0f);
     const sl_body_handle dynamic = body_make(
         &world, SL_BODY_DYNAMIC, sl_vec2_make(1.0f, 0.0f), 1.0f, NULL);
     const sl_body_handle fixed =
@@ -118,11 +119,11 @@ static void config_and_descriptor_validation_are_atomic(void)
 #define EXPECT_REJECTED(candidate)                                             \
     do {                                                                       \
         const uint32_t count_before = sl_world_joint_count(&world);            \
-        const uint32_t free_before = world.joint_free_count;                   \
+        const uint32_t free_before = world.state->joint_free_count;            \
         SL_EXPECT(sl_joint_handle_is_null(                                     \
             sl_world_joint_create(&world, &(candidate))));                     \
         SL_EXPECT_INT_EQ(sl_world_joint_count(&world), count_before);          \
-        SL_EXPECT_INT_EQ(world.joint_free_count, free_before);                 \
+        SL_EXPECT_INT_EQ(world.state->joint_free_count, free_before);          \
     } while (false)
 
     sl_joint_desc invalid = desc;
@@ -205,8 +206,8 @@ static void handles_swap_remove_reset_and_body_destroy(void)
     SL_EXPECT(sl_world_joint_at(&world, 1u).index == last.index);
     sl_world_joint_destroy(&world, middle);
     sl_world_joint_destroy(&world, sl_joint_handle_null());
-    sl_world_joint_destroy(&world,
-                           (sl_joint_handle){ world.joint_capacity + 1u, 9u });
+    sl_world_joint_destroy(
+        &world, (sl_joint_handle){ sl_world_joint_capacity(&world) + 1u, 9u });
 
     const sl_joint_handle reused = distance_make(&world, a, b, 1.0f, true);
     SL_EXPECT(reused.index == middle.index);
@@ -221,7 +222,8 @@ static void handles_swap_remove_reset_and_body_destroy(void)
     sl_world_reset(&world);
     SL_EXPECT(!sl_world_joint_is_valid(&world, first));
     SL_EXPECT_INT_EQ(sl_world_joint_count(&world), 0u);
-    SL_EXPECT_INT_EQ(world.joint_free_count, world.joint_capacity);
+    SL_EXPECT_INT_EQ(world.state->joint_free_count,
+                     sl_world_joint_capacity(&world));
     sl_world_destroy(&world);
 }
 

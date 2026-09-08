@@ -16,6 +16,9 @@ extern "C" {
 
 /* Joint handles use the same slot/generation lifetime contract as bodies.
  * A zero generation is never issued and therefore encodes null. */
+/* Scoped to the originating world lifetime. Equal values can exist in other
+ * worlds or after destroy/reinitialize; cross-world handles are invalid usage.
+ */
 typedef struct sl_joint_handle {
     uint32_t index;
     uint32_t generation;

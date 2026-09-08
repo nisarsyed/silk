@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 
 #include <float.h>
 #include <math.h>
@@ -107,11 +108,11 @@ static void materials_validate_pack_and_reset(void)
         sl_world_body_create(&world, &zero_material);
     SL_EXPECT(sl_world_body_get_friction(&world, reset_handle) == 0.0f);
     SL_EXPECT(sl_world_body_get_restitution(&world, reset_handle) == 0.0f);
-    const uint32_t dense = world.slots[reset_handle.index].dense;
-    SL_EXPECT(world.delta_positions[dense].x == 0.0f &&
-              world.delta_positions[dense].y == 0.0f);
-    SL_EXPECT(world.delta_rotations[dense].c == 1.0f &&
-              world.delta_rotations[dense].s == 0.0f);
+    const uint32_t dense = world.state->slots[reset_handle.index].dense;
+    SL_EXPECT(world.state->delta_positions[dense].x == 0.0f &&
+              world.state->delta_positions[dense].y == 0.0f);
+    SL_EXPECT(world.state->delta_rotations[dense].c == 1.0f &&
+              world.state->delta_rotations[dense].s == 0.0f);
 
     sl_world_destroy(&world);
 }
@@ -212,11 +213,11 @@ static void create_wraps_angle(void)
     SL_EXPECT(sl_world_body_set_angle(&world, h, 1.234f));
     SL_EXPECT_NEAR(sl_world_body_get_angle(&world, h), 1.234f, k_eps);
 
-    const uint32_t dense = world.slots[h.index].dense;
-    const sl_rotation before = world.rotations[dense];
+    const uint32_t dense = world.state->slots[h.index].dense;
+    const sl_rotation before = world.state->rotations[dense];
     SL_EXPECT(!sl_world_body_set_angle(&world, h, NAN));
-    SL_EXPECT(world.rotations[dense].c == before.c &&
-              world.rotations[dense].s == before.s);
+    SL_EXPECT(world.state->rotations[dense].c == before.c &&
+              world.state->rotations[dense].s == before.s);
 
     sl_world_destroy(&world);
 }
@@ -743,9 +744,9 @@ static void get_transform_matches_position_and_angle(void)
     SL_EXPECT(tf.position.x == 7.0f && tf.position.y == -3.0f);
     SL_EXPECT_NEAR(tf.rotation.c, 0.0f, k_eps);
     SL_EXPECT_NEAR(tf.rotation.s, 1.0f, k_eps);
-    const uint32_t dense = world.slots[h.index].dense;
-    SL_EXPECT(tf.rotation.c == world.rotations[dense].c);
-    SL_EXPECT(tf.rotation.s == world.rotations[dense].s);
+    const uint32_t dense = world.state->slots[h.index].dense;
+    SL_EXPECT(tf.rotation.c == world.state->rotations[dense].c);
+    SL_EXPECT(tf.rotation.s == world.state->rotations[dense].s);
 
     /* Local +x maps to world +y under this frame. */
     const sl_vec2 local_x = sl_transform_apply(tf, sl_vec2_make(1.0f, 0.0f));

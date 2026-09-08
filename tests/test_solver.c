@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 
 #include <float.h>
 #include <math.h>
@@ -297,11 +298,13 @@ static void tuning_validation_and_extreme_mass_stay_finite(void)
     const sl_world_config defaults = { .body_capacity = 2u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &defaults));
-    SL_EXPECT(world.contact_hertz == SL_CONTACT_HERTZ_DEFAULT);
-    SL_EXPECT(world.contact_damping_ratio == SL_CONTACT_DAMPING_RATIO_DEFAULT);
-    SL_EXPECT(world.contact_push_velocity_max ==
+    SL_EXPECT(world.state->contact_hertz == SL_CONTACT_HERTZ_DEFAULT);
+    SL_EXPECT(world.state->contact_damping_ratio ==
+              SL_CONTACT_DAMPING_RATIO_DEFAULT);
+    SL_EXPECT(world.state->contact_push_velocity_max ==
               SL_CONTACT_PUSH_VELOCITY_MAX_DEFAULT);
-    SL_EXPECT(world.restitution_threshold == SL_RESTITUTION_THRESHOLD_DEFAULT);
+    SL_EXPECT(world.state->restitution_threshold ==
+              SL_RESTITUTION_THRESHOLD_DEFAULT);
     sl_world_destroy(&world);
 
     sl_world_config invalid = defaults;
