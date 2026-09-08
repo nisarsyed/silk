@@ -119,3 +119,16 @@ The [stats overhead record](../bench/reports/stats-overhead.json) preserves a
 matched parent/instrumented measurement with its own harness revisions. It is
 historical evidence, not an input to the current validator. Small timing deltas
 within the run-to-run spread do not establish a speedup or slowdown.
+
+## Check the tools locally
+
+Run `python3 bench/test_report.py --executable build/release/bin/sl_bench` for
+parser and live CLI checks, and `python3 tools/check_format.py` for tracked C
+sources/headers. These developer-tool checks run separately from CTest.
+
+The [CI workflow](../.github/workflows/ci.yml) runs two all-scene 2/8 smoke
+profiles across supported compilers. Full settling/performance runs remain
+explicit developer work; machine speed cannot fail ordinary PR checks.
+Download raw reports and comparison artifacts from the workflow run within
+14 days. Their metadata identifies the tested revision, including the combined
+PR/base checkout. Failed validation retains raw output when available.
