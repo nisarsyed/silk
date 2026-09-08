@@ -20,99 +20,99 @@
     "host": "Darwin",
     "host_version": "25.6.0",
     "processor": "arm64",
-    "revision": "38a5bb085d1945af526d301a9f402daf851e87f7-dirty"
+    "revision": "8528623d8e5196aa4ac5ea787eab3557bdaace7e"
   },
   "scenes": [
     {
       "scene": "pyramid",
       "average_ms_runs": [
-        0.245548333,
-        0.252591667,
-        0.253333333,
-        0.246446667,
-        0.278565
+        0.248403333,
+        0.245258333,
+        0.254308333,
+        0.246566667,
+        0.245238333
       ],
-      "median_average_ms": 0.252591667,
-      "minimum_average_ms": 0.245548333,
-      "maximum_average_ms": 0.278565
+      "median_average_ms": 0.246566667,
+      "minimum_average_ms": 0.245238333,
+      "maximum_average_ms": 0.254308333
     },
     {
       "scene": "rain",
       "average_ms_runs": [
-        1.05767833,
-        1.06256,
-        1.06272333,
-        1.05917,
-        1.05462833
+        1.04501167,
+        1.05936333,
+        1.04989667,
+        1.046435,
+        1.07445667
       ],
-      "median_average_ms": 1.05917,
-      "minimum_average_ms": 1.05462833,
-      "maximum_average_ms": 1.06272333
+      "median_average_ms": 1.04989667,
+      "minimum_average_ms": 1.04501167,
+      "maximum_average_ms": 1.07445667
     },
     {
       "scene": "piles",
       "average_ms_runs": [
-        0.078255,
-        0.077955,
-        0.079405,
-        0.079885,
-        0.079685
+        0.0776116667,
+        0.0773083333,
+        0.0769216667,
+        0.0769983333,
+        0.0742566667
       ],
-      "median_average_ms": 0.079405,
-      "minimum_average_ms": 0.077955,
-      "maximum_average_ms": 0.079885
+      "median_average_ms": 0.0769983333,
+      "minimum_average_ms": 0.0742566667,
+      "maximum_average_ms": 0.0776116667
     },
     {
       "scene": "chains",
       "average_ms_runs": [
-        0.0169966667,
-        0.0171,
-        0.0176433333,
-        0.0172633333,
-        0.0175883333
+        0.01719,
+        0.017985,
+        0.017305,
+        0.01766,
+        0.0175466667
       ],
-      "median_average_ms": 0.0172633333,
-      "minimum_average_ms": 0.0169966667,
-      "maximum_average_ms": 0.0176433333
+      "median_average_ms": 0.0175466667,
+      "minimum_average_ms": 0.01719,
+      "maximum_average_ms": 0.017985
     },
     {
       "scene": "churn",
       "average_ms_runs": [
-        0.015695,
-        0.0158633333,
-        0.0156183333,
-        0.01581,
-        0.0165233333
+        0.0156583333,
+        0.0157233333,
+        0.01576,
+        0.0157933333,
+        0.01547
       ],
-      "median_average_ms": 0.01581,
-      "minimum_average_ms": 0.0156183333,
-      "maximum_average_ms": 0.0165233333
+      "median_average_ms": 0.0157233333,
+      "minimum_average_ms": 0.01547,
+      "maximum_average_ms": 0.0157933333
     },
     {
       "scene": "table",
       "average_ms_runs": [
-        0.00203666667,
-        0.001995,
-        0.00209166667,
-        0.002055,
-        0.00210833333
+        0.00200833333,
+        0.00202166667,
+        0.00184166667,
+        0.00197833333,
+        0.00213
       ],
-      "median_average_ms": 0.002055,
-      "minimum_average_ms": 0.001995,
-      "maximum_average_ms": 0.00210833333
+      "median_average_ms": 0.00200833333,
+      "minimum_average_ms": 0.00184166667,
+      "maximum_average_ms": 0.00213
     },
     {
       "scene": "inverted",
       "average_ms_runs": [
-        0.00296333333,
-        0.00299333333,
-        0.00295666667,
-        0.00308166667,
-        0.00286333333
+        0.00289333333,
+        0.00293666667,
+        0.00271833333,
+        0.00287666667,
+        0.00293
       ],
-      "median_average_ms": 0.00296333333,
-      "minimum_average_ms": 0.00286333333,
-      "maximum_average_ms": 0.00308166667
+      "median_average_ms": 0.00289333333,
+      "minimum_average_ms": 0.00271833333,
+      "maximum_average_ms": 0.00293666667
     }
   ]
 }

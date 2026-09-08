@@ -173,3 +173,9 @@ while checking physical quality independently across activation policies.
 `compare` deliberately requires identical settings; it must not equate an awake
 workload with a sleeping one. Rain and inverted-mass components can remain awake
 when constraint-error guards fail, even with low residual speeds.
+
+The [activation comparison](../bench/reports/sleep.json) records five full runs
+per mode, sleep-disabled equivalence to the island parent, timing spread,
+combined memory and quality. The current matrix contains sleep-off reports;
+`bench/reports/sleep-on/` contains sleep-on reports. The schema-3 island parent
+is archived under `bench/reports/islands-awake/` with its measured revision.
