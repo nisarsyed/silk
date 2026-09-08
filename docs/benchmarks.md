@@ -19,13 +19,14 @@ python3 bench/report.py compare build/reports/run-1.json build/reports/run-2.jso
 Windows multi-config executables are under `build/windows/bin/Debug/` and end
 in `.exe`. No Python package is required. `--scene` accepts `all` (the default)
 or one fixture below.
+`--sleep off|on` selects activation policy and defaults to off.
 `--warmup` accepts 0–10000 and `--steps` 1–10000. Output is always JSON.
 The runner preserves raw stdout/stderr when validation fails. Use
 `python3 bench/report.py --help` for validation and comparison subcommands.
 
 ## Choose a fixture
 
-Every fixture stays awake and uses dt = binary32(1/60), four substeps and zero
+Every fixture uses dt = binary32(1/60), four substeps and zero
 drag. [Fixture builders](../bench/main.c) define geometry, seeds, materials and
 capacities; each report's `settings` records the resolved workload.
 
@@ -42,9 +43,9 @@ capacities; each report's `settings` records the resolved workload.
 Churn deliberately creates overlaps by teleporting bodies; its quality limits
 account for ongoing motion rather than expecting settled equilibrium.
 
-## Schema 3 and metric meanings
+## Schema 4 and metric meanings
 
-[report.py](../bench/report.py) validates schema 3; a
+[report.py](../bench/report.py) validates schema 4; a
 [committed report](../bench/reports/matrix/run-1.json) shows every field.
 Reconfigure after source changes to refresh build/revision metadata. Source
 archives can supply `-DSL_BENCH_REVISION=<revision>`; Git builds record their
@@ -73,8 +74,9 @@ to the transform immediately before the last-window first step; speeds and
 support forces use that final window. Joint error is anchor distance for
 revolute joints or absolute distance-target error for distance joints.
 
-Static contact support uses the final cached normal impulse divided by substep
-dt and its vertical normal component. It excludes joint reactions, so chains
+The `cached_support_force_mean` estimate uses the final cached normal impulse divided by substep
+dt and its vertical normal component. Sleeping steps retain that cache; it is not a measurement of newly executed
+solver work. The estimate excludes joint reactions, so chains
 have no static-contact support ratio gate. The supported-weight reference is
 total dynamic mass times downward gravity. Table/pyramid/rain/piles/inverted
 require mean force/weight in [0.95, 1.05]. The table therefore checks load
@@ -129,7 +131,7 @@ parser and live CLI checks, and `python3 tools/check_format.py` for tracked C
 sources/headers. These developer-tool checks run separately from CTest.
 
 The [CI workflow](../.github/workflows/ci.yml) runs two all-scene 2/8 smoke
-profiles across supported compilers. Full settling/performance runs remain
+profiles for each sleep mode across supported compilers. Full settling/performance runs remain
 explicit developer work; machine speed cannot fail ordinary PR checks.
 Download raw reports and comparison artifacts from the workflow run within
 14 days. Their metadata identifies the tested revision, including the combined
@@ -137,7 +139,7 @@ PR/base checkout. Failed validation retains raw output when available.
 
 The [world-storage comparison](../bench/reports/world-storage.json) records the
 schema-1 to schema-2 measurement, including preserved parent reports. Historical
-reports are evidence only; the current validator accepts schema 3.
+reports are evidence only; the current validator accepts schema 4.
 
 Constraint-island reports use schema 3. `island` memory is 44 bytes per body
 capacity plus four bytes per contact/joint capacity; padding and fixed state
@@ -154,3 +156,20 @@ unchanged physical digests, quality and preexisting work. Raw parent inputs are
 archived under `bench/reports/islands-parent/`; the current matrix records the
 measured island implementation revision. Graph construction adds work even when
 all bodies are awake; sleeping benefits are measured separately in the next layer.
+
+Schema 4 adds resolved sleep policy, current awake/sleeping dynamic counts,
+last-step executed/skipped island counts, wake work and body transition totals.
+`memory_bytes.sleep` is 13 bytes per body capacity; fixed state and padding are
+reported separately. The physical digest is unchanged; activation is compared
+through the other report fields and complete engine replay tests.
+
+```sh
+python3 bench/report.py run build/release/bin/sl_bench --output build/sleep-off --sleep off --quality
+python3 bench/report.py run build/release/bin/sl_bench --output build/sleep-on --sleep on --quality
+```
+
+Each command defaults to five runs. Compare timing spread and executed work,
+while checking physical quality independently across activation policies.
+`compare` deliberately requires identical settings; it must not equate an awake
+workload with a sleeping one. Rain and inverted-mass components can remain awake
+when constraint-error guards fail, even with low residual speeds.

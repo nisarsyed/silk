@@ -5,11 +5,11 @@
  * Compare float representations and reject non-finite live state. Cover
  * configuration, generations/packed ownership/free lists, live body/shape
  * fields, ordered contacts and joint descriptors/caches, pair occupancy,
- * moved/retry queues, tree topology/free links joint adjacency, retained island
- * membership and ordered ranges. Exclude addresses, padding, inactive payloads,
- * unused queue tails and scratch overwritten before its next use. Add future
- * sleep/activation metadata here; keep private-storage migrations inside this
- * helper, not in fixtures.
+ * moved/retry queues, tree topology/free links, joint adjacency, retained
+ * island membership and ordered ranges. Sleep policy, flags, quiet-step/travel
+ * accumulators and fixed timestep are included. Exclude addresses, padding,
+ * inactive payloads, unused queue tails and scratch overwritten before use.
+ * Keep private-storage migrations inside this helper, not in fixtures.
  *
  * Values hold integers or binary32 bits; the first mismatch wins. On success
  * out is untouched. The fixture runner supplies seed/operation context. */

@@ -26,6 +26,19 @@ typedef struct sl_island {
 } sl_island;
 
 typedef struct sl_world_state {
+    bool sleep_enabled;
+    float sleep_speed_max;
+    float sleep_angular_speed_max;
+    float sleep_time_min;
+    float sleep_dt;
+    uint32_t sleep_steps_required;
+    uint32_t *quiet_steps;
+    float *quiet_translation;
+    float *quiet_rotation;
+    uint8_t *sleeping;
+    uint32_t wake_count;
+    bool wake_batch;
+
     uint32_t island_count;
     uint32_t island_body_count;
     uint32_t island_contact_count;
@@ -143,7 +156,7 @@ typedef struct sl_world_state {
 
     /* Fixed diagnostic storage; never participates in physics decisions.
      * Cost: one step snapshot + two work counters + three uint32_t + bool and
-     * ABI padding (288 bytes on arm64); no per-entity diagnostic arrays. */
+     * ABI padding (368 bytes on arm64); no per-entity diagnostic arrays. */
     sl_world_step_stats step_stats;
     sl_world_work work_total;
     sl_world_work step_work;
@@ -154,6 +167,16 @@ typedef struct sl_world_state {
 
 } sl_world_state;
 
+bool sl_island_is_sleeping(const sl_world_state *world, uint32_t id);
+void sl_wake_begin(sl_world_state *world);
+void sl_wake_seed(sl_world_state *world, uint32_t slot);
+void sl_wake_finish(sl_world_state *world);
+void sl_sleep_body_changed(sl_world_state *world, uint32_t slot);
+void sl_sleep_step_begin(sl_world_state *world, float dt);
+void sl_sleep_graph_ready(sl_world_state *world);
+void sl_sleep_step_end(sl_world_state *world);
+void sl_sleep_travel(sl_world_state *world, uint32_t row, sl_vec2 before,
+                     sl_rotation rotation_before);
 void sl_islands_build(sl_world_state *world);
 
 bool sl_body_is_valid(const sl_world_state *world, sl_body_handle handle);

@@ -27,4 +27,6 @@ void sl_joint_warm_start(sl_world_state *world);
 void sl_joint_solve(sl_world_state *world, bool use_bias);
 void sl_joint_store(sl_world_state *world);
 
+bool sl_joint_island_quiet(const sl_world_state *world, uint32_t id);
+
 #endif /* SILK_JOINT_INTERNAL_H */

@@ -24,7 +24,7 @@ class ReportTests(unittest.TestCase):
         report.quality_check(self.baseline)
 
     def test_schema_version(self):
-        for version in (1, 2, 4, True, '3'):
+        for version in (1, 2, 3, 5, True, '4'):
             value = copy.deepcopy(self.baseline)
             value['schema_version'] = version
             with self.assertRaises(ValueError):
@@ -69,7 +69,7 @@ class ReportTests(unittest.TestCase):
             (('drops',), 1), (('cumulative_work', 'contact_drops'), 1),
             (('counts', 'bodies'), 65537), (('counts', 'pairs'), 0),
             (('settings', 'measured_steps'), 0), (('settings', 'substeps'), 9),
-            (('settings', 'restitution'), 2), (('settings', 'sleep_enabled'), True),
+            (('settings', 'restitution'), 2), (('settings', 'sleep_enabled'), 1),
             (('memory_bytes', 'arena'), 1), (('step', 'substeps'), 0),
             (('timing_ms', 'p95'), 1e8), (('quality', 'window_steps'), 0),
             (('semantic_digest',), 'not-a-digest'), (('step', 'work', 'pair_probes'), 2**64),
@@ -115,6 +115,15 @@ class ReportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             report.quality_check(changed)
 
+    def test_activation_invariants(self):
+        for group, field, value in (('counts', 'sleeping_dynamics', 1),
+                                    ('step', 'islands_skipped', 1),
+                                    ('settings', 'sleep_enabled', 'on')):
+            changed = copy.deepcopy(self.baseline)
+            changed['results'][0][group][field] = value
+            with self.assertRaises(ValueError):
+                report.validate(changed)
+
     def test_cli_rejection(self):
         if EXE is None:
             self.skipTest('pass --executable for live CLI checks')
@@ -122,6 +131,7 @@ class ReportTests(unittest.TestCase):
                  ('--steps', '99999999999999999'), ('--steps', '1x'), ('--warmup',),
                  ('--scene', 'bogus'), ('--scene', 'baseline'),
                  ('--format', 'json'), ('--format', 'text'), ('--unknown', '1'),
+                 ('--sleep', 'maybe'), ('--sleep', 'on', '--sleep', 'off'),
                  ('--steps', '1', '--steps', '2'), ('--warmup', '+2')]
         for args in cases:
             with self.subTest(args=args):

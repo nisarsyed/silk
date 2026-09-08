@@ -474,13 +474,22 @@ static void contact_refresh(sl_world_state *world, sl_contact *contact)
         friction_mix(world->frictions[dense_a], world->frictions[dense_b]);
     contact->restitution =
         sl_max(world->restitutions[dense_a], world->restitutions[dense_b]);
-    contact->touching = contact->manifold.point_count > 0u;
+    const bool touching = contact->manifold.point_count > 0u;
+    if (touching != contact->touching) {
+        sl_wake_seed(world, contact->body_a.index);
+        sl_wake_seed(world, contact->body_b.index);
+    }
+    contact->touching = touching;
 }
 
 static void contact_remove(sl_world_state *world, uint32_t row)
 {
     SL_ASSERT(row < world->contact_count);
     const sl_contact *contact = &world->contacts[row];
+    if (contact->touching) {
+        sl_wake_seed(world, contact->body_a.index);
+        sl_wake_seed(world, contact->body_b.index);
+    }
     pair_remove(world, pair_key(contact->body_a.index, contact->body_b.index));
     const uint32_t last = world->contact_count - 1u;
     if (row != last) {

@@ -2,6 +2,7 @@ add_library(silk STATIC
     silk.c
     world.c
     query.c
+    sleep.c
     island.c
     step.c
     shape.c

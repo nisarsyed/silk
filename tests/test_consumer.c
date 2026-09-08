@@ -24,6 +24,8 @@ static void public_lifecycle(void)
                                        .body_a = a,
                                        .body_b = b };
     const sl_joint_handle joint = sl_world_joint_create(&world, &joint_desc);
+    SL_EXPECT(sl_world_body_is_awake(&world, a));
+    SL_EXPECT(sl_world_body_wake(&world, a));
     SL_EXPECT(sl_world_body_is_valid(&world, a));
     SL_EXPECT(sl_world_joint_is_valid(&world, joint));
     sl_world_step(&world, 1.0f / 60.0f);

@@ -46,6 +46,8 @@ typedef struct sl_manifold {
 /* Persistent broad-phase pair in canonical body-slot order. Materials are
  * mixed from the bodies at each step. touching includes speculative points
  * with positive separation up to SL_SPECULATIVE_DISTANCE. */
+/* Manifold impulses are retained solver caches. A sleeping step can expose
+ * the same cache without executing that constraint. */
 typedef struct sl_contact {
     sl_body_handle body_a;
     sl_body_handle body_b;

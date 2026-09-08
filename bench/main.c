@@ -48,6 +48,7 @@ typedef struct bench_scene {
 #define BENCH_QUALITY_WINDOW 60u
 
 typedef struct bench_options {
+    bool sleep_enabled;
     const char *scene;
     uint32_t warmup;
     uint32_t steps;
@@ -129,11 +130,12 @@ static bool scene_world_init(bench_scene *scene, const char *name,
     return true;
 }
 
-static bool pyramid_build(bench_scene *scene)
+static bool pyramid_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(
             scene, "pyramid",
-            (sl_world_config){ .body_capacity = BENCH_PYRAMID_BODY_COUNT,
+            (sl_world_config){ .sleep_enabled = sleep_enabled,
+                               .body_capacity = BENCH_PYRAMID_BODY_COUNT,
                                .gravity = k_gravity,
                                .substep_count = k_substep_count },
             0u)) {
@@ -177,11 +179,12 @@ static bool pyramid_build(bench_scene *scene)
     return scene->body_count == BENCH_PYRAMID_BODY_COUNT;
 }
 
-static bool rain_build(bench_scene *scene)
+static bool rain_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(
             scene, "rain",
-            (sl_world_config){ .body_capacity = BENCH_RAIN_BODY_COUNT,
+            (sl_world_config){ .sleep_enabled = sleep_enabled,
+                               .body_capacity = BENCH_RAIN_BODY_COUNT,
                                .contact_capacity = BENCH_RAIN_CONTACT_CAPACITY,
                                .gravity = k_gravity,
                                .substep_count = k_substep_count },
@@ -262,10 +265,11 @@ static bool fixture_body(bench_scene *scene, sl_shape *shape, float x, float y,
                                 .friction = 0.6f };
     return scene_body_add(scene, &desc);
 }
-static bool piles_build(bench_scene *scene)
+static bool piles_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(scene, "piles",
-                          (sl_world_config){ .body_capacity = 161u,
+                          (sl_world_config){ .sleep_enabled = sleep_enabled,
+                                             .body_capacity = 161u,
                                              .contact_capacity = 2048u,
                                              .joint_capacity = 0u,
                                              .gravity = { 0.0f, -9.81f },
@@ -289,10 +293,11 @@ static bool piles_build(bench_scene *scene)
     }
     return true;
 }
-static bool chains_build(bench_scene *scene)
+static bool chains_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(scene, "chains",
-                          (sl_world_config){ .body_capacity = 104u,
+                          (sl_world_config){ .sleep_enabled = sleep_enabled,
+                                             .body_capacity = 104u,
                                              .contact_capacity = 1024u,
                                              .joint_capacity = 96u,
                                              .gravity = { 0.0f, -9.81f },
@@ -332,10 +337,11 @@ static bool chains_build(bench_scene *scene)
     }
     return true;
 }
-static bool churn_build(bench_scene *scene)
+static bool churn_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(scene, "churn",
-                          (sl_world_config){ .body_capacity = 128u,
+                          (sl_world_config){ .sleep_enabled = sleep_enabled,
+                                             .body_capacity = 128u,
                                              .contact_capacity = 2048u,
                                              .joint_capacity = 0u,
                                              .gravity = { 0.0f, 0.0f },
@@ -355,10 +361,11 @@ static bool churn_build(bench_scene *scene)
     }
     return true;
 }
-static bool table_build(bench_scene *scene)
+static bool table_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(scene, "table",
-                          (sl_world_config){ .body_capacity = 5u,
+                          (sl_world_config){ .sleep_enabled = sleep_enabled,
+                                             .body_capacity = 5u,
                                              .contact_capacity = 64u,
                                              .joint_capacity = 0u,
                                              .gravity = { 0.0f, -9.81f },
@@ -378,10 +385,11 @@ static bool table_build(bench_scene *scene)
            fixture_body(scene, &top, 0.0f, 2.2f, 2.0f) &&
            fixture_body(scene, &load, 0.0f, 2.9f, 5.0f);
 }
-static bool inverted_build(bench_scene *scene)
+static bool inverted_build(bench_scene *scene, bool sleep_enabled)
 {
     if (!scene_world_init(scene, "inverted",
-                          (sl_world_config){ .body_capacity = 7u,
+                          (sl_world_config){ .sleep_enabled = sleep_enabled,
+                                             .body_capacity = 7u,
                                              .contact_capacity = 128u,
                                              .joint_capacity = 0u,
                                              .gravity = { 0.0f, -9.81f },
@@ -406,7 +414,7 @@ static bool inverted_build(bench_scene *scene)
 }
 typedef struct bench_fixture {
     const char *name;
-    bool (*build)(bench_scene *);
+    bool (*build)(bench_scene *, bool);
 } bench_fixture;
 static const bench_fixture k_fixtures[] = {
     { "pyramid", pyramid_build },  { "rain", rain_build },
@@ -656,57 +664,64 @@ static void json_string(const char *value)
 }
 static void work_print(const sl_world_work *w)
 {
-    printf("{\"tree_node_visits\":%" PRIu64 ",\"pair_candidates\":%" PRIu64
-           ",\"pair_probes\":%" PRIu64 ",\"proxy_creates\":%" PRIu64
-           ",\"proxy_destroys\":%" PRIu64 ",\"proxy_moves\":%" PRIu64
-           ",\"graph_body_visits\":%" PRIu64
-           ",\"graph_constraint_visits\":%" PRIu64
-           ",\"graph_parent_probes\":%" PRIu64 ",\"contact_drops\":%" PRIu64
-           "}",
-           w->tree_node_visits, w->pair_candidates, w->pair_probes,
-           w->proxy_creates, w->proxy_destroys, w->proxy_moves,
-           w->graph_body_visits, w->graph_constraint_visits,
-           w->graph_parent_probes, w->contact_drops);
+    printf(
+        "{\"tree_node_visits\":%" PRIu64 ",\"pair_candidates\":%" PRIu64
+        ",\"pair_probes\":%" PRIu64 ",\"proxy_creates\":%" PRIu64
+        ",\"proxy_destroys\":%" PRIu64 ",\"proxy_moves\":%" PRIu64
+        ",\"wake_visits\":%" PRIu64 ",\"body_wakes\":%" PRIu64
+        ",\"body_sleeps\":%" PRIu64 ",\"graph_body_visits\":%" PRIu64
+        ",\"graph_constraint_visits\":%" PRIu64
+        ",\"graph_parent_probes\":%" PRIu64 ",\"contact_drops\":%" PRIu64 "}",
+        w->tree_node_visits, w->pair_candidates, w->pair_probes,
+        w->proxy_creates, w->proxy_destroys, w->proxy_moves, w->wake_visits,
+        w->body_wakes, w->body_sleeps, w->graph_body_visits,
+        w->graph_constraint_visits, w->graph_parent_probes, w->contact_drops);
 }
 static void result_json(const bench_scene *scene, const bench_result *r,
                         const bench_options *o)
 {
     printf("{\"scene\":");
     json_string(scene->name);
-    printf(",\"settings\":{\"fixture_version\":1,\"friction\":%.9g,"
-           "\"restitution\":%.9g,\"seed\":%" PRIu32 ",\"warmup_steps\":%" PRIu32
-           ",\"measured_steps\":%" PRIu32
-           ",\"dt_seconds\":%.9g,\"substeps\":%" PRIu32
-           ",\"body_capacity\":%" PRIu32 ",\"contact_capacity\":%" PRIu32
-           ",\"joint_capacity\":%" PRIu32
-           ",\"gravity\":[%.9g,%.9g],\"linear_drag\":0,\"angular_drag\":0,"
-           "\"sleep_enabled\":false"
-           ",\"linear_speed_max\":%.9g,\"contact_hertz\":%.9g,\"contact_"
-           "damping_ratio\":%.9g"
-           ",\"contact_push_velocity_max\":%.9g,\"restitution_threshold\":%.9g,"
-           "\"joint_hertz\":%.9g,\"joint_damping_ratio\":%.9g}",
-           strcmp(scene->name, "rain") == 0 ? (double)0.4f : (double)0.6f,
-           strcmp(scene->name, "rain") == 0 ? (double)0.1f : 0.0, scene->seed,
-           o->warmup, o->steps, (double)k_timestep, k_substep_count,
-           r->stats.body_capacity, r->stats.contact_capacity,
-           r->stats.joint_capacity, (double)scene->config.gravity.x,
-           (double)scene->config.gravity.y, (double)SL_LINEAR_SPEED_MAX_DEFAULT,
-           (double)SL_CONTACT_HERTZ_DEFAULT,
-           (double)SL_CONTACT_DAMPING_RATIO_DEFAULT,
-           (double)SL_CONTACT_PUSH_VELOCITY_MAX_DEFAULT,
-           (double)SL_RESTITUTION_THRESHOLD_DEFAULT,
-           (double)SL_JOINT_HERTZ_DEFAULT,
-           (double)SL_JOINT_DAMPING_RATIO_DEFAULT);
+    printf(
+        ",\"settings\":{\"fixture_version\":1,\"friction\":%.9g,"
+        "\"restitution\":%.9g,\"seed\":%" PRIu32 ",\"warmup_steps\":%" PRIu32
+        ",\"measured_steps\":%" PRIu32
+        ",\"dt_seconds\":%.9g,\"substeps\":%" PRIu32
+        ",\"body_capacity\":%" PRIu32 ",\"contact_capacity\":%" PRIu32
+        ",\"joint_capacity\":%" PRIu32
+        ",\"gravity\":[%.9g,%.9g],\"linear_drag\":0,\"angular_drag\":0,"
+        "\"sleep_enabled\":%s,\"sleep_speed_max\":%.9g,\"sleep_angular_speed_"
+        "max\":%.9g,\"sleep_time_min\":%.9g"
+        ",\"linear_speed_max\":%.9g,\"contact_hertz\":%.9g,\"contact_"
+        "damping_ratio\":%.9g"
+        ",\"contact_push_velocity_max\":%.9g,\"restitution_threshold\":%.9g,"
+        "\"joint_hertz\":%.9g,\"joint_damping_ratio\":%.9g}",
+        strcmp(scene->name, "rain") == 0 ? (double)0.4f : (double)0.6f,
+        strcmp(scene->name, "rain") == 0 ? (double)0.1f : 0.0, scene->seed,
+        o->warmup, o->steps, (double)k_timestep, k_substep_count,
+        r->stats.body_capacity, r->stats.contact_capacity,
+        r->stats.joint_capacity, (double)scene->config.gravity.x,
+        (double)scene->config.gravity.y, o->sleep_enabled ? "true" : "false",
+        (double)SL_SLEEP_SPEED_MAX_DEFAULT,
+        (double)SL_SLEEP_ANGULAR_SPEED_MAX_DEFAULT,
+        (double)SL_SLEEP_TIME_MIN_DEFAULT, (double)SL_LINEAR_SPEED_MAX_DEFAULT,
+        (double)SL_CONTACT_HERTZ_DEFAULT,
+        (double)SL_CONTACT_DAMPING_RATIO_DEFAULT,
+        (double)SL_CONTACT_PUSH_VELOCITY_MAX_DEFAULT,
+        (double)SL_RESTITUTION_THRESHOLD_DEFAULT,
+        (double)SL_JOINT_HERTZ_DEFAULT, (double)SL_JOINT_DAMPING_RATIO_DEFAULT);
     printf(",\"timing_ms\":{\"average\":%.9g,\"median\":%.9g,\"p95\":%.9g,"
            "\"max\":%.9g,\"mutation_average\":%.9g}",
            r->average_ms, r->median_ms, r->p95_ms, r->maximum_ms,
            r->mutation_average_ms);
     printf(",\"semantic_digest\":\"%016" PRIx64 "\",\"drops\":%" PRIu64,
            r->digest, r->dropped_contact_count);
-    printf(",\"counts\":{\"bodies\":%" PRIu32 ",\"contacts\":%" PRIu32
-           ",\"joints\":%" PRIu32 ",\"pairs\":%" PRIu32
+    printf(",\"counts\":{\"awake_dynamics\":%" PRIu32
+           ",\"sleeping_dynamics\":%" PRIu32 ",\"bodies\":%" PRIu32
+           ",\"contacts\":%" PRIu32 ",\"joints\":%" PRIu32 ",\"pairs\":%" PRIu32
            ",\"pair_capacity\":%" PRIu32 ",\"body_high\":%" PRIu32
            ",\"contact_high\":%" PRIu32 ",\"joint_high\":%" PRIu32 "}",
+           r->stats.awake_dynamic_count, r->stats.sleeping_dynamic_count,
            r->stats.body_count, r->stats.contact_count, r->stats.joint_count,
            r->stats.pair_count, r->stats.pair_capacity,
            r->stats.body_count_high, r->stats.contact_count_high,
@@ -715,21 +730,25 @@ static void result_json(const bench_scene *scene, const bench_result *r,
            ",\"kinematic_bodies\":%" PRIu32 ",\"contact_constraints\":%" PRIu32
            ",\"joint_constraints\":%" PRIu32 ",\"substeps\":%" PRIu32
            ",\"islands\":%" PRIu32 ",\"island_bodies_max\":%" PRIu32
+           ",\"islands_executed\":%" PRIu32 ",\"islands_skipped\":%" PRIu32
            ",\"work\":",
            r->stats.step.dynamic_body_count, r->stats.step.kinematic_body_count,
            r->stats.step.contact_constraint_count,
            r->stats.step.joint_constraint_count, r->stats.step.substep_count,
-           r->stats.step.island_count, r->stats.step.island_body_count_max);
+           r->stats.step.island_count, r->stats.step.island_body_count_max,
+           r->stats.step.island_executed_count,
+           r->stats.step.island_skipped_count);
     work_print(&r->stats.step.work);
     printf("},\"cumulative_work\":");
     work_print(&r->stats.cumulative);
     const sl_world_memory_breakdown *m = &r->memory;
-    printf(",\"memory_bytes\":{\"island\":%zu,\"world_state\":%zu,\"body\":%zu,"
+    printf(",\"memory_bytes\":{\"sleep\":%zu,\"island\":%zu,\"world_state\":%"
+           "zu,\"body\":%zu,"
            "\"broadphase\":"
            "%zu,\"contact\":%zu,"
            "\"pair\":%zu,\"contact_solver\":%zu,\"joint\":%zu,\"padding\":%zu,"
            "\"arena\":%zu,\"world\":%zu}",
-           m->island_bytes, m->world_state_bytes, m->body_bytes,
+           m->sleep_bytes, m->island_bytes, m->world_state_bytes, m->body_bytes,
            m->broadphase_bytes, m->contact_bytes, m->pair_bytes,
            m->contact_solver_bytes, m->joint_bytes, m->padding_bytes,
            m->arena_bytes, m->world_bytes);
@@ -738,7 +757,8 @@ static void result_json(const bench_scene *scene, const bench_result *r,
            ",\"penetration_max\":%.9g,\"cached_penetration_max\":%.9g"
            ",\"translation_drift_max\":%.9g,\"rotation_drift_max\":%.9g,"
            "\"linear_speed_max\":%.9g,\"angular_speed_max\":%.9g"
-           ",\"joint_error_max\":%.9g,\"support_force_mean\":%.9g,\"supported_"
+           ",\"joint_error_max\":%.9g,\"cached_support_force_mean\":%.9g,"
+           "\"supported_"
            "weight\":%.9g}}",
            q->window_steps, (double)q->penetration_max,
            (double)q->cached_penetration_max, (double)q->translation_drift_max,
@@ -773,12 +793,21 @@ static bool options_parse(int argc, char **argv, bench_options *o)
                           .warmup = k_warmup_step_count,
                           .steps = k_measured_step_count };
     uint32_t seen = 0u;
-    if (argc > 7 || (argc & 1) == 0) {
+    if (argc > 9 || (argc & 1) == 0) {
         return false;
     }
     for (int i = 1; i < argc; i += 2) {
         uint32_t bit = 0u;
-        if (strcmp(argv[i], "--scene") == 0) {
+        if (strcmp(argv[i], "--sleep") == 0) {
+            bit = 8u;
+            if (strcmp(argv[i + 1], "on") == 0) {
+                o->sleep_enabled = true;
+            } else if (strcmp(argv[i + 1], "off") == 0) {
+                o->sleep_enabled = false;
+            } else {
+                return false;
+            }
+        } else if (strcmp(argv[i], "--scene") == 0) {
             bit = 1u;
             bool found = strcmp(argv[i + 1], "all") == 0;
             for (uint32_t j = 0u; j < BENCH_FIXTURE_COUNT; ++j) {
@@ -814,12 +843,13 @@ int main(int argc, char **argv)
 {
     bench_options options;
     if (!options_parse(argc, argv, &options) || !binary32_supported()) {
-        fprintf(stderr, "usage: sl_bench [--scene "
-                        "all|pyramid|rain|piles|chains|churn|table|inverted] "
-                        "[--warmup 0..10000] [--steps 1..10000]\n");
+        fprintf(stderr,
+                "usage: sl_bench [--scene "
+                "all|pyramid|rain|piles|chains|churn|table|inverted] "
+                "[--warmup 0..10000] [--steps 1..10000] [--sleep off|on]\n");
         return EXIT_FAILURE;
     }
-    printf("{\"schema_version\":3,\"metadata\":{\"compiler\":");
+    printf("{\"schema_version\":4,\"metadata\":{\"compiler\":");
     json_string(SL_BENCH_COMPILER_ID);
     printf(",\"compiler_version\":");
     json_string(SL_BENCH_COMPILER_VERSION);
@@ -849,8 +879,8 @@ int main(int argc, char **argv)
         if (scene == NULL) {
             return EXIT_FAILURE;
         }
-        const bool valid =
-            k_fixtures[i].build(scene) && scene_run(scene, &options, &result);
+        const bool valid = k_fixtures[i].build(scene, options.sleep_enabled) &&
+                           scene_run(scene, &options, &result);
         if (valid) {
             if (!first) {
                 putchar(',');

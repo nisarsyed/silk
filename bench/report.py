@@ -11,16 +11,16 @@ import sys
 
 SCENES = ('pyramid', 'rain', 'piles', 'chains', 'churn', 'table', 'inverted')
 WORK = ('tree_node_visits', 'pair_candidates', 'pair_probes', 'proxy_creates',
-        'proxy_destroys', 'proxy_moves', 'contact_drops', 'graph_body_visits', 'graph_constraint_visits', 'graph_parent_probes')
+        'proxy_destroys', 'proxy_moves', 'contact_drops', 'graph_body_visits', 'graph_constraint_visits', 'graph_parent_probes', 'wake_visits', 'body_wakes', 'body_sleeps')
 QUALITY = ('penetration_max', 'cached_penetration_max', 'translation_drift_max',
            'rotation_drift_max', 'linear_speed_max', 'angular_speed_max',
-           'joint_error_max', 'support_force_mean', 'supported_weight')
-MEMORY = ('island', 'world_state', 'body', 'broadphase', 'contact', 'pair', 'contact_solver', 'joint', 'padding', 'arena', 'world')
+           'joint_error_max', 'cached_support_force_mean', 'supported_weight')
+MEMORY = ('sleep', 'island', 'world_state', 'body', 'broadphase', 'contact', 'pair', 'contact_solver', 'joint', 'padding', 'arena', 'world')
 SETTINGS = ('fixture_version', 'friction', 'restitution', 'seed', 'warmup_steps', 'measured_steps', 'dt_seconds', 'substeps',
             'body_capacity', 'contact_capacity', 'joint_capacity', 'gravity',
             'linear_drag', 'angular_drag', 'sleep_enabled', 'linear_speed_max',
             'contact_hertz', 'contact_damping_ratio', 'contact_push_velocity_max',
-            'restitution_threshold', 'joint_hertz', 'joint_damping_ratio')
+            'restitution_threshold', 'joint_hertz', 'joint_damping_ratio', 'sleep_speed_max', 'sleep_angular_speed_max', 'sleep_time_min')
 
 
 def require(condition, message):
@@ -60,7 +60,7 @@ def load(path):
 
 def validate(report):
     fields(report, ('schema_version', 'metadata', 'results'), 'report')
-    require(type(report['schema_version']) is int and report['schema_version'] == 3, 'unsupported schema')
+    require(type(report['schema_version']) is int and report['schema_version'] == 4, 'unsupported schema')
     meta = report['metadata']
     fields(meta, ('compiler', 'compiler_version', 'build', 'flags', 'warnings', 'host',
                   'host_version', 'processor', 'revision'), 'metadata')
@@ -82,7 +82,7 @@ def validate(report):
                           ('joint_capacity', 65536)):
             number(settings[key], 0 if key in ('seed', 'warmup_steps', 'joint_capacity') else 1,
                    high, f'settings.{key}', True)
-        require(type(settings['sleep_enabled']) is bool and not settings['sleep_enabled'], 'wave 1 is awake')
+        require(type(settings['sleep_enabled']) is bool, 'sleep policy must be boolean')
         require(type(settings['gravity']) is list and len(settings['gravity']) == 2, 'gravity shape')
         for value in settings['gravity']:
             number(value, -1e6, 1e6, 'gravity')
@@ -99,7 +99,7 @@ def validate(report):
         require(type(row['semantic_digest']) is str and re.fullmatch(r'[0-9a-f]{16}', row['semantic_digest']), 'invalid semantic_digest')
         number(row['drops'], 0, 0, 'unexpected contact drops', True)
         counts = row['counts']
-        fields(counts, ('bodies', 'contacts', 'joints', 'pairs', 'pair_capacity',
+        fields(counts, ('awake_dynamics', 'sleeping_dynamics', 'bodies', 'contacts', 'joints', 'pairs', 'pair_capacity',
                         'body_high', 'contact_high', 'joint_high'), 'counts')
         for key, value in counts.items():
             number(value, 0, 524288, f'counts.{key}', True)
@@ -109,9 +109,13 @@ def validate(report):
         capacity = counts['pair_capacity']
         require(capacity > 0 and capacity & (capacity - 1) == 0, 'pair capacity must be power of two')
         step = row['step']
-        fields(step, ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'islands', 'island_bodies_max', 'work'), 'step')
-        for key in ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'islands', 'island_bodies_max'):
+        fields(step, ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'islands', 'island_bodies_max', 'islands_executed', 'islands_skipped', 'work'), 'step')
+        for key in ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'islands', 'island_bodies_max', 'islands_executed', 'islands_skipped'):
             number(step[key], 0, 262144, f'step.{key}', True)
+        require(step['islands_executed'] + step['islands_skipped'] == step['islands'], 'island execution invariant')
+        require(counts['awake_dynamics'] + counts['sleeping_dynamics'] <= counts['bodies'], 'activation count invariant')
+        if not settings['sleep_enabled']:
+            require(counts['sleeping_dynamics'] == 0 and step['islands_skipped'] == 0, 'disabled sleep invariant')
         require(step['substeps'] == settings['substeps'], 'step substeps mismatch')
         require(step['dynamic_bodies'] + step['kinematic_bodies'] <= counts['bodies'], 'active count invariant')
         require(step['contact_constraints'] <= counts['contacts'] and step['joint_constraints'] <= counts['joints'], 'constraint count invariant')
@@ -132,7 +136,7 @@ def validate(report):
         number(quality['window_steps'], 1, 60, 'window_steps', True)
         require(quality['window_steps'] == min(60, settings['measured_steps']), 'quality window mismatch')
         for key in QUALITY:
-            number(quality[key], -1e12 if key == 'support_force_mean' else 0, 1e12, key)
+            number(quality[key], -1e12 if key == 'cached_support_force_mean' else 0, 1e12, key)
     return report
 
 
@@ -147,7 +151,7 @@ def quality_check(report):
         if 'support_ratio' in bound:
             q = row['quality']
             require(q['supported_weight'] > 0, 'support weight is zero')
-            ratio = q['support_force_mean'] / q['supported_weight']
+            ratio = q['cached_support_force_mean'] / q['supported_weight']
             require(bound['support_ratio'][0] <= ratio <= bound['support_ratio'][1], f"{row['scene']}: load transfer ratio {ratio}")
 
 
@@ -191,6 +195,7 @@ def main():
     run.add_argument('--output', type=Path, required=True)
     run.add_argument('--repeat', type=bounded(1, 20), default=5)
     run.add_argument('--scene', choices=('all',) + SCENES, default='all')
+    run.add_argument('--sleep', choices=('off', 'on'), default='off')
     run.add_argument('--warmup', type=bounded(0, 10000), default=120)
     run.add_argument('--steps', type=bounded(1, 10000), default=600)
     run.add_argument('--quality', action='store_true')
@@ -213,7 +218,7 @@ def main():
         else:
             args.output.mkdir(parents=True, exist_ok=True)
             command = [str(args.executable.resolve()), '--scene', args.scene, '--warmup', str(args.warmup),
-                       '--steps', str(args.steps)]
+                       '--steps', str(args.steps), '--sleep', args.sleep]
             reports = []
             for i in range(args.repeat):
                 result = subprocess.run(command, text=True, capture_output=True, timeout=600, check=False)
