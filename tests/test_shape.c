@@ -932,7 +932,37 @@ static void random_convex_polygons_satisfy_invariants(void)
     SL_EXPECT(ray_ok);
 }
 
+static void ray_cast_circle_preserves_small_radius_on_long_rays(void)
+{
+    const float radii[] = { 0.001f, 1.0f, SL_SHAPE_EXTENT_MAX };
+    const sl_transform transform = { { 0.0f, 0.0f }, { 1.0f, 0.0f } };
+    const sl_ray ray = { { -9216.0f, 0.0f }, { 18432.0f, 0.0f } };
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        sl_shape circle = sl_shape_none();
+        SL_EXPECT(sl_shape_make_circle(radii[i], &circle));
+        sl_ray_hit hit;
+        SL_EXPECT(sl_shape_ray_cast(&circle, transform, ray, &hit));
+        SL_EXPECT_NEAR(hit.point.x, -radii[i], SL_EPSILON);
+        SL_EXPECT_NEAR(hit.point.y, 0.0f, SL_EPSILON);
+        SL_EXPECT_NEAR(hit.normal.x, -1.0f, SL_EPSILON);
+        SL_EXPECT_NEAR(hit.normal.y, 0.0f, SL_EPSILON);
+        SL_EXPECT_NEAR(hit.fraction, (9216.0f - radii[i]) / 18432.0f,
+                       SL_EPSILON);
+    }
+    sl_shape circle = sl_shape_none();
+    SL_EXPECT(sl_shape_make_circle(1.0f, &circle));
+    sl_ray_hit hit;
+    SL_EXPECT(sl_shape_ray_cast(
+        &circle, transform, (sl_ray){ { -9216.0f, 0.5f }, { 18432.0f, 0.0f } },
+        &hit));
+    SL_EXPECT_NEAR(hit.point.x, -sqrtf(0.75f), SL_EPSILON);
+    SL_EXPECT_NEAR(hit.normal.y, 0.5f, SL_EPSILON);
+    SL_EXPECT_NEAR(sl_vec2_length(hit.normal), 1.0f, SL_EPSILON);
+}
+
 static const sl_test_case k_cases[] = {
+    { "long circle rays preserve radius",
+      ray_cast_circle_preserves_small_radius_on_long_rays },
     { "none_shape_is_zeroed_and_inert", none_shape_is_zeroed_and_inert },
     { "constructors_zero_unused_payload", constructors_zero_unused_payload },
     { "circle_make_rejects_bad_radius", circle_make_rejects_bad_radius },

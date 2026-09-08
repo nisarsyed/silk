@@ -396,34 +396,42 @@ static bool ray_valid(sl_ray ray)
 static bool circle_ray_cast(const sl_shape *shape, sl_transform transform,
                             sl_ray ray, sl_ray_hit *hit)
 {
-    const float radius = shape->circle.radius;
-    /* u: ray origin relative to the circle center. */
-    const sl_vec2 u = sl_vec2_sub(ray.origin, transform.position);
-    const sl_vec2 d = ray.translation;
-
-    const float dd = sl_vec2_dot(d, d);
-    const float uc = sl_vec2_dot(u, u) - radius * radius;
-    /* The containment pre-check already returned for origins inside or
-     * on the boundary, so uc > 0 holds here. */
-    if (uc <= 0.0f) {
+    /* Project onto the ray before computing the small radial offset. The
+     * quadratic discriminant subtracts large nearly equal squared terms;
+     * at world-scale distances it can erase the entire circle radius.
+     * Double intermediates preserve the offset without changing stored state.
+     */
+    const double radius = (double)shape->circle.radius;
+    const double ux = (double)ray.origin.x - (double)transform.position.x;
+    const double uy = (double)ray.origin.y - (double)transform.position.y;
+    const double dx = (double)ray.translation.x;
+    const double dy = (double)ray.translation.y;
+    const double dd = dx * dx + dy * dy;
+    const double projection = -(ux * dx + uy * dy) / dd;
+    if (projection <= 0.0) {
         return false;
     }
-    const float ub = sl_vec2_dot(u, d);
-    if (ub >= 0.0f) {
-        return false; /* receding: nearest approach lies behind */
-    }
-    const float discriminant = ub * ub - dd * uc;
-    if (discriminant < 0.0f) {
+    const double closest_x = ux + projection * dx;
+    const double closest_y = uy + projection * dy;
+    const double height_sq =
+        radius * radius - (closest_x * closest_x + closest_y * closest_y);
+    if (height_sq < 0.0) {
         return false;
     }
-    /* uc > 0 and ub < 0 keep the near root in [0, 1] iff it exists. */
-    const float fraction = (-ub - sqrtf(discriminant)) / dd;
-    if (fraction > 1.0f) {
+    const double offset = sqrt(height_sq / dd);
+    const double fraction = projection - offset;
+    if (fraction < 0.0 || fraction > 1.0) {
         return false;
     }
-    hit->fraction = fraction;
-    hit->point = sl_vec2_add(ray.origin, sl_vec2_scale(d, fraction));
-    hit->normal = sl_vec2_normalize(sl_vec2_add(u, sl_vec2_scale(d, fraction)));
+    /* Retain the radial offset when fraction itself rounds to the center's
+     * projection. Reconstruct the point from the shape rather than that
+     * rounded fraction so a long ray still has a unit outward normal. */
+    const double nx = closest_x - offset * dx;
+    const double ny = closest_y - offset * dy;
+    hit->fraction = (float)fraction;
+    hit->point = (sl_vec2){ (float)((double)transform.position.x + nx),
+                            (float)((double)transform.position.y + ny) };
+    hit->normal = (sl_vec2){ (float)(nx / radius), (float)(ny / radius) };
     return true;
 }
 

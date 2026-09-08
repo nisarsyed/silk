@@ -136,12 +136,19 @@ inspect bodies, joints and diagnostics through the public accessors. Handles
 belong to the world lifetime that created them.
 
 Include the subsystem headers you use, such as `<silk/math.h>`,
-`<silk/shape.h>`, `<silk/contact.h>`, `<silk/joint.h>`, `<silk/world.h>`, and
-`<silk/step.h>`. `<silk/silk.h>` exposes the version macros and `sl_version()`.
+`<silk/shape.h>`, `<silk/contact.h>`, `<silk/joint.h>`, `<silk/world.h>`,
+`<silk/step.h>`, and `<silk/query.h>`. `<silk/silk.h>` exposes the version macros
+and `sl_version()`.
 The core chooses no timestep: call `sl_world_step` with one fixed value
 throughout a run, or initialize `sl_stepper` with your application's fixed
 value. The sandbox's 1/60-second timestep is an example policy, not a library
 default.
+
+World queries provide tight-AABB overlap, shape point containment and closest
+ray hits through `<silk/query.h>`. Buffer queries return ascending body slots,
+total matches and truncation; they accept zero capacity for counting. Queries
+preserve snapshots and simulation state but share scratch, so same-world
+operations must not run concurrently. See the header for type masks and ray bounds.
 
 `sl_world_config.substep_count` defaults to four and accepts one through eight.
 Body friction and restitution default to zero; joint storage is opt-in through
