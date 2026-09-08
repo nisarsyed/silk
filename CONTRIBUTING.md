@@ -140,3 +140,7 @@ forms under `.github/ISSUE_TEMPLATE/`.
 Do not knowingly leave broken invariants or weakened guardrails as follow-up
 work. When a legitimate follow-up is outside the current change, document its
 scope and rationale explicitly.
+
+Use `gh stack` for stacked pull requests: initialize or adopt the ordered
+branches with `gh stack init`, publish with `gh stack submit`, and use its
+sync/rebase commands when maintaining the stack. Nisar handles merging.
