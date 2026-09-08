@@ -418,7 +418,7 @@ sl_tree_query_result sl_tree_query(sl_tree *tree, sl_tree_root_kind root,
                                    sl_aabb aabb, uint32_t *out_users,
                                    uint32_t out_capacity)
 {
-    sl_tree_query_result result = { 0u, false };
+    sl_tree_query_result result = { 0 };
     if (tree == NULL || tree->nodes == NULL || !sl_tree_root_valid(root) ||
         !sl_aabb_is_valid(aabb) || (out_capacity > 0u && out_users == NULL)) {
         return result;
@@ -432,6 +432,7 @@ sl_tree_query_result sl_tree_query(sl_tree *tree, sl_tree_root_kind root,
     tree->stack[stack_count++] = root_id;
     while (stack_count > 0u) {
         const uint32_t node_id = tree->stack[--stack_count];
+        result.node_visits += 1u;
         const sl_tree_node *node = &tree->nodes[node_id];
         if (!sl_aabb_overlaps(node->aabb, aabb)) {
             continue;

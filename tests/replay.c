@@ -97,6 +97,28 @@ bool sl_replay_compare(const sl_world *a, const sl_world *b,
     F(restitution_threshold);
     F(joint_hertz);
     F(joint_damping_ratio);
+    U(work_total.tree_node_visits);
+    U(step_stats.work.tree_node_visits);
+    U(work_total.pair_candidates);
+    U(step_stats.work.pair_candidates);
+    U(work_total.pair_probes);
+    U(step_stats.work.pair_probes);
+    U(work_total.proxy_creates);
+    U(step_stats.work.proxy_creates);
+    U(work_total.proxy_destroys);
+    U(step_stats.work.proxy_destroys);
+    U(work_total.proxy_moves);
+    U(step_stats.work.proxy_moves);
+    U(work_total.contact_drops);
+    U(step_stats.work.contact_drops);
+    U(body_count_high);
+    U(contact_count_high);
+    U(joint_count_high);
+    U(step_stats.dynamic_body_count);
+    U(step_stats.kinematic_body_count);
+    U(step_stats.contact_constraint_count);
+    U(step_stats.joint_constraint_count);
+    U(step_stats.substep_count);
     V(gravity);
     for (i = 0u; i < a->body_capacity; ++i) {
         U(slots[i].dense);

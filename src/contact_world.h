@@ -10,6 +10,9 @@
 uint32_t sl_contact_pair_capacity(uint32_t contact_capacity);
 size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
                                      uint32_t contact_capacity);
+size_t sl_contact_world_memory_layout(uint32_t body_capacity,
+                                      uint32_t contact_capacity,
+                                      sl_world_memory_breakdown *out);
 bool sl_contact_world_init(sl_world *world, void *memory, size_t memory_bytes);
 void sl_contact_world_reset(sl_world *world);
 

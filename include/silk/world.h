@@ -122,6 +122,68 @@ typedef struct sl_joint_slot {
     uint32_t generation; /* bumped on destroy/reset; wrap skips zero */
 } sl_joint_slot;
 
+/* Deterministic work: candidates are matching tree leaves before filtering;
+ * visits include rejected query nodes. Probes count every inspected pair
+ * bucket, including terminating empty buckets and deletion/reinsertion work.
+ * Proxy counts record successful create/destroy/reinsert operations, not retry
+ * marking. Drops count failed eligible contact candidates. Counters saturate
+ * at UINT64_MAX; cumulative work includes mutations between steps. */
+typedef struct sl_world_work {
+    uint64_t tree_node_visits;
+    uint64_t pair_candidates;
+    uint64_t pair_probes;
+    uint64_t proxy_creates;
+    uint64_t proxy_destroys;
+    uint64_t proxy_moves;
+    uint64_t contact_drops;
+} sl_world_work;
+
+/* Prepared constraint records, not scalar equations or successful impulses.
+ * Each substep executes warm start and biased/relax contact/joint sweeps;
+ * contact restitution executes once. Step work is independent of cumulative
+ * saturation. An empty valid step has zero workload and configured substeps. */
+typedef struct sl_world_step_stats {
+    sl_world_work work;
+    uint32_t dynamic_body_count;
+    uint32_t kinematic_body_count;
+    uint32_t contact_constraint_count;
+    uint32_t joint_constraint_count;
+    uint32_t substep_count;
+} sl_world_step_stats;
+
+typedef struct sl_world_stats {
+    sl_world_step_stats step; /* most recently completed valid step */
+    sl_world_work cumulative; /* since initialization/reset */
+    uint32_t body_count;
+    uint32_t body_capacity;
+    uint32_t contact_count;
+    uint32_t contact_capacity;
+    uint32_t joint_count;
+    uint32_t joint_capacity;
+    uint32_t pair_count; /* one occupied bucket per persistent contact */
+    uint32_t pair_capacity;
+    uint32_t body_count_high;
+    uint32_t contact_count_high; /* also pair occupancy high-water */
+    uint32_t joint_count_high;
+} sl_world_stats;
+
+/* Payload categories plus padding sum to arena_bytes, the exact allocation.
+ * world_bytes is caller-owned sizeof(sl_world), not part of that sum.
+ * Categories include internal struct padding; padding_bytes counts alignment
+ * between arena slices. Joint bytes include solver scratch/body adjacency and
+ * are zero when joints are disabled. */
+typedef struct sl_world_memory_breakdown {
+    size_t body_bytes;
+    size_t broadphase_bytes;
+    size_t contact_bytes;
+    size_t pair_bytes;
+    size_t contact_solver_bytes;
+    size_t joint_bytes;
+    size_t padding_bytes;
+    size_t arena_bytes;
+    size_t world_bytes;
+} sl_world_memory_breakdown;
+
 /* Owning runtime object: initialize from zero, never copy after init, and
  * treat every field below as engine-private. Copying duplicates arena
  * ownership and makes destruction unsafe. */
@@ -230,12 +292,32 @@ typedef struct sl_world {
      * solver stage, so AoS is the appropriate scratch granularity. */
     void *joint_constraints;
 
+    /* Fixed diagnostic storage; never participates in physics decisions.
+     * Cost: one step snapshot + two work counters + three uint32_t + bool and
+     * ABI padding. Measured arm64 overhead: 208 bytes (world 480 -> 688);
+     * arena size and per-entity storage are unaffected. */
+    sl_world_step_stats step_stats;
+    sl_world_work work_total;
+    sl_world_work step_work;
+    uint32_t body_count_high;
+    uint32_t contact_count_high;
+    uint32_t joint_count_high;
+    bool stats_stepping;
+
     void *memory; /* backing block carved into every array above */
 } sl_world;
 
 /* Exact bytes sl_world_init allocates for this configuration after resolving
  * zero defaults; 0 when a capacity or configuration value is invalid. */
 size_t sl_world_memory_bytes(const sl_world_config *config);
+/* False for invalid configuration/NULL output, leaving output untouched. */
+bool sl_world_memory_breakdown_get(const sl_world_config *config,
+                                   sl_world_memory_breakdown *out);
+/* Copied values; reads mutate no state or contact/shape snapshots. Current
+ * counts reflect mutations; last-step values survive rejected steps and
+ * mutations. Reset clears work/high-water/last-step values and retains
+ * capacities. */
+sl_world_stats sl_world_get_stats(const sl_world *world);
 
 /* *world must be zero-initialized or previously destroyed: re-initializing
  * a live world leaks its arena, so the assert fires in debug builds.

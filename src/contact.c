@@ -8,6 +8,7 @@
 #include "collide.h"
 #include "joint.h"
 #include "silk/assert.h"
+#include "stats.h"
 #include "tree.h"
 
 #define SL_CONTACT_CARVE_ALIGN ((size_t)8u)
@@ -91,8 +92,9 @@ uint32_t sl_contact_pair_capacity(uint32_t contact_capacity)
     return capacity;
 }
 
-size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
-                                     uint32_t contact_capacity)
+size_t sl_contact_world_memory_layout(uint32_t body_capacity,
+                                      uint32_t contact_capacity,
+                                      sl_world_memory_breakdown *out)
 {
     if (body_capacity < 1u || body_capacity > SL_BODY_COUNT_MAX) {
         return 0u;
@@ -103,6 +105,7 @@ size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
     }
 
     size_t total = 0u;
+    size_t payload = 0u;
     size_t slice = 0u;
 #define ADD_SLICE(count, type)                                                 \
     do {                                                                       \
@@ -110,6 +113,7 @@ size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
             !size_add(total, slice, &total)) {                                 \
             return 0u;                                                         \
         }                                                                      \
+        payload += (size_t)(count) * sizeof(type);                             \
     } while (false)
 
     ADD_SLICE(1u, sl_tree);
@@ -117,16 +121,30 @@ size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
     if (tree_bytes == 0u || !size_add(total, tree_bytes, &total)) {
         return 0u;
     }
+    /* 2*body_capacity makes both tree arrays exact 8-byte multiples. */
+    payload += tree_bytes;
     ADD_SLICE(body_capacity, sl_aabb);
     ADD_SLICE(body_capacity, uint32_t);
     ADD_SLICE(body_capacity, uint8_t);
     ADD_SLICE(body_capacity, uint32_t);
     ADD_SLICE(body_capacity, uint32_t);
+    out->broadphase_bytes = payload;
     ADD_SLICE(contact_capacity, sl_contact);
+    out->contact_bytes = (size_t)contact_capacity * sizeof(sl_contact);
     ADD_SLICE(pair_capacity, uint64_t);
+    out->pair_bytes = (size_t)pair_capacity * sizeof(uint64_t);
+    out->padding_bytes = total - payload;
 
 #undef ADD_SLICE
     return total;
+}
+
+size_t sl_contact_world_memory_bytes(uint32_t body_capacity,
+                                     uint32_t contact_capacity)
+{
+    sl_world_memory_breakdown ignored = { 0 };
+    return sl_contact_world_memory_layout(body_capacity, contact_capacity,
+                                          &ignored);
 }
 
 static sl_tree *world_tree(sl_world *world)
@@ -247,6 +265,7 @@ bool sl_contact_body_create(sl_world *world, uint32_t dense, uint32_t slot)
     if (proxy == SL_TREE_NODE_NONE) {
         return false;
     }
+    SL_WORK_ADD(world, proxy_creates, 1u);
     world->proxies[dense] = proxy;
     world->proxy_aabbs[dense] = fat_aabb;
     moved_mark(world, dense, slot);
@@ -266,6 +285,7 @@ void sl_contact_body_destroy(sl_world *world, uint32_t dense, uint32_t slot)
                               world->proxies[dense]);
     SL_ASSERT(destroyed);
     (void)destroyed;
+    SL_WORK_ADD(world, proxy_destroys, 1u);
     world->proxies[dense] = SL_TREE_NODE_NONE;
 }
 
@@ -297,6 +317,7 @@ bool sl_contact_body_update(sl_world *world, uint32_t dense, uint32_t slot)
     if (!moved) {
         return false;
     }
+    SL_WORK_ADD(world, proxy_moves, 1u);
     world->proxy_aabbs[dense] = fat_aabb;
     moved_mark(world, dense, slot);
     return true;
@@ -341,7 +362,7 @@ static uint32_t pair_hash(uint64_t key)
     return (uint32_t)key;
 }
 
-static bool pair_find(const sl_world *world, uint64_t key, uint32_t *out)
+static bool pair_find(sl_world *world, uint64_t key, uint32_t *out)
 {
     SL_ASSERT(key != 0u);
     const uint32_t mask = world->pair_capacity - 1u;
@@ -349,16 +370,19 @@ static bool pair_find(const sl_world *world, uint64_t key, uint32_t *out)
     for (uint32_t probe = 0u; probe < world->pair_capacity; ++probe) {
         const uint64_t stored = world->pair_keys[index];
         if (stored == 0u) {
+            SL_WORK_ADD(world, pair_probes, (uint64_t)probe + 1u);
             *out = index;
             return false;
         }
         if (stored == key) {
+            SL_WORK_ADD(world, pair_probes, (uint64_t)probe + 1u);
             *out = index;
             return true;
         }
         index = (index + 1u) & mask;
     }
     SL_ASSERT(false);
+    SL_WORK_ADD(world, pair_probes, world->pair_capacity);
     *out = 0u;
     return false;
 }
@@ -388,6 +412,7 @@ static void pair_remove(sl_world *world, uint64_t key)
     for (uint32_t probe = 0u; probe < world->pair_capacity; ++probe) {
         const uint64_t shifted = world->pair_keys[index];
         if (shifted == 0u) {
+            SL_WORK_ADD(world, pair_probes, (uint64_t)probe + 1u);
             return;
         }
         world->pair_keys[index] = 0u;
@@ -548,6 +573,9 @@ static bool contact_create(sl_world *world, uint32_t slot_a, uint32_t slot_b)
     contact->body_b = (sl_body_handle){ high, world->slots[high].generation };
     contact_refresh(world, contact);
     world->contact_count += 1u;
+    if (world->contact_count > world->contact_count_high) {
+        world->contact_count_high = world->contact_count;
+    }
     return true;
 }
 
@@ -575,6 +603,7 @@ static void pair_candidate(sl_world *world, uint32_t slot, uint32_t other_slot,
     }
     if (!contact_create(world, slot, other_slot)) {
         world->contact_drop_count += 1u;
+        SL_WORK_ADD(world, contact_drops, 1u);
         *dropped = true;
     }
 }
@@ -586,6 +615,8 @@ static void query_root(sl_world *world, uint32_t slot, sl_tree_root_kind root,
     const sl_tree_query_result result =
         sl_tree_query(world_tree(world), root, world->proxy_aabbs[dense],
                       world->query_slots, world->body_capacity);
+    SL_WORK_ADD(world, tree_node_visits, result.node_visits);
+    SL_WORK_ADD(world, pair_candidates, result.count);
     SL_ASSERT(!result.overflow && result.count <= world->body_capacity);
     const uint32_t count = (result.count <= world->body_capacity)
                                ? result.count
