@@ -1,6 +1,7 @@
 #include "replay.h"
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 #include <math.h>
 #include <silk/step.h>
 #include <string.h>
@@ -23,7 +24,7 @@ static uint64_t operation_apply(sl_world *world, uint32_t kind, uint32_t value)
                           ? sl_shape_make_circle(0.5f, &shape)
                           : sl_shape_make_box(0.5f, 0.5f, &shape);
     SL_EXPECT(made);
-    if (kind == 0u || world->body_count == 0u) {
+    if (kind == 0u || world->state->body_count == 0u) {
         const sl_body_type type = (sl_body_type)(value % 3u);
         const sl_body_desc desc = {
             .position = { (float)(value % 8u), (float)((value / 8u) % 4u) },
@@ -36,7 +37,7 @@ static uint64_t operation_apply(sl_world *world, uint32_t kind, uint32_t value)
         return ((uint64_t)h.index << 32u) | h.generation;
     }
     const sl_body_handle body =
-        sl_world_body_at(world, value % world->body_count);
+        sl_world_body_at(world, value % world->state->body_count);
     switch (kind) {
     case 1u:
         sl_world_body_destroy(world, body);
@@ -70,7 +71,8 @@ static uint64_t operation_apply(sl_world *world, uint32_t kind, uint32_t value)
         const sl_joint_desc desc = {
             .kind = (value & 1u) ? SL_JOINT_DISTANCE : SL_JOINT_REVOLUTE,
             .body_a = body,
-            .body_b = sl_world_body_at(world, (value + 1u) % world->body_count),
+            .body_b = sl_world_body_at(world,
+                                       (value + 1u) % world->state->body_count),
             .distance = { .length = 1.0f },
             .collide_connected = (value & 2u) != 0u
         };
@@ -78,9 +80,10 @@ static uint64_t operation_apply(sl_world *world, uint32_t kind, uint32_t value)
         return ((uint64_t)h.index << 32u) | h.generation;
     }
     case 13u:
-        if (world->joint_count != 0u) {
+        if (world->state->joint_count != 0u) {
             sl_world_joint_destroy(
-                world, sl_world_joint_at(world, value % world->joint_count));
+                world,
+                sl_world_joint_at(world, value % world->state->joint_count));
         }
         return 0u;
     case 14u:
@@ -162,14 +165,14 @@ static void rejection_and_diagnostic(void)
                                     .seed = REPLAY_SEED,
                                     .operation = 5u };
     /* Signed zero proves this is a representation comparison, not float ==. */
-    b.positions[0].x = -0.0f;
+    b.state->positions[0].x = -0.0f;
     SL_EXPECT(!sl_replay_compare(&a, &b, &mismatch));
     SL_EXPECT(strcmp(mismatch.field_name, "positions[i].x") == 0);
     SL_EXPECT_INT_EQ(mismatch.entity, 0u);
     SL_EXPECT(mismatch.value_a == 0u &&
               mismatch.value_b == UINT32_C(0x80000000));
     SL_EXPECT(mismatch.seed == REPLAY_SEED && mismatch.operation == 5u);
-    b.positions[0].x = 0.0f;
+    b.state->positions[0].x = 0.0f;
     sl_world_reset(&a);
     SL_EXPECT(!sl_world_body_is_valid(&a, body));
     (void)operation_apply(&a, 0u, 0u);
@@ -283,7 +286,7 @@ static void coupled_long_run(void)
         SL_EXPECT_INT_EQ(sl_world_contact_drop_count(&worlds[0]), 0u);
     }
     sl_replay_mismatch mismatch = { 0 };
-    worlds[1].joint_distance_impulses[0] += 1.0f;
+    worlds[1].state->joint_distance_impulses[0] += 1.0f;
     SL_EXPECT(!sl_replay_compare(&worlds[0], &worlds[1], &mismatch));
     SL_EXPECT(strcmp(mismatch.field_name, "joint_distance_impulses[i]") == 0);
     sl_world_destroy(&worlds[0]);

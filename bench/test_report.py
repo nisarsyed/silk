@@ -23,6 +23,13 @@ class ReportTests(unittest.TestCase):
         report.validate(self.baseline)
         report.quality_check(self.baseline)
 
+    def test_schema_version(self):
+        for version in (1, 3, True, '2'):
+            value = copy.deepcopy(self.baseline)
+            value['schema_version'] = version
+            with self.assertRaises(ValueError):
+                report.validate(value)
+
     def test_malformed_json(self):
         for text in ('{', '{"a":1,"a":2}', '{"a":NaN}', '{"a":Infinity}', '[' * 2000):
             with self.subTest(text=text[:40]):

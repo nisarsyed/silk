@@ -1,6 +1,7 @@
 #include "replay.h"
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 
 #include <float.h>
 #include <math.h>
@@ -67,7 +68,7 @@ static void test_default_substeps_pin_gravity_trajectory(void)
                                .gravity = sl_vec2_make(0.0f, -10.0f) };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
-    SL_EXPECT_INT_EQ(world.substep_count, 4u);
+    SL_EXPECT_INT_EQ(sl_world_get_substep_count(&world), 4u);
 
     sl_body_desc desc = { .mass = 1.0f };
     const sl_body_handle handle = sl_world_body_create(&world, &desc);
@@ -77,11 +78,11 @@ static void test_default_substeps_pin_gravity_trajectory(void)
     SL_EXPECT_NEAR(sl_world_body_get_velocity(&world, handle).y, -1.0f, k_eps);
     SL_EXPECT_NEAR(sl_world_body_get_position(&world, handle).y, -0.0625f,
                    k_eps);
-    const uint32_t dense = world.slots[handle.index].dense;
-    SL_EXPECT(world.delta_positions[dense].x == 0.0f &&
-              world.delta_positions[dense].y == 0.0f);
-    SL_EXPECT(world.delta_rotations[dense].c == 1.0f &&
-              world.delta_rotations[dense].s == 0.0f);
+    const uint32_t dense = world.state->slots[handle.index].dense;
+    SL_EXPECT(world.state->delta_positions[dense].x == 0.0f &&
+              world.state->delta_positions[dense].y == 0.0f);
+    SL_EXPECT(world.state->delta_rotations[dense].c == 1.0f &&
+              world.state->delta_rotations[dense].s == 0.0f);
     sl_world_destroy(&world);
 }
 
@@ -218,12 +219,12 @@ static void test_invalid_step_is_release_safe_and_atomic(void)
     void *snapshot = malloc(bytes);
     SL_EXPECT(snapshot != NULL);
     if (snapshot != NULL) {
-        memcpy(snapshot, world.memory, bytes);
+        memcpy(snapshot, world.state, bytes);
         const float invalid_dt[] = { NAN, INFINITY, 0.0f, -1.0f, FLT_MIN };
         for (uint32_t i = 0u; i < sizeof(invalid_dt) / sizeof(invalid_dt[0]);
              ++i) {
             sl_world_step(&world, invalid_dt[i]);
-            SL_EXPECT(memcmp(snapshot, world.memory, bytes) == 0);
+            SL_EXPECT(memcmp(snapshot, world.state, bytes) == 0);
         }
         free(snapshot);
     }
@@ -369,7 +370,8 @@ static void test_step_holds_last_finite_state_on_overflow(void)
 
     const sl_vec2 position = sl_world_body_get_position(&world, h);
     const float angle = sl_world_body_get_angle(&world, h);
-    const sl_rotation rotation = world.rotations[world.slots[h.index].dense];
+    const sl_rotation rotation =
+        world.state->rotations[world.state->slots[h.index].dense];
     SL_EXPECT(sl_vec2_is_finite(position));
     SL_EXPECT(sl_is_finite(angle));
     SL_EXPECT_NEAR(position.x, 800.0f, k_eps);
@@ -862,14 +864,14 @@ static void test_config_validation_and_defaults(void)
                                     .gravity = sl_vec2_make(NAN, 0.0f),
                                     .linear_drag = 0.0f };
     SL_EXPECT(!sl_world_init(&world, &nan_gravity));
-    SL_EXPECT(world.memory == NULL && world.body_capacity == 0u);
+    SL_EXPECT(world.state == NULL && sl_world_body_capacity(&world) == 0u);
 
     sl_world_config inf_gravity = { .body_capacity = 4u,
                                     .substep_count = 1u,
                                     .gravity = sl_vec2_make(0.0f, INFINITY),
                                     .linear_drag = 0.0f };
     SL_EXPECT(!sl_world_init(&world, &inf_gravity));
-    SL_EXPECT(world.memory == NULL);
+    SL_EXPECT(world.state == NULL);
 
     sl_world_config neg_drag = { .body_capacity = 4u, .substep_count = 1u };
     neg_drag.linear_drag = -1.0f;
@@ -1084,11 +1086,12 @@ static void test_churn_step_stress_matches_model(void)
                     moved[i] = moved[i] || alive[i];
                 }
                 /* Every executed step consumes both accumulators. */
-                for (uint32_t row = 0u; row < world.body_count; ++row) {
+                for (uint32_t row = 0u; row < sl_world_body_count(&world);
+                     ++row) {
                     forces_settled = forces_settled &&
-                                     world.forces[row].x == 0.0f &&
-                                     world.forces[row].y == 0.0f &&
-                                     world.torques[row] == 0.0f;
+                                     world.state->forces[row].x == 0.0f &&
+                                     world.state->forces[row].y == 0.0f &&
+                                     world.state->torques[row] == 0.0f;
                 }
             }
         }
@@ -1498,11 +1501,12 @@ static void test_churn_mixed_types_stress_matches_model(void)
                 sl_world_advance(&twin, &twin_stepper, frame_time);
             SL_EXPECT_INT_EQ(stepped, stepped_twin);
             if (stepped > 0u) {
-                for (uint32_t row = 0u; row < world.body_count; ++row) {
+                for (uint32_t row = 0u; row < sl_world_body_count(&world);
+                     ++row) {
                     accumulators_settled = accumulators_settled &&
-                                           world.forces[row].x == 0.0f &&
-                                           world.forces[row].y == 0.0f &&
-                                           world.torques[row] == 0.0f;
+                                           world.state->forces[row].x == 0.0f &&
+                                           world.state->forces[row].y == 0.0f &&
+                                           world.state->torques[row] == 0.0f;
                 }
             }
         }
@@ -1520,8 +1524,8 @@ static void test_churn_mixed_types_stress_matches_model(void)
                 continue;
             }
             const sl_vec2 position = sl_world_body_get_position(&world, probe);
-            const uint32_t dense = world.slots[probe.index].dense;
-            const sl_rotation rotation = world.rotations[dense];
+            const uint32_t dense = world.state->slots[probe.index].dense;
+            const sl_rotation rotation = world.state->rotations[dense];
             payloads_finite =
                 payloads_finite && sl_vec2_is_finite(position) &&
                 sl_vec2_is_finite(sl_world_body_get_velocity(&world, probe)) &&

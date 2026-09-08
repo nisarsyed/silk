@@ -10,6 +10,9 @@ extern "C" {
 
 /* index means nothing unless generation != 0; generations are never
  * issued as 0, so any zeroed handle is the null handle. */
+/* Scoped to the originating world lifetime. Equal values can exist in other
+ * worlds or after destroy/reinitialize; cross-world handles are invalid usage.
+ */
 typedef struct sl_body_handle {
     uint32_t index;
     uint32_t generation;

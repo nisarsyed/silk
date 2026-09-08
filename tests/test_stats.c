@@ -2,6 +2,7 @@
 #include "silk_test.h"
 #include "stats.h"
 #include "suites.h"
+#include "world_internal.h"
 #include <math.h>
 #include <silk/step.h>
 
@@ -92,12 +93,14 @@ static void memory_accounting(void)
             };
             sl_world_memory_breakdown m = { 0 };
             SL_EXPECT(sl_world_memory_breakdown_get(&config, &m));
-            SL_EXPECT(m.body_bytes + m.broadphase_bytes + m.contact_bytes +
-                          m.pair_bytes + m.contact_solver_bytes +
-                          m.joint_bytes + m.padding_bytes ==
+            SL_EXPECT(m.world_state_bytes + m.body_bytes + m.broadphase_bytes +
+                          m.contact_bytes + m.pair_bytes +
+                          m.contact_solver_bytes + m.joint_bytes +
+                          m.padding_bytes ==
                       m.arena_bytes);
             SL_EXPECT(m.arena_bytes == sl_world_memory_bytes(&config));
             SL_EXPECT(m.world_bytes == sizeof(sl_world));
+            SL_EXPECT(m.world_state_bytes == sizeof(sl_world_state));
             SL_EXPECT((m.joint_bytes == 0u) == (joints == 0u));
             /* 169 payload bytes: 16 ownership + 32 vec2 + 16 rotation +
              * 32 scalar + 1 type + 72 shape, before slice padding. */
@@ -117,11 +120,11 @@ static void saturation_and_empty_step(void)
     const sl_world_config config = { .body_capacity = 1u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
-    world.work_total.proxy_creates = UINT64_MAX;
+    world.state->work_total.proxy_creates = UINT64_MAX;
     (void)ball(&world, 0.0f);
     SL_EXPECT(sl_world_get_stats(&world).cumulative.proxy_creates ==
               UINT64_MAX);
-    world.work_total.proxy_moves = UINT64_MAX;
+    world.state->work_total.proxy_moves = UINT64_MAX;
     const sl_body_handle body = sl_world_body_at(&world, 0u);
     SL_EXPECT(
         sl_world_body_set_velocity(&world, body, (sl_vec2){ 20.0f, 0.0f }));

@@ -15,7 +15,7 @@ WORK = ('tree_node_visits', 'pair_candidates', 'pair_probes', 'proxy_creates',
 QUALITY = ('penetration_max', 'cached_penetration_max', 'translation_drift_max',
            'rotation_drift_max', 'linear_speed_max', 'angular_speed_max',
            'joint_error_max', 'support_force_mean', 'supported_weight')
-MEMORY = ('body', 'broadphase', 'contact', 'pair', 'contact_solver', 'joint', 'padding', 'arena', 'world')
+MEMORY = ('world_state', 'body', 'broadphase', 'contact', 'pair', 'contact_solver', 'joint', 'padding', 'arena', 'world')
 SETTINGS = ('fixture_version', 'friction', 'restitution', 'seed', 'warmup_steps', 'measured_steps', 'dt_seconds', 'substeps',
             'body_capacity', 'contact_capacity', 'joint_capacity', 'gravity',
             'linear_drag', 'angular_drag', 'sleep_enabled', 'linear_speed_max',
@@ -60,7 +60,7 @@ def load(path):
 
 def validate(report):
     fields(report, ('schema_version', 'metadata', 'results'), 'report')
-    require(type(report['schema_version']) is int and report['schema_version'] == 1, 'unsupported schema')
+    require(type(report['schema_version']) is int and report['schema_version'] == 2, 'unsupported schema')
     meta = report['metadata']
     fields(meta, ('compiler', 'compiler_version', 'build', 'flags', 'warnings', 'host',
                   'host_version', 'processor', 'revision'), 'metadata')

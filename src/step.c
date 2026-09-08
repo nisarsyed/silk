@@ -1,4 +1,5 @@
 #include "silk/step.h"
+#include "world_internal.h"
 
 #include <string.h>
 
@@ -56,8 +57,13 @@ static void position_delta_integrate(float base_position, float velocity,
     }
 }
 
-void sl_world_step(sl_world *world, float dt)
+void sl_world_step(sl_world *owner, float dt)
 {
+    SL_ASSERT(owner != NULL);
+    if (owner == NULL) {
+        return;
+    }
+    sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
     if (world == NULL) {
         return;

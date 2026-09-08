@@ -130,6 +130,11 @@ add_subdirectory(path/to/silk)
 target_link_libraries(my_app PRIVATE silk::silk)
 ```
 
+A world is a zero-initialized owning shell: call `sl_world_init` and
+`sl_world_destroy`, and never copy it while initialized. Storage is private;
+inspect bodies, joints and diagnostics through the public accessors. Handles
+belong to the world lifetime that created them.
+
 Include the subsystem headers you use, such as `<silk/math.h>`,
 `<silk/shape.h>`, `<silk/contact.h>`, `<silk/joint.h>`, `<silk/world.h>`, and
 `<silk/step.h>`. `<silk/silk.h>` exposes the version macros and `sl_version()`.

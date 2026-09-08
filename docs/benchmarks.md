@@ -42,9 +42,9 @@ capacities; each report's `settings` records the resolved workload.
 Churn deliberately creates overlaps by teleporting bodies; its quality limits
 account for ongoing motion rather than expecting settled equilibrium.
 
-## Schema 1 and metric meanings
+## Schema 2 and metric meanings
 
-[report.py](../bench/report.py) validates schema 1; a
+[report.py](../bench/report.py) validates schema 2; a
 [committed report](../bench/reports/matrix/run-1.json) shows every field.
 Reconfigure after source changes to refresh build/revision metadata. Source
 archives can supply `-DSL_BENCH_REVISION=<revision>`; Git builds record their
@@ -58,6 +58,8 @@ revision and a tracked-change `-dirty` suffix.
   See [the digest implementation](../bench/quality.c) for the exact fields.
   It is a public snapshot check, not the complete private replay comparison.
 - Counts, work and memory follow the contracts in [world.h](../include/silk/world.h).
+  The `world_state` category is private metadata within the allocation; `world`
+  is the caller-owned shell. Compare their combined total when layouts change.
   `drops` covers warm-up and measured steps and must be zero.
 - Quality lengths are world units, rotations radians, speeds units/s or radians/s,
   and forces kg×units/s². The final measurement window is min(60, measured steps).

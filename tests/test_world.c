@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include "world_internal.h"
 
 #include <math.h>
 #include <stdbool.h>
@@ -19,17 +20,17 @@ static void test_init_destroy_roundtrip(void)
     sl_world_config config = { .body_capacity = 4u };
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
-    SL_EXPECT_INT_EQ(world.body_capacity, 4);
+    SL_EXPECT_INT_EQ(sl_world_body_capacity(&world), 4);
     SL_EXPECT_INT_EQ(sl_world_body_count(&world), 0);
-    SL_EXPECT(world.memory != NULL);
+    SL_EXPECT(world.state != NULL);
 
     sl_world_destroy(&world);
-    SL_EXPECT(world.memory == NULL);
-    SL_EXPECT_INT_EQ(world.body_capacity, 0);
+    SL_EXPECT(world.state == NULL);
+    SL_EXPECT_INT_EQ(sl_world_body_capacity(&world), 0);
 
     /* Destroy is idempotent on an already-zeroed world. */
     sl_world_destroy(&world);
-    SL_EXPECT(world.memory == NULL);
+    SL_EXPECT(world.state == NULL);
 }
 
 static void test_init_zeroes_contact_storage(void)
@@ -38,18 +39,18 @@ static void test_init_zeroes_contact_storage(void)
     sl_world world = { 0 };
     SL_EXPECT(sl_world_init(&world, &config));
 
-    const size_t contact_bytes =
-        (size_t)world.contact_capacity * sizeof(world.contacts[0]);
+    const size_t contact_bytes = (size_t)sl_world_contact_capacity(&world) *
+                                 sizeof(world.state->contacts[0]);
     const size_t pair_bytes =
-        (size_t)world.pair_capacity * sizeof(world.pair_keys[0]);
+        (size_t)world.state->pair_capacity * sizeof(world.state->pair_keys[0]);
     unsigned char *expected =
         calloc((contact_bytes > pair_bytes) ? contact_bytes : pair_bytes, 1u);
     SL_EXPECT(expected != NULL);
     if (expected != NULL) {
         /* Tree initialization writes its bounded free list after the arena
          * clear. Contact records and hash storage remain wholly zeroed. */
-        SL_EXPECT(memcmp(world.contacts, expected, contact_bytes) == 0);
-        SL_EXPECT(memcmp(world.pair_keys, expected, pair_bytes) == 0);
+        SL_EXPECT(memcmp(world.state->contacts, expected, contact_bytes) == 0);
+        SL_EXPECT(memcmp(world.state->pair_keys, expected, pair_bytes) == 0);
     }
 
     free(expected);
@@ -62,11 +63,11 @@ static void test_init_rejects_bad_capacity(void)
 
     sl_world_config zero = { .body_capacity = 0u };
     SL_EXPECT(!sl_world_init(&world, &zero));
-    SL_EXPECT(world.memory == NULL && world.body_capacity == 0u);
+    SL_EXPECT(world.state == NULL && sl_world_body_capacity(&world) == 0u);
 
     sl_world_config overflow = { .body_capacity = SL_BODY_COUNT_MAX + 1u };
     SL_EXPECT(!sl_world_init(&world, &overflow));
-    SL_EXPECT(world.memory == NULL && world.body_capacity == 0u);
+    SL_EXPECT(world.state == NULL && sl_world_body_capacity(&world) == 0u);
 
     /* Both bounds themselves are accepted. */
     sl_world_config one = { .body_capacity = 1u };
@@ -75,7 +76,7 @@ static void test_init_rejects_bad_capacity(void)
 
     sl_world_config full = { .body_capacity = SL_BODY_COUNT_MAX };
     SL_EXPECT(sl_world_init(&world, &full));
-    SL_EXPECT_INT_EQ(world.body_capacity, SL_BODY_COUNT_MAX);
+    SL_EXPECT_INT_EQ(sl_world_body_capacity(&world), SL_BODY_COUNT_MAX);
     sl_world_destroy(&world);
 }
 
@@ -125,8 +126,9 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     const sl_world_config worst_config = {
         .body_capacity = SL_BODY_COUNT_MAX,
     };
+    const size_t state_bytes = (sizeof(sl_world_state) + 7u) & ~(size_t)7u;
     const size_t worst = sl_world_memory_bytes(&worst_config);
-    SL_EXPECT(worst == (size_t)95813688u);
+    SL_EXPECT(worst == ((size_t)95813688u + state_bytes));
     SL_EXPECT(worst <= (size_t)93u << 20);
 
     const sl_world_config with_joints = {
@@ -134,7 +136,7 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
         .joint_capacity = SL_JOINT_COUNT_MAX,
     };
     const size_t joint_worst = sl_world_memory_bytes(&with_joints);
-    SL_EXPECT(joint_worst == (size_t)108003384u);
+    SL_EXPECT(joint_worst == ((size_t)108003384u + state_bytes));
     SL_EXPECT(joint_worst <= (size_t)104u << 20);
 
     const sl_world_config zero = { 0 };
@@ -149,12 +151,13 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
      * SL_BODY_COUNT_MAX * sizeof(uint32_t) bytes at maximum capacity. */
     const sl_world_config small_config = { .body_capacity = 4u };
     const size_t small = sl_world_memory_bytes(&small_config);
-    SL_EXPECT(small == (size_t)5912u);
+    SL_EXPECT(small == ((size_t)5912u + state_bytes));
     const sl_world_config small_joints = {
         .body_capacity = 4u,
         .joint_capacity = 2u,
     };
-    SL_EXPECT(sl_world_memory_bytes(&small_joints) == (size_t)6312u);
+    SL_EXPECT(sl_world_memory_bytes(&small_joints) ==
+              ((size_t)6312u + state_bytes));
 }
 
 static void test_create_rejects_non_finite_state(void)
@@ -750,8 +753,8 @@ static void test_churn_stress_matches_model(void)
         /* Full-model verification sweep, every operation. */
         const uint32_t reported = sl_world_body_count(&world);
         counts_match = counts_match && reported == live;
-        invariant_holds =
-            invariant_holds && reported + world.free_count == CHURN_CAPACITY;
+        invariant_holds = invariant_holds &&
+                          reported + world.state->free_count == CHURN_CAPACITY;
         for (uint32_t i = 0u; i < CHURN_CAPACITY; ++i) {
             sl_body_handle probe = { i, generation[i] };
             const bool engine_alive = sl_world_body_is_valid(&world, probe);
