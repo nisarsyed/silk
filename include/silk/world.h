@@ -122,10 +122,12 @@ typedef struct sl_joint_slot {
     uint32_t generation; /* bumped on destroy/reset; wrap skips zero */
 } sl_joint_slot;
 
-/* Deterministic work: candidates are tree leaf matches before filtering;
- * visits include rejected nodes; probes include deletion/reinsertion buckets.
- * Proxy counts record successful tree operations. All counters saturate at
- * UINT64_MAX. Cumulative work includes mutations between steps. */
+/* Deterministic work: candidates are matching tree leaves before filtering;
+ * visits include rejected query nodes. Probes count every inspected pair
+ * bucket, including terminating empty buckets and deletion/reinsertion work.
+ * Proxy counts record successful create/destroy/reinsert operations, not retry
+ * marking. Drops count failed eligible contact candidates. Counters saturate
+ * at UINT64_MAX; cumulative work includes mutations between steps. */
 typedef struct sl_world_work {
     uint64_t tree_node_visits;
     uint64_t pair_candidates;
@@ -136,6 +138,10 @@ typedef struct sl_world_work {
     uint64_t contact_drops;
 } sl_world_work;
 
+/* Prepared constraint records, not scalar equations or successful impulses.
+ * Each substep executes warm start and biased/relax contact/joint sweeps;
+ * contact restitution executes once. Step work is independent of cumulative
+ * saturation. An empty valid step has zero workload and configured substeps. */
 typedef struct sl_world_step_stats {
     sl_world_work work;
     uint32_t dynamic_body_count;
@@ -163,7 +169,9 @@ typedef struct sl_world_stats {
 
 /* Payload categories plus padding sum to arena_bytes, the exact allocation.
  * world_bytes is caller-owned sizeof(sl_world), not part of that sum.
- * Joint payload includes its solver scratch and body adjacency when enabled. */
+ * Categories include internal struct padding; padding_bytes counts alignment
+ * between arena slices. Joint bytes include solver scratch/body adjacency and
+ * are zero when joints are disabled. */
 typedef struct sl_world_memory_breakdown {
     size_t body_bytes;
     size_t broadphase_bytes;
@@ -284,7 +292,10 @@ typedef struct sl_world {
      * solver stage, so AoS is the appropriate scratch granularity. */
     void *joint_constraints;
 
-    /* Fixed diagnostic storage; never participates in physics decisions. */
+    /* Fixed diagnostic storage; never participates in physics decisions.
+     * Cost: one step snapshot + two work counters + three uint32_t + bool and
+     * ABI padding. Measured arm64 overhead: 208 bytes (world 480 -> 688);
+     * arena size and per-entity storage are unaffected. */
     sl_world_step_stats step_stats;
     sl_world_work work_total;
     sl_world_work step_work;
@@ -302,9 +313,10 @@ size_t sl_world_memory_bytes(const sl_world_config *config);
 /* False for invalid configuration/NULL output, leaving output untouched. */
 bool sl_world_memory_breakdown_get(const sl_world_config *config,
                                    sl_world_memory_breakdown *out);
-/* Copied values; does not invalidate contact/shape snapshots. Current counts
- * reflect mutations; last-step values survive rejected steps and mutations.
- * Reset clears work/high-water/last-step values and retains capacities. */
+/* Copied values; reads mutate no state or contact/shape snapshots. Current
+ * counts reflect mutations; last-step values survive rejected steps and
+ * mutations. Reset clears work/high-water/last-step values and retains
+ * capacities. */
 sl_world_stats sl_world_get_stats(const sl_world *world);
 
 /* *world must be zero-initialized or previously destroyed: re-initializing
