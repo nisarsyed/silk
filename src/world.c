@@ -73,6 +73,19 @@ static size_t world_body_layout(size_t capacity, size_t *payload)
 #undef BODY_SLICE
     return total;
 }
+/* Four slot arrays and seven-word descriptors: 44 B/body + 4 B/contact
+ * + 4 B/joint. Each slice is independently aligned like the body arrays. */
+static size_t island_layout(uint32_t bodies, uint32_t contacts, uint32_t joints,
+                            size_t *payload)
+{
+    *payload = (size_t)bodies * (4u * sizeof(uint32_t) + sizeof(sl_island)) +
+               ((size_t)contacts + joints) * sizeof(uint32_t);
+    return 4u * slice_bytes(bodies, sizeof(uint32_t)) +
+           slice_bytes(bodies, sizeof(sl_island)) +
+           slice_bytes(contacts, sizeof(uint32_t)) +
+           slice_bytes(joints, sizeof(uint32_t));
+}
+
 static size_t world_memory_bytes_for(size_t capacity)
 {
     size_t payload = 0u;
@@ -187,6 +200,9 @@ bool sl_world_memory_breakdown_get(const sl_world_config *config,
     const size_t solver = sl_solver_memory_bytes(resolved.contact_capacity);
     const size_t joint = sl_joint_memory_layout(
         resolved.body_capacity, resolved.joint_capacity, &result.joint_bytes);
+    const size_t island =
+        island_layout(resolved.body_capacity, resolved.contact_capacity,
+                      resolved.joint_capacity, &result.island_bytes);
     if (contact == 0u || solver == 0u ||
         (resolved.joint_capacity > 0u && joint == 0u) ||
         body > SIZE_MAX - contact || body + contact > SIZE_MAX - solver ||
@@ -195,13 +211,13 @@ bool sl_world_memory_breakdown_get(const sl_world_config *config,
     }
     /* Solver records are pinned to an 8-byte multiple in solver.c. */
     result.contact_solver_bytes = solver;
-    result.padding_bytes +=
-        body - result.body_bytes + joint - result.joint_bytes;
+    result.padding_bytes += body - result.body_bytes + joint -
+                            result.joint_bytes + island - result.island_bytes;
     result.world_state_bytes = sizeof(sl_world_state);
     result.padding_bytes +=
         align_up(sizeof(sl_world_state)) - sizeof(sl_world_state);
-    result.arena_bytes =
-        align_up(sizeof(sl_world_state)) + body + contact + solver + joint;
+    result.arena_bytes = align_up(sizeof(sl_world_state)) + body + contact +
+                         solver + joint + island;
     result.world_bytes = sizeof(sl_world);
     *out = result;
     return true;
@@ -445,8 +461,13 @@ bool sl_world_init(sl_world *owner, const sl_world_config *config)
         sl_solver_memory_bytes(resolved.contact_capacity);
     const size_t joint_bytes =
         sl_joint_memory_bytes(config->body_capacity, resolved.joint_capacity);
+    size_t island_payload = 0u;
+    const size_t island_bytes =
+        island_layout(resolved.body_capacity, resolved.contact_capacity,
+                      resolved.joint_capacity, &island_payload);
     const size_t total_bytes = align_up(sizeof(sl_world_state)) + body_bytes +
-                               contact_bytes + solver_bytes + joint_bytes;
+                               contact_bytes + solver_bytes + joint_bytes +
+                               island_bytes;
 
     unsigned char *base = malloc(total_bytes);
     if (base == NULL) {
@@ -534,6 +555,23 @@ bool sl_world_init(sl_world *owner, const sl_world_config *config)
     if (joint_bytes > 0u) {
         joint_memory = carve(base, &offset, joint_bytes, 1u);
     }
+    world->island_parents =
+        (uint32_t *)carve(base, &offset, capacity, sizeof(uint32_t));
+    world->island_sizes =
+        (uint32_t *)carve(base, &offset, capacity, sizeof(uint32_t));
+    world->body_islands =
+        (uint32_t *)carve(base, &offset, capacity, sizeof(uint32_t));
+    world->island_bodies =
+        (uint32_t *)carve(base, &offset, capacity, sizeof(uint32_t));
+    world->islands =
+        (sl_island *)carve(base, &offset, capacity, sizeof(sl_island));
+    world->island_contacts = (uint32_t *)carve(
+        base, &offset, resolved.contact_capacity, sizeof(uint32_t));
+    world->island_joints = (uint32_t *)carve(
+        base, &offset, resolved.joint_capacity, sizeof(uint32_t));
+    for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+        world->body_islands[slot] = SL_BODY_DENSE_NONE;
+    }
     SL_ASSERT(offset == total_bytes);
     if (!sl_joint_world_init(world, joint_memory, joint_bytes)) {
         free(base);
@@ -566,6 +604,13 @@ void sl_world_reset(sl_world *owner)
     sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
 
+    world->island_count = 0u;
+    world->island_body_count = 0u;
+    world->island_contact_count = 0u;
+    world->island_joint_count = 0u;
+    for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+        world->body_islands[slot] = SL_BODY_DENSE_NONE;
+    }
     sl_joint_world_reset(world);
     sl_contact_world_reset(world);
     memset(&world->step_stats, 0, sizeof(world->step_stats));
@@ -611,6 +656,7 @@ sl_body_handle sl_world_body_create(sl_world *owner, const sl_body_desc *desc)
 
     const uint32_t slot_id = world->free_indices[world->free_count - 1u];
     world->free_count--;
+    world->body_islands[slot_id] = SL_BODY_DENSE_NONE;
 
     const uint32_t dense = world->body_count;
     world->body_count++;
@@ -705,6 +751,7 @@ void sl_world_body_destroy(sl_world *owner, sl_body_handle handle)
     }
     world->body_count--;
 
+    world->body_islands[handle.index] = SL_BODY_DENSE_NONE;
     slot->dense = SL_BODY_DENSE_NONE;
     slot->generation = generation_bump(slot->generation);
     world->free_indices[world->free_count] = handle.index;

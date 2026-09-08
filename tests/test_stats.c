@@ -93,8 +93,8 @@ static void memory_accounting(void)
             };
             sl_world_memory_breakdown m = { 0 };
             SL_EXPECT(sl_world_memory_breakdown_get(&config, &m));
-            SL_EXPECT(m.world_state_bytes + m.body_bytes + m.broadphase_bytes +
-                          m.contact_bytes + m.pair_bytes +
+            SL_EXPECT(m.island_bytes + m.world_state_bytes + m.body_bytes +
+                          m.broadphase_bytes + m.contact_bytes + m.pair_bytes +
                           m.contact_solver_bytes + m.joint_bytes +
                           m.padding_bytes ==
                       m.arena_bytes);

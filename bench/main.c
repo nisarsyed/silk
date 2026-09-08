@@ -659,10 +659,14 @@ static void work_print(const sl_world_work *w)
     printf("{\"tree_node_visits\":%" PRIu64 ",\"pair_candidates\":%" PRIu64
            ",\"pair_probes\":%" PRIu64 ",\"proxy_creates\":%" PRIu64
            ",\"proxy_destroys\":%" PRIu64 ",\"proxy_moves\":%" PRIu64
-           ",\"contact_drops\":%" PRIu64 "}",
+           ",\"graph_body_visits\":%" PRIu64
+           ",\"graph_constraint_visits\":%" PRIu64
+           ",\"graph_parent_probes\":%" PRIu64 ",\"contact_drops\":%" PRIu64
+           "}",
            w->tree_node_visits, w->pair_candidates, w->pair_probes,
            w->proxy_creates, w->proxy_destroys, w->proxy_moves,
-           w->contact_drops);
+           w->graph_body_visits, w->graph_constraint_visits,
+           w->graph_parent_probes, w->contact_drops);
 }
 static void result_json(const bench_scene *scene, const bench_result *r,
                         const bench_options *o)
@@ -710,21 +714,25 @@ static void result_json(const bench_scene *scene, const bench_result *r,
     printf(",\"step\":{\"dynamic_bodies\":%" PRIu32
            ",\"kinematic_bodies\":%" PRIu32 ",\"contact_constraints\":%" PRIu32
            ",\"joint_constraints\":%" PRIu32 ",\"substeps\":%" PRIu32
+           ",\"islands\":%" PRIu32 ",\"island_bodies_max\":%" PRIu32
            ",\"work\":",
            r->stats.step.dynamic_body_count, r->stats.step.kinematic_body_count,
            r->stats.step.contact_constraint_count,
-           r->stats.step.joint_constraint_count, r->stats.step.substep_count);
+           r->stats.step.joint_constraint_count, r->stats.step.substep_count,
+           r->stats.step.island_count, r->stats.step.island_body_count_max);
     work_print(&r->stats.step.work);
     printf("},\"cumulative_work\":");
     work_print(&r->stats.cumulative);
     const sl_world_memory_breakdown *m = &r->memory;
-    printf(",\"memory_bytes\":{\"world_state\":%zu,\"body\":%zu,\"broadphase\":"
+    printf(",\"memory_bytes\":{\"island\":%zu,\"world_state\":%zu,\"body\":%zu,"
+           "\"broadphase\":"
            "%zu,\"contact\":%zu,"
            "\"pair\":%zu,\"contact_solver\":%zu,\"joint\":%zu,\"padding\":%zu,"
            "\"arena\":%zu,\"world\":%zu}",
-           m->world_state_bytes, m->body_bytes, m->broadphase_bytes,
-           m->contact_bytes, m->pair_bytes, m->contact_solver_bytes,
-           m->joint_bytes, m->padding_bytes, m->arena_bytes, m->world_bytes);
+           m->island_bytes, m->world_state_bytes, m->body_bytes,
+           m->broadphase_bytes, m->contact_bytes, m->pair_bytes,
+           m->contact_solver_bytes, m->joint_bytes, m->padding_bytes,
+           m->arena_bytes, m->world_bytes);
     const bench_quality *q = &r->quality;
     printf(",\"quality\":{\"window_steps\":%" PRIu32
            ",\"penetration_max\":%.9g,\"cached_penetration_max\":%.9g"
@@ -811,7 +819,7 @@ int main(int argc, char **argv)
                         "[--warmup 0..10000] [--steps 1..10000]\n");
         return EXIT_FAILURE;
     }
-    printf("{\"schema_version\":2,\"metadata\":{\"compiler\":");
+    printf("{\"schema_version\":3,\"metadata\":{\"compiler\":");
     json_string(SL_BENCH_COMPILER_ID);
     printf(",\"compiler_version\":");
     json_string(SL_BENCH_COMPILER_VERSION);

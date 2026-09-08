@@ -42,9 +42,9 @@ capacities; each report's `settings` records the resolved workload.
 Churn deliberately creates overlaps by teleporting bodies; its quality limits
 account for ongoing motion rather than expecting settled equilibrium.
 
-## Schema 2 and metric meanings
+## Schema 3 and metric meanings
 
-[report.py](../bench/report.py) validates schema 2; a
+[report.py](../bench/report.py) validates schema 3; a
 [committed report](../bench/reports/matrix/run-1.json) shows every field.
 Reconfigure after source changes to refresh build/revision metadata. Source
 archives can supply `-DSL_BENCH_REVISION=<revision>`; Git builds record their
@@ -137,4 +137,13 @@ PR/base checkout. Failed validation retains raw output when available.
 
 The [world-storage comparison](../bench/reports/world-storage.json) records the
 schema-1 to schema-2 measurement, including preserved parent reports. Historical
-reports are evidence only; the current validator accepts schema 2.
+reports are evidence only; the current validator accepts schema 3.
+
+Constraint-island reports use schema 3. `island` memory is 44 bytes per body
+capacity plus four bytes per contact/joint capacity; padding and fixed state
+metadata are separate. `step.islands` and `island_bodies_max` describe the last
+completed graph build. Graph work counts inspected body-slot entries, source
+constraint rows and union/find parent reads, including repeated passes. All
+constraints retain their original relative order within each component.
+Compare whole-step timings with matched parent runs; their difference is total
+overhead, not an isolated graph-build timer.

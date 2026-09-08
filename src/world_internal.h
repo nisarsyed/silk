@@ -16,7 +16,27 @@ typedef struct sl_joint_slot {
     uint32_t generation; /* bumped on destroy/reset; wrap skips zero */
 } sl_joint_slot;
 
+/* Last completed graph build. Ranges own dynamic slots and eligible source
+ * rows; boundaries are shared read-only and never bridge components. */
+typedef struct sl_island {
+    uint32_t root_slot;
+    uint32_t body_offset, body_count;
+    uint32_t contact_offset, contact_count;
+    uint32_t joint_offset, joint_count;
+} sl_island;
+
 typedef struct sl_world_state {
+    uint32_t island_count;
+    uint32_t island_body_count;
+    uint32_t island_contact_count;
+    uint32_t island_joint_count;
+    uint32_t *island_parents;
+    uint32_t *island_sizes;
+    uint32_t *body_islands;
+    uint32_t *island_bodies;
+    sl_island *islands;
+    uint32_t *island_contacts;
+    uint32_t *island_joints;
     uint32_t body_count;    /* rows used by every packed array below */
     uint32_t body_capacity; /* slot count, fixed at init */
     uint32_t free_count;
@@ -123,8 +143,7 @@ typedef struct sl_world_state {
 
     /* Fixed diagnostic storage; never participates in physics decisions.
      * Cost: one step snapshot + two work counters + three uint32_t + bool and
-     * ABI padding. Measured arm64 diagnostic cost: 208 bytes within this
-     * allocation-owned metadata; no per-entity diagnostic arrays. */
+     * ABI padding (288 bytes on arm64); no per-entity diagnostic arrays. */
     sl_world_step_stats step_stats;
     sl_world_work work_total;
     sl_world_work step_work;
@@ -134,6 +153,8 @@ typedef struct sl_world_state {
     bool stats_stepping;
 
 } sl_world_state;
+
+void sl_islands_build(sl_world_state *world);
 
 bool sl_body_is_valid(const sl_world_state *world, sl_body_handle handle);
 bool sl_joint_is_valid(const sl_world_state *world, sl_joint_handle handle);

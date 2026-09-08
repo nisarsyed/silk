@@ -82,6 +82,39 @@ bool sl_replay_compare(const sl_world *owner_a, const sl_world *owner_b,
     U(body_count);
     U(body_capacity);
     U(free_count);
+    U(island_count);
+    U(island_body_count);
+    U(island_contact_count);
+    U(island_joint_count);
+    U(step_stats.island_count);
+    U(step_stats.island_body_count_max);
+    U(work_total.graph_body_visits);
+    U(work_total.graph_constraint_visits);
+    U(work_total.graph_parent_probes);
+    U(step_stats.work.graph_body_visits);
+    U(step_stats.work.graph_constraint_visits);
+    U(step_stats.work.graph_parent_probes);
+    for (i = 0u; i < a->body_capacity; ++i) {
+        U(body_islands[i]);
+    }
+    for (i = 0u; i < a->island_body_count; ++i) {
+        U(island_bodies[i]);
+    }
+    for (i = 0u; i < a->island_contact_count; ++i) {
+        U(island_contacts[i]);
+    }
+    for (i = 0u; i < a->island_joint_count; ++i) {
+        U(island_joints[i]);
+    }
+    for (i = 0u; i < a->island_count; ++i) {
+        U(islands[i].root_slot);
+        U(islands[i].body_offset);
+        U(islands[i].body_count);
+        U(islands[i].contact_offset);
+        U(islands[i].contact_count);
+        U(islands[i].joint_offset);
+        U(islands[i].joint_count);
+    }
     U(contact_count);
     U(contact_capacity);
     U(contact_drop_count);
