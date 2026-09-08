@@ -147,3 +147,10 @@ constraint rows and union/find parent reads, including repeated passes. All
 constraints retain their original relative order within each component.
 Compare whole-step timings with matched parent runs; their difference is total
 overhead, not an isolated graph-build timer.
+
+The [island comparison](../bench/reports/islands.json) records five matched
+schema-2 parent and schema-3 island runs, including exact combined memory and
+unchanged physical digests, quality and preexisting work. Raw parent inputs are
+archived under `bench/reports/islands-parent/`; the current matrix records the
+measured island implementation revision. Graph construction adds work even when
+all bodies are awake; sleeping benefits are measured separately in the next layer.

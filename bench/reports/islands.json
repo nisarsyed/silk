@@ -1,0 +1,219 @@
+{
+  "parent_schema": 2,
+  "islands_schema": 3,
+  "parent_metadata": {
+    "compiler": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "build": "Release",
+    "flags": " -O3 -DNDEBUG",
+    "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+    "host": "Darwin",
+    "host_version": "25.6.0",
+    "processor": "arm64",
+    "revision": "c4bcd9e6617dc291976574661b68155702569113"
+  },
+  "islands_metadata": {
+    "compiler": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "build": "Release",
+    "flags": " -O3 -DNDEBUG",
+    "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+    "host": "Darwin",
+    "host_version": "25.6.0",
+    "processor": "arm64",
+    "revision": "480b6652b60ffb4ef79f3812723569b3ac1556d1"
+  },
+  "repetitions": 5,
+  "interpretation": "Matched total step measurements, not isolated graph-build time. Per-run means and spread are retained. Historical schema-2 inputs are evidence only.",
+  "scenes": [
+    {
+      "scene": "pyramid",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.241398333,
+        0.235193333,
+        0.234013333,
+        0.235296667,
+        0.237138333
+      ],
+      "islands_average_ms_runs": [
+        0.249351667,
+        0.24112,
+        0.24307,
+        0.246136667,
+        0.242803333
+      ],
+      "median_overhead_percent": 3.3036307309869395,
+      "parent_total_bytes": 312168,
+      "islands_total_bytes": 325000,
+      "island_payload_bytes": 12660,
+      "graph_work": {
+        "graph_body_visits": 607680,
+        "graph_constraint_visits": 1274400,
+        "graph_parent_probes": 3582720
+      }
+    },
+    {
+      "scene": "rain",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.961875,
+        0.962951667,
+        0.963948333,
+        0.973493333,
+        0.984556667
+      ],
+      "islands_average_ms_runs": [
+        1.05409833,
+        1.037575,
+        1.04180833,
+        1.041965,
+        1.03868
+      ],
+      "median_overhead_percent": 8.077196083495908,
+      "parent_total_bytes": 5407304,
+      "islands_total_bytes": 5561144,
+      "island_payload_bytes": 153668,
+      "graph_work": {
+        "graph_body_visits": 5768640,
+        "graph_constraint_visits": 27420000,
+        "graph_parent_probes": 27048798
+      }
+    },
+    {
+      "scene": "piles",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.0717416667,
+        0.0736733333,
+        0.0725183333,
+        0.0739983333,
+        0.0719483333
+      ],
+      "islands_average_ms_runs": [
+        0.0787433333,
+        0.0764733333,
+        0.0764616667,
+        0.0773166667,
+        0.0772683333
+      ],
+      "median_overhead_percent": 6.55006780195817,
+      "parent_total_bytes": 651776,
+      "islands_total_bytes": 667224,
+      "island_payload_bytes": 15276,
+      "graph_work": {
+        "graph_body_visits": 463680,
+        "graph_constraint_visits": 345600,
+        "graph_parent_probes": 1036800
+      }
+    },
+    {
+      "scene": "chains",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.01522,
+        0.015525,
+        0.01539,
+        0.01592,
+        0.0156966667
+      ],
+      "islands_average_ms_runs": [
+        0.0179083333,
+        0.0175133333,
+        0.0175766667,
+        0.017415,
+        0.01729
+      ],
+      "median_overhead_percent": 12.8072998389694,
+      "parent_total_bytes": 350680,
+      "islands_total_bytes": 359888,
+      "island_payload_bytes": 9056,
+      "graph_work": {
+        "graph_body_visits": 299520,
+        "graph_constraint_visits": 207360,
+        "graph_parent_probes": 633600
+      }
+    },
+    {
+      "scene": "churn",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.00986333333,
+        0.00967666667,
+        0.00979666667,
+        0.00977833333,
+        0.009735
+      ],
+      "islands_average_ms_runs": [
+        0.0123433333,
+        0.0119433333,
+        0.0118816667,
+        0.0118683333,
+        0.01193
+      ],
+      "median_overhead_percent": 22.004431607978336,
+      "parent_total_bytes": 642536,
+      "islands_total_bytes": 656512,
+      "island_payload_bytes": 13824,
+      "graph_work": {
+        "graph_body_visits": 368640,
+        "graph_constraint_visits": 860526,
+        "graph_parent_probes": 243270
+      }
+    },
+    {
+      "scene": "table",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.00192666667,
+        0.00185333333,
+        0.00190833333,
+        0.00185,
+        0.00171833333
+      ],
+      "islands_average_ms_runs": [
+        0.00198666667,
+        0.001895,
+        0.00188,
+        0.00195,
+        0.001835
+      ],
+      "median_overhead_percent": 2.248201622748569,
+      "parent_total_bytes": 21136,
+      "islands_total_bytes": 21784,
+      "island_payload_bytes": 476,
+      "graph_work": {
+        "graph_body_visits": 14400,
+        "graph_constraint_visits": 10800,
+        "graph_parent_probes": 21600
+      }
+    },
+    {
+      "scene": "inverted",
+      "physical_digest_quality_and_existing_work_equal": true,
+      "parent_average_ms_runs": [
+        0.00270166667,
+        0.002635,
+        0.002735,
+        0.00273,
+        0.00267833333
+      ],
+      "islands_average_ms_runs": [
+        0.00288666667,
+        0.00272333333,
+        0.00288333333,
+        0.00267166667,
+        0.00280333333
+      ],
+      "median_overhead_percent": 3.763108940452664,
+      "parent_total_bytes": 40632,
+      "islands_total_bytes": 41624,
+      "island_payload_bytes": 820,
+      "graph_work": {
+        "graph_body_visits": 20160,
+        "graph_constraint_visits": 12960,
+        "graph_parent_probes": 36000
+      }
+    }
+  ]
+}
