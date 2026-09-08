@@ -153,8 +153,8 @@ overhead, not an isolated graph-build timer.
 The [island comparison](../bench/reports/islands.json) records five matched
 schema-2 parent and schema-3 island runs, including exact combined memory and
 unchanged physical digests, quality and preexisting work. Raw parent inputs are
-archived under `bench/reports/islands-parent/`; the current matrix records the
-measured island implementation revision. Graph construction adds work even when
+archived under `bench/reports/islands-parent/`; `bench/reports/islands-awake/`
+records the measured island implementation revision. Graph construction adds work even when
 all bodies are awake; sleeping benefits are measured separately in the next layer.
 
 Schema 4 adds resolved sleep policy, current awake/sleeping dynamic counts,
@@ -179,3 +179,9 @@ per mode, sleep-disabled equivalence to the island parent, timing spread,
 combined memory and quality. The current matrix contains sleep-off reports;
 `bench/reports/sleep-on/` contains sleep-on reports. The schema-3 island parent
 is archived under `bench/reports/islands-awake/` with its measured revision.
+
+On the recorded host, sleep-on median total-step time was about 76% lower for
+piles and 60% lower for chains than sleep-off, while rain was about 7% higher.
+Churn's sleep-disabled path was about 32% higher than the island parent, with
+another 22% increase when enabled. Those moving-body costs remain visible in
+the evidence; settled-scene savings do not imply a universal speed improvement.
