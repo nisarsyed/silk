@@ -31,6 +31,9 @@ static void public_lifecycle(void)
     sl_world_step(&world, 1.0f / 60.0f);
     SL_EXPECT(sl_vec2_is_finite(sl_world_body_get_position(&world, a)));
     SL_EXPECT_INT_EQ(sl_world_get_stats(&world).joint_count, 1u);
+    sl_island_stats island;
+    SL_EXPECT(sl_world_body_get_island_stats(&world, a, &island));
+    SL_EXPECT_INT_EQ(island.dynamic_body_count, 2u);
     sl_query_result matches;
     sl_body_handle found[2];
     SL_EXPECT(sl_world_query_aabb(&world,

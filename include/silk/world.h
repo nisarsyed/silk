@@ -228,6 +228,25 @@ bool sl_world_memory_breakdown_get(const sl_world_config *config,
  * capacities. */
 sl_world_stats sl_world_get_stats(const sl_world *world);
 
+/* Copied diagnostic values from the last completed island build. IDs are
+ * ephemeral indices, not handles. Between steps, counts can describe topology
+ * from before a mutation. Static and kinematic boundaries are excluded from
+ * dynamic_body_count and can participate in several islands. */
+typedef struct sl_island_stats {
+    uint32_t id;
+    uint32_t dynamic_body_count;
+    uint32_t contact_count;
+    uint32_t joint_count;
+} sl_island_stats;
+
+/* Returns false, leaving *out unchanged, for a missing output, invalid body,
+ * static/kinematic body, or dynamic body not assigned by a completed build.
+ * Destruction, slot reuse and reset clear assignment immediately. Reading
+ * these copied values preserves diagnostics and all snapshot lifetimes. */
+bool sl_world_body_get_island_stats(const sl_world *world,
+                                    sl_body_handle handle,
+                                    sl_island_stats *out);
+
 /* *world must be zero-initialized or previously destroyed: re-initializing
  * a live world leaks its arena, so the assert fires in debug builds.
  * Returns false, leaving *world zeroed, when body_capacity or

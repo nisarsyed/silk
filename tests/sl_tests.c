@@ -9,6 +9,7 @@ int main(void)
     failures += sl_replay_suite();
     failures += sl_sleep_suite();
     failures += sl_island_suite();
+    failures += sl_diagnostics_suite();
     failures += sl_stats_suite();
     failures += sl_consumer_suite();
     failures += sl_query_suite();

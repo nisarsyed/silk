@@ -1403,3 +1403,26 @@ bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle)
     SL_ASSERT(world != NULL);
     return world->state != NULL && sl_body_is_valid(world->state, handle);
 }
+
+bool sl_world_body_get_island_stats(const sl_world *owner,
+                                    sl_body_handle handle, sl_island_stats *out)
+{
+    SL_ASSERT(owner != NULL);
+    const sl_world_state *world = owner->state;
+    if (out == NULL || world == NULL || !sl_body_is_valid(world, handle)) {
+        return false;
+    }
+    const uint32_t row = world->slots[handle.index].dense;
+    const uint32_t id = world->body_islands[handle.index];
+    if (world->types[row] != (uint8_t)SL_BODY_DYNAMIC ||
+        id == SL_BODY_DENSE_NONE) {
+        return false;
+    }
+    SL_ASSERT(id < world->island_count);
+    const sl_island *island = &world->islands[id];
+    *out = (sl_island_stats){ .id = id,
+                              .dynamic_body_count = island->body_count,
+                              .contact_count = island->contact_count,
+                              .joint_count = island->joint_count };
+    return true;
+}

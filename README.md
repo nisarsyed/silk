@@ -90,18 +90,36 @@ Controls:
 
 - Left-drag empty space to spawn and launch a body.
 - Press `B` to switch between circles and boxes.
-- Left-hold a body to tether it; off-center grabs apply torque.
+- Left-hold a body to wake and tether it; exact shape containment selects the
+  nearest center, with body-slot ties. Off-center grabs apply torque.
 - Press `C` to toggle contact points and normals; gold points are speculative
   contacts with positive separation.
-- Press `A` to toggle exact fat broad-phase proxy AABBs.
+- Press `A` to toggle tight shape bounds (yellow) and fat proxies (blue).
+- Press `1`–`4` for playground, settled piles, moving support, or joint chain.
+- Press `S` to toggle sleeping and rebuild the selected scene; sleeping starts on.
+- Press `M` in the support scene to start/stop its fixed-step motion.
+- Press `I` for last-build island colors; sleeping bodies are dim in both modes.
+- Press `Q` to cycle point, closest-ray, and AABB inspection. Right-drag defines
+  rays/boxes; release selects the first result without waking it. Queries show
+  up to eight handles and explicitly report truncation. Picking uses a separate
+  full-capacity buffer, so demo truncation does not restrict selection.
 - Press `J` to spawn a bounded six-link revolute chain anchored at the cursor;
   joint anchors and connections are drawn automatically.
-- Press `Space` to pause or resume, `.` to step while paused, and `R` to reset.
+- Press `Space` to pause or resume, `.` to step while paused, and `R` to rebuild the selected scene.
 
 The deterministic default scene combines falling bodies with a ten-row box
 pyramid on colliding static ground. Shapes use friction 0.6 and restitution
 0.1, with four solver substeps per fixed step. The HUD reports body, contact,
-and joint counts/capacities and dropped contacts.
+and joint counts/capacities, awake/asleep counts, last-step work and island
+counts, cumulative work/drops, and exact allocated memory plus the owning shell.
+Selected-body values and island diagnostics use copied public accessors. Island
+IDs describe the last completed build and may reflect topology before a mutation;
+they are not persistent handles. Query inspection does not wake bodies.
+
+The piles/support fixtures use restitution zero; the scene geometry and seed are
+fixed in the sandbox source. Pause and single-step apply support motion and
+tether forces only when a simulation step executes. Reset rebuilds the selected
+fixture and clears all old handles, queries, and interaction state.
 
 ## Deterministic benchmark
 
