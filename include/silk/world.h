@@ -118,6 +118,11 @@ typedef struct sl_world_work {
     uint64_t tree_node_visits;
     uint64_t pair_candidates;
     uint64_t pair_probes;
+    /* Actual inspected graph entries, including repeated construction passes
+     * and parent reads during union/find. Saturate with other work counters. */
+    uint64_t graph_body_visits;
+    uint64_t graph_constraint_visits;
+    uint64_t graph_parent_probes;
     uint64_t proxy_creates;
     uint64_t proxy_destroys;
     uint64_t proxy_moves;
@@ -134,6 +139,8 @@ typedef struct sl_world_step_stats {
     uint32_t kinematic_body_count;
     uint32_t contact_constraint_count;
     uint32_t joint_constraint_count;
+    uint32_t island_count;
+    uint32_t island_body_count_max;
     uint32_t substep_count;
 } sl_world_step_stats;
 
@@ -159,6 +166,7 @@ typedef struct sl_world_stats {
  * between arena slices. Joint bytes include solver scratch/body adjacency and
  * are zero when joints are disabled. */
 typedef struct sl_world_memory_breakdown {
+    size_t island_bytes; /* bounded graph arrays, excluding alignment gaps */
     size_t world_state_bytes; /* private metadata in the allocation */
     size_t body_bytes;
     size_t broadphase_bytes;

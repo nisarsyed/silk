@@ -749,8 +749,9 @@ void sl_joint_prepare(sl_world_state *world, float h, float inverse_h)
     const float hertz = sl_min(world->joint_hertz, 0.125f * inverse_h);
     const sl_joint_softness softness =
         softness_make(hertz, world->joint_damping_ratio, h);
-    for (uint32_t row = 0u; row < world->joint_count; ++row) {
-        sl_joint_constraint *constraint = &constraints[row];
+    for (uint32_t index = 0u; index < world->island_joint_count; ++index) {
+        const uint32_t row = world->island_joints[index];
+        sl_joint_constraint *constraint = &constraints[index];
         memset(constraint, 0, sizeof(*constraint));
         constraint->joint_row = row;
         constraint->dense_a =

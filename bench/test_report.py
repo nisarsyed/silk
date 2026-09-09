@@ -24,7 +24,7 @@ class ReportTests(unittest.TestCase):
         report.quality_check(self.baseline)
 
     def test_schema_version(self):
-        for version in (1, 3, True, '2'):
+        for version in (1, 2, 4, True, '3'):
             value = copy.deepcopy(self.baseline)
             value['schema_version'] = version
             with self.assertRaises(ValueError):

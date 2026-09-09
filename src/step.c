@@ -113,6 +113,7 @@ void sl_world_step(sl_world *owner, float dt)
     memset(&world->step_work, 0, sizeof(world->step_work));
     world->stats_stepping = true;
     sl_contact_step_begin(world);
+    sl_islands_build(world);
     sl_joint_prepare(world, h, inverse_h);
     sl_solver_prepare(world, h, inverse_h);
 
@@ -128,8 +129,18 @@ void sl_world_step(sl_world *owner, float dt)
      * 2019). Silk reuses one frame manifold/Jacobian preparation so the
      * substeps add bounded solver work without repeating broad-phase work. */
     for (uint32_t substep = 0u; substep < world->substep_count; ++substep) {
-        for (uint32_t i = 0u; i < world->body_count; ++i) {
+        /* Dynamic rows follow component ranges. The second span advances
+         * controller-owned kinematics globally exactly once per substep. */
+        for (uint32_t index = 0u;
+             index < world->island_body_count + world->body_count; ++index) {
+            const bool island_row = index < world->island_body_count;
+            const uint32_t i =
+                island_row ? world->slots[world->island_bodies[index]].dense
+                           : index - world->island_body_count;
             const uint8_t type = world->types[i];
+            if (!island_row && type == (uint8_t)SL_BODY_DYNAMIC) {
+                continue;
+            }
             const bool dynamic = type == (uint8_t)SL_BODY_DYNAMIC;
             const bool moving = dynamic || type == (uint8_t)SL_BODY_KINEMATIC;
             SL_ASSERT(dynamic || world->inv_masses[i] == 0.0f);
@@ -168,8 +179,18 @@ void sl_world_step(sl_world *owner, float dt)
         sl_joint_solve(world, true);
         sl_solver_solve(world, inverse_h, true);
 
-        for (uint32_t i = 0u; i < world->body_count; ++i) {
+        /* Dynamic rows follow component ranges. The second span advances
+         * controller-owned kinematics globally exactly once per substep. */
+        for (uint32_t index = 0u;
+             index < world->island_body_count + world->body_count; ++index) {
+            const bool island_row = index < world->island_body_count;
+            const uint32_t i =
+                island_row ? world->slots[world->island_bodies[index]].dense
+                           : index - world->island_body_count;
             const uint8_t type = world->types[i];
+            if (!island_row && type == (uint8_t)SL_BODY_DYNAMIC) {
+                continue;
+            }
             const bool dynamic = type == (uint8_t)SL_BODY_DYNAMIC;
             const bool moving = dynamic || type == (uint8_t)SL_BODY_KINEMATIC;
             if (!moving) {
@@ -210,6 +231,12 @@ void sl_world_step(sl_world *owner, float dt)
     }
     sl_contact_step_end(world);
     world->stats_stepping = false;
+    completed.island_count = world->island_count;
+    for (uint32_t i = 0u; i < world->island_count; ++i) {
+        if (world->islands[i].body_count > completed.island_body_count_max) {
+            completed.island_body_count_max = world->islands[i].body_count;
+        }
+    }
     completed.work = world->step_work;
     completed.substep_count = world->substep_count;
     completed.contact_constraint_count = world->contact_constraint_count;

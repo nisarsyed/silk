@@ -274,7 +274,8 @@ void sl_solver_prepare(sl_world_state *world, float h, float inverse_h)
     sl_contact_constraint *constraints = world_constraints(world);
     uint32_t constraint_count = 0u;
 
-    for (uint32_t row = 0u; row < world->contact_count; ++row) {
+    for (uint32_t index = 0u; index < world->island_contact_count; ++index) {
+        const uint32_t row = world->island_contacts[index];
         const sl_contact *contact = &world->contacts[row];
         if (!contact->touching) {
             continue;

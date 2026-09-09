@@ -11,11 +11,11 @@ import sys
 
 SCENES = ('pyramid', 'rain', 'piles', 'chains', 'churn', 'table', 'inverted')
 WORK = ('tree_node_visits', 'pair_candidates', 'pair_probes', 'proxy_creates',
-        'proxy_destroys', 'proxy_moves', 'contact_drops')
+        'proxy_destroys', 'proxy_moves', 'contact_drops', 'graph_body_visits', 'graph_constraint_visits', 'graph_parent_probes')
 QUALITY = ('penetration_max', 'cached_penetration_max', 'translation_drift_max',
            'rotation_drift_max', 'linear_speed_max', 'angular_speed_max',
            'joint_error_max', 'support_force_mean', 'supported_weight')
-MEMORY = ('world_state', 'body', 'broadphase', 'contact', 'pair', 'contact_solver', 'joint', 'padding', 'arena', 'world')
+MEMORY = ('island', 'world_state', 'body', 'broadphase', 'contact', 'pair', 'contact_solver', 'joint', 'padding', 'arena', 'world')
 SETTINGS = ('fixture_version', 'friction', 'restitution', 'seed', 'warmup_steps', 'measured_steps', 'dt_seconds', 'substeps',
             'body_capacity', 'contact_capacity', 'joint_capacity', 'gravity',
             'linear_drag', 'angular_drag', 'sleep_enabled', 'linear_speed_max',
@@ -60,7 +60,7 @@ def load(path):
 
 def validate(report):
     fields(report, ('schema_version', 'metadata', 'results'), 'report')
-    require(type(report['schema_version']) is int and report['schema_version'] == 2, 'unsupported schema')
+    require(type(report['schema_version']) is int and report['schema_version'] == 3, 'unsupported schema')
     meta = report['metadata']
     fields(meta, ('compiler', 'compiler_version', 'build', 'flags', 'warnings', 'host',
                   'host_version', 'processor', 'revision'), 'metadata')
@@ -109,8 +109,8 @@ def validate(report):
         capacity = counts['pair_capacity']
         require(capacity > 0 and capacity & (capacity - 1) == 0, 'pair capacity must be power of two')
         step = row['step']
-        fields(step, ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'work'), 'step')
-        for key in ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps'):
+        fields(step, ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'islands', 'island_bodies_max', 'work'), 'step')
+        for key in ('dynamic_bodies', 'kinematic_bodies', 'contact_constraints', 'joint_constraints', 'substeps', 'islands', 'island_bodies_max'):
             number(step[key], 0, 262144, f'step.{key}', True)
         require(step['substeps'] == settings['substeps'], 'step substeps mismatch')
         require(step['dynamic_bodies'] + step['kinematic_bodies'] <= counts['bodies'], 'active count invariant')
