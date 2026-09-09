@@ -1,0 +1,1 @@
+[{"scene":"query-point","queries":65536,"batch_ms":21.868,"digest":"e0f3c1273ab42325"},{"scene":"query-broad","queries":65536,"batch_ms":998.197,"digest":"1250ad5d4aaa2325"}]

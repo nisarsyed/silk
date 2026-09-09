@@ -1,0 +1,32 @@
+diff --git a/src/query.c b/src/query.c
+index c21297e..9b1dcb4 100644
+--- a/src/query.c
++++ b/src/query.c
+@@ -87,7 +87,6 @@ static void query_buffer(const sl_world_state *world, sl_aabb bounds,
+                          sl_query_result *result)
+ {
+     const uint32_t count = candidates(world, bounds, mask);
+-    slots_sort(world->query_slots, count);
+     uint32_t matches = 0u;
+     for (uint32_t i = 0u; i < count; ++i) {
+         const uint32_t slot = world->query_slots[i];
+@@ -102,9 +101,16 @@ static void query_buffer(const sl_world_state *world, sl_aabb bounds,
+                 : sl_aabb_overlaps(sl_shape_aabb(shape, transform), bounds);
+         if (!match)
+             continue;
+-        if (matches < capacity)
+-            bodies[matches] = body_handle(world, slot);
+-        ++matches;
++        world->query_slots[matches++] = slot;
++    }
++    /* Only exact matches need ordering. Compaction never overwrites an
++     * unread candidate and uses the same bounded scratch storage. */
++    if (capacity > 0u) {
++        slots_sort(world->query_slots, matches);
++        const uint32_t written = matches < capacity ? matches : capacity;
++        for (uint32_t i = 0u; i < written; ++i) {
++            bodies[i] = body_handle(world, world->query_slots[i]);
++        }
+     }
+     *result = (sl_query_result){ matches, matches > capacity };
+ }

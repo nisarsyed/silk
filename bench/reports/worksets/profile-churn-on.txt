@@ -1,0 +1,474 @@
+Analysis of sampling sl_bench (pid 37948) every 1 millisecond
+Process:         sl_bench [37948]
+Path:            /Users/USER/*/sl_bench
+Load Address:    0x1024a8000
+Identifier:      sl_bench
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  Python [37695]
+Target Type:     live task
+
+Date/Time:       2026-09-09 12:27:21.923 +0500
+Launch Time:     2026-09-09 12:27:21.896 +0500
+OS Version:      macOS 26.6.2 (25G83)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+----
+
+Call graph:
+    315 Thread_17759061   DispatchQueue_1: com.apple.main-thread  (serial)
+      314 start  (in dyld) + 6992  [0x18cf0c4e4]
+      + 167 main  (in sl_bench) + 2256  [0x1024a91b0]  main.c:883
+      + ! 37 sl_world_step  (in sl_bench) + 604  [0x1024b0900]  step.c:116
+      + ! : 21 sl_contact_step_begin  (in sl_bench) + 464  [0x1024b94a4]  contact.c:699
+      + ! : | 9 contact_refresh  (in sl_bench) + 180  [0x1024b9924]  contact.c:470
+      + ! : | + 3 sl_collide_shapes  (in sl_bench) + 12,28  [0x1024b6e20,0x1024b6e30]  collide.c:426
+      + ! : | + 3 sl_collide_shapes  (in sl_bench) + 164,196,...  [0x1024b6eb8,0x1024b6ed8,...]  collide.c:438
+      + ! : | + 2 sl_collide_shapes  (in sl_bench) + 40  [0x1024b6e3c]  collide.c:434
+      + ! : | + 1 sl_collide_shapes  (in sl_bench) + 56  [0x1024b6e4c]  collide.c:437
+      + ! : | 5 contact_refresh  (in sl_bench) + 236,212,...  [0x1024b995c,0x1024b9944,...]  contact.c:470
+      + ! : | 3 contact_refresh  (in sl_bench) + 468,472  [0x1024b9a44,0x1024b9a48]  contact.c:474
+      + ! : | 2 sl_collide_shapes  (in sl_bench) + 1552,1560  [0x1024b7424,0x1024b742c]  collide.c:453
+      + ! : | 1 contact_refresh  (in sl_bench) + 36  [0x1024b9894]  contact.c:463
+      + ! : | 1 contact_refresh  (in sl_bench) + 112  [0x1024b98e0]  contact.c:469
+      + ! : 5 sl_contact_step_begin  (in sl_bench) + 660  [0x1024b9568]  contact.c:700
+      + ! : | 3 query_root  (in sl_bench) + 964  [0x1024b9ee0]  contact.c:642
+      + ! : | + 3 contact_refresh  (in sl_bench) + 180  [0x1024b9924]  contact.c:470
+      + ! : | +   1 sl_collide_shapes  (in sl_bench) + 16  [0x1024b6e24]  collide.c:426
+      + ! : | +   1 sl_collide_shapes  (in sl_bench) + 40  [0x1024b6e3c]  collide.c:434
+      + ! : | +   1 sl_collide_shapes  (in sl_bench) + 56  [0x1024b6e4c]  collide.c:437
+      + ! : | 1 query_root  (in sl_bench) + 264  [0x1024b9c24]  contact.c:641
+      + ! : | 1 query_root  (in sl_bench) + 608  [0x1024b9d7c]  contact.c:642
+      + ! : 4 sl_contact_step_begin  (in sl_bench) + 252,200  [0x1024b93d0,0x1024b939c]  contact.c:699
+      + ! : 2 sl_contact_step_begin  (in sl_bench) + 88  [0x1024b932c]  contact.c:699
+      + ! : | 1 sl_body_is_valid  (in sl_bench) + 28  [0x1024ad8b4]  world.c:823
+      + ! : | 1 sl_body_is_valid  (in sl_bench) + 40  [0x1024ad8c0]  world.c:824
+      + ! : 2 sl_contact_step_begin  (in sl_bench) + 200  [0x1024b939c]  contact.c:699
+      + ! : | 2 sl_joint_pair_should_collide  (in sl_bench) + 76  [0x1024b4cb0]  joint.c:0
+      + ! : 1 sl_contact_step_begin  (in sl_bench) + 104  [0x1024b933c]  contact.c:699
+      + ! : | 1 sl_body_is_valid  (in sl_bench) + 56  [0x1024ad8d0]  world.c:0
+      + ! : 1 sl_contact_step_begin  (in sl_bench) + 436  [0x1024b9488]  contact.c:699
+      + ! : | 1 contact_remove  (in sl_bench) + 400  [0x1024b90cc]  contact.c:493
+      + ! : 1 sl_contact_step_begin  (in sl_bench) + 876  [0x1024b9640]  contact.c:700
+      + ! 34 sl_world_step  (in sl_bench) + 1612  [0x1024b0cf0]  step.c:213
+      + ! : 7 sl_world_step  (in sl_bench) + 1256  [0x1024b0b8c]  step.c:188
+      + ! : 6 sl_sleep_travel  (in sl_bench) + 384  [0x1024afbd0]  sleep.c:0
+      + ! : 4 sl_sleep_travel  (in sl_bench) + 120  [0x1024afac8]  sleep.c:283
+      + ! : | 3 atan2f  (in libsystem_m.dylib) + 84,20  [0x19d090774,0x19d090734]
+      + ! : | 1 DYLD-STUB$$atan2f  (in sl_bench) + 4  [0x1024bb114]
+      + ! : 3 atan2f  (in libsystem_m.dylib) + 116  [0x19d090794]
+      + ! : 3 sl_sleep_travel  (in sl_bench) + 204  [0x1024afb1c]  sleep.c:289
+      + ! : | 3 hypot  (in libsystem_m.dylib) + 128,16  [0x19d090540,0x19d0904d0]
+      + ! : 2 sl_sleep_travel  (in sl_bench) + 8  [0x1024afa58]  sleep.c:275
+      + ! : 2 sl_sleep_travel  (in sl_bench) + 372  [0x1024afbc4]  sleep.c:289
+      + ! : 2 sl_world_step  (in sl_bench) + 1272  [0x1024b0b9c]  step.c:189
+      + ! : 2 sl_world_step  (in sl_bench) + 1344  [0x1024b0be4]  step.c:199
+      + ! : 1 sl_sleep_travel  (in sl_bench) + 40  [0x1024afa78]  sleep.c:276
+      + ! : 1 sl_world_step  (in sl_bench) + 1320  [0x1024b0bcc]  step.c:193
+      + ! : 1 sl_world_step  (in sl_bench) + 1484  [0x1024b0c70]  step.c:207
+      + ! 15 sl_world_step  (in sl_bench) + 928  [0x1024b0a44]  step.c:175
+      + ! : 3 linear_velocity_cap  (in sl_bench) + 0  [0x1024b128c]  step.c:14
+      + ! : 3 sl_world_step  (in sl_bench) + 1004  [0x1024b0a90]  step.c:143
+      + ! : 3 sl_world_step  (in sl_bench) + 1160,1152  [0x1024b0b2c,0x1024b0b24]  step.c:171
+      + ! : 1 linear_velocity_cap  (in sl_bench) + 24  [0x1024b12a4]  step.c:25
+      + ! : 1 sl_world_step  (in sl_bench) + 968  [0x1024b0a6c]  step.c:0
+      + ! : 1 sl_world_step  (in sl_bench) + 952  [0x1024b0a5c]  step.c:138
+      + ! : 1 sl_world_step  (in sl_bench) + 1100  [0x1024b0af0]  step.c:161
+      + ! : 1 sl_world_step  (in sl_bench) + 1076  [0x1024b0ad8]  step.c:163
+      + ! : 1 sl_world_step  (in sl_bench) + 948  [0x1024b0a58]  step.c:176
+      + ! 12 sl_world_step  (in sl_bench) + 1200  [0x1024b0b54]  step.c:181
+      + ! : 12 sl_solver_warm_start  (in sl_bench) + 120  [0x1024b31d0]  solver.c:364
+      + ! :   3 sl_solver_warm_start  (in sl_bench) + 260,308,...  [0x1024b325c,0x1024b328c,...]  solver.c:378
+      + ! :   2 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + ! :   2 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! :   2 sl_solver_warm_start  (in sl_bench) + 196,224  [0x1024b321c,0x1024b3238]  solver.c:371
+      + ! :   1 sl_solver_warm_start  (in sl_bench) + 120  [0x1024b31d0]  solver.c:0
+      + ! :   1 sl_solver_warm_start  (in sl_bench) + 88  [0x1024b31b0]  solver.c:362
+      + ! :   1 sl_solver_warm_start  (in sl_bench) + 136  [0x1024b31e0]  solver.c:369
+      + ! 11 sl_world_step  (in sl_bench) + 1228  [0x1024b0b70]  step.c:183
+      + ! : 11 sl_solver_solve  (in sl_bench) + 160  [0x1024b3474]  solver.c:665
+      + ! :   5 sl_solver_solve  (in sl_bench) + 392,788,...  [0x1024b355c,0x1024b36e8,...]  solver.c:671
+      + ! :   2 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! :   2 sl_solver_solve  (in sl_bench) + 132,136  [0x1024b3458,0x1024b345c]  solver.c:662
+      + ! :   1 sl_solver_solve  (in sl_bench) + 160  [0x1024b3474]  solver.c:665
+      + ! :   1 sl_solver_solve  (in sl_bench) + 172  [0x1024b3480]  solver.c:669
+      + ! 8 sl_world_step  (in sl_bench) + 1212  [0x1024b0b60]  step.c:182
+      + ! : 8 sl_joint_solve  (in sl_bench) + 152  [0x1024b6330]  joint.c:980
+      + ! :   4 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + ! :   1 sl_joint_solve  (in sl_bench) + 124  [0x1024b6314]  joint.c:977
+      + ! :   1 sl_joint_solve  (in sl_bench) + 120  [0x1024b6310]  joint.c:978
+      + ! :   1 sl_joint_solve  (in sl_bench) + 164  [0x1024b633c]  joint.c:984
+      + ! 7 sl_world_step  (in sl_bench) + 1192  [0x1024b0b4c]  step.c:180
+      + ! : 6 sl_joint_warm_start  (in sl_bench) + 136  [0x1024b5fe8]  joint.c:831
+      + ! : | 2 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + ! : | 1 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! : | 1 sl_joint_warm_start  (in sl_bench) + 104  [0x1024b5fc8]  joint.c:829
+      + ! : | 1 sl_joint_warm_start  (in sl_bench) + 136  [0x1024b5fe8]  joint.c:831
+      + ! : | 1 sl_joint_warm_start  (in sl_bench) + 144  [0x1024b5ff0]  joint.c:835
+      + ! : 1 sl_joint_warm_start  (in sl_bench) + 812  [0x1024b628c]  joint.c:0
+      + ! 7 sl_world_step  (in sl_bench) + 1880  [0x1024b0dfc]  step.c:247
+      + ! : 4 sl_sleep_step_end  (in sl_bench) + 240  [0x1024afce0]  sleep.c:313
+      + ! : | 1 DYLD-STUB$$hypot  (in sl_bench) + 4  [0x1024bb174]
+      + ! : | 1 hypot  (in libsystem_m.dylib) + 36  [0x19d0904e4]
+      + ! : | 1 sl_sleep_step_end  (in sl_bench) + 104  [0x1024afc58]  sleep.c:299
+      + ! : | 1 sl_sleep_step_end  (in sl_bench) + 580  [0x1024afe34]  sleep.c:332
+      + ! : 2 sl_sleep_step_end  (in sl_bench) + 760  [0x1024afee8]  sleep.c:306
+      + ! : | 1 sl_sleep_step_end  (in sl_bench) + 208  [0x1024afcc0]  sleep.c:312
+      + ! : | 1 sl_solver_island_quiet  (in sl_bench) + 252  [0x1024b48a0]  solver.c:774
+      + ! : 1 sl_sleep_step_end  (in sl_bench) + 776  [0x1024afef8]  sleep.c:307
+      + ! :   1 sl_sleep_step_end  (in sl_bench) + 160  [0x1024afc90]  sleep.c:0
+      + ! 6 sl_world_step  (in sl_bench) + 868  [0x1024b0a08]  step.c:218
+      + ! : 5 sl_solver_solve  (in sl_bench) + 160  [0x1024b3474]  solver.c:665
+      + ! : | 2 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! : | 1 sl_solver_solve  (in sl_bench) + 3352  [0x1024b40ec]  solver.c:0
+      + ! : | 1 sl_solver_solve  (in sl_bench) + 128  [0x1024b3454]  solver.c:663
+      + ! : | 1 sl_solver_solve  (in sl_bench) + 172  [0x1024b3480]  solver.c:669
+      + ! : 1 sl_solver_solve  (in sl_bench) + 0  [0x1024b33d4]  solver.c:662
+      + ! 5 sl_world_step  (in sl_bench) + 620  [0x1024b0910]  step.c:118
+      + ! : 1 sl_islands_build  (in sl_bench) + 120  [0x1024aff94]  island.c:0
+      + ! : 1 sl_islands_build  (in sl_bench) + 480  [0x1024b00fc]  island.c:108
+      + ! : 1 sl_islands_build  (in sl_bench) + 956  [0x1024b02d8]  island.c:137
+      + ! : 1 sl_islands_build  (in sl_bench) + 84  [0x1024aff70]  island.c:79
+      + ! : 1 sl_islands_build  (in sl_bench) + 176  [0x1024affcc]  island.c:89
+      + ! :   1 edge_join  (in sl_bench) + 200  [0x1024b05cc]  island.c:47
+      + ! 5 sl_world_step  (in sl_bench) + 1984  [0x1024b0e64]  step.c:254
+      + ! : 4 sl_contact_step_end  (in sl_bench) + 48  [0x1024b97bc]  contact.c:708
+      + ! : | 2 sl_contact_body_update  (in sl_bench) + 140,772  [0x1024b8944,0x1024b8bbc]  contact.c:314
+      + ! : | 1 sl_contact_body_update  (in sl_bench) + 80  [0x1024b8908]  contact.c:313
+      + ! : | + 1 body_tight_aabb  (in sl_bench) + 52  [0x1024b86f4]  contact.c:216
+      + ! : | +   1 sl_shape_aabb  (in sl_bench) + 92  [0x1024b1d58]  shape.c:348
+      + ! : | 1 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + ! : |   1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + ! : |     1 sl_tree_leaf_insert  (in sl_bench) + 964  [0x1024ba53c]  tree.c:0
+      + ! : 1 sl_contact_body_update  (in sl_bench) + 1028  [0x1024b8cbc]  contact.c:329
+      + ! 4 sl_world_step  (in sl_bench) + 628  [0x1024b0918]  step.c:119
+      + ! : 2 sl_sleep_graph_ready  (in sl_bench) + 368  [0x1024af824]  sleep.c:233
+      + ! : 1 sl_sleep_graph_ready  (in sl_bench) + 132  [0x1024af738]  sleep.c:215
+      + ! : 1 sl_sleep_graph_ready  (in sl_bench) + 392  [0x1024af83c]  sleep.c:228
+      + ! 4 sl_world_step  (in sl_bench) + 852  [0x1024b09f8]  step.c:217
+      + ! : 3 sl_joint_solve  (in sl_bench) + 152  [0x1024b6330]  joint.c:980
+      + ! : | 2 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + ! : | 1 sl_joint_solve  (in sl_bench) + 124  [0x1024b6314]  joint.c:977
+      + ! : 1 sl_joint_solve  (in sl_bench) + 0  [0x1024b6298]  joint.c:977
+      + ! 2 sl_sleep_travel  (in sl_bench) + 412  [0x1024afbec]  sleep.c:292
+      + ! 2 sl_world_step  (in sl_bench) + 1568  [0x1024b0cc4]  step.c:210
+      + ! : 1 sl_rotation_integrate  (in sl_bench) + 88  [0x1024b133c]  math.h:266
+      + ! : 1 sl_world_step  (in sl_bench) + 1572  [0x1024b0cc8]  step.c:212
+      + ! 2 sl_world_step  (in sl_bench) + 1640  [0x1024b0d0c]  step.c:222
+      + ! : 2 sl_joint_store  (in sl_bench) + 84  [0x1024b6b18]  joint.c:1008
+      + ! :   2 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! 2 sl_world_step  (in sl_bench) + 1648  [0x1024b0d14]  step.c:223
+      + ! : 1 sl_solver_store  (in sl_bench) + 148  [0x1024b4508]  solver.c:0
+      + ! : 1 sl_solver_store  (in sl_bench) + 100  [0x1024b44d8]  solver.c:741
+      + ! 2 sl_world_step  (in sl_bench) + 1840  [0x1024b0dd4]  step.c:243
+      + ! : 1 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + ! : 1 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! 1 sl_world_step  (in sl_bench) + 664  [0x1024b093c]  step.c:121
+      + ! : 1 sl_solver_prepare  (in sl_bench) + 160  [0x1024b2be8]  solver.c:280
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! 1 sl_world_step  (in sl_bench) + 1632  [0x1024b0d04]  step.c:221
+      + !   1 sl_solver_restitution  (in sl_bench) + 128  [0x1024b419c]  solver.c:683
+      + !     1 sl_solver_restitution  (in sl_bench) + 96  [0x1024b417c]  solver.c:681
+      + 107 main  (in sl_bench) + 1776  [0x1024a8fd0]  main.c:883
+      + ! 32 sl_world_step  (in sl_bench) + 604  [0x1024b0900]  step.c:116
+      + ! : 17 sl_contact_step_begin  (in sl_bench) + 464  [0x1024b94a4]  contact.c:699
+      + ! : | 7 contact_refresh  (in sl_bench) + 180  [0x1024b9924]  contact.c:470
+      + ! : | + 3 sl_collide_shapes  (in sl_bench) + 40  [0x1024b6e3c]  collide.c:434
+      + ! : | + 2 sl_collide_shapes  (in sl_bench) + 0,16  [0x1024b6e14,0x1024b6e24]  collide.c:426
+      + ! : | + 1 sl_collide_shapes  (in sl_bench) + 56  [0x1024b6e4c]  collide.c:437
+      + ! : | + 1 sl_collide_shapes  (in sl_bench) + 216  [0x1024b6eec]  collide.c:438
+      + ! : | 4 contact_refresh  (in sl_bench) + 212,236  [0x1024b9944,0x1024b995c]  contact.c:470
+      + ! : | 4 sl_collide_shapes  (in sl_bench) + 1556,1548,...  [0x1024b7428,0x1024b7420,...]  collide.c:453
+      + ! : | 1 contact_refresh  (in sl_bench) + 108  [0x1024b98dc]  contact.c:468
+      + ! : | 1 contact_refresh  (in sl_bench) + 468  [0x1024b9a44]  contact.c:474
+      + ! : 6 sl_contact_step_begin  (in sl_bench) + 252,104,...  [0x1024b93d0,0x1024b933c,...]  contact.c:699
+      + ! : 4 sl_contact_step_begin  (in sl_bench) + 88  [0x1024b932c]  contact.c:699
+      + ! : | 2 sl_body_is_valid  (in sl_bench) + 8  [0x1024ad8a0]  world.c:818
+      + ! : | 1 sl_body_is_valid  (in sl_bench) + 56  [0x1024ad8d0]  world.c:0
+      + ! : | 1 sl_body_is_valid  (in sl_bench) + 0  [0x1024ad898]  world.c:815
+      + ! : 2 sl_contact_step_begin  (in sl_bench) + 200  [0x1024b939c]  contact.c:699
+      + ! : | 1 sl_joint_pair_should_collide  (in sl_bench) + 76  [0x1024b4cb0]  joint.c:0
+      + ! : | 1 sl_joint_pair_should_collide  (in sl_bench) + 0  [0x1024b4c64]  joint.c:307
+      + ! : 1 contact_refresh  (in sl_bench) + 664  [0x1024b9b08]  contact.c:483
+      + ! : 1 sl_contact_step_begin  (in sl_bench) + 104  [0x1024b933c]  contact.c:699
+      + ! : | 1 sl_body_is_valid  (in sl_bench) + 56  [0x1024ad8d0]  world.c:0
+      + ! : 1 sl_contact_step_begin  (in sl_bench) + 660  [0x1024b9568]  contact.c:700
+      + ! :   1 query_root  (in sl_bench) + 92  [0x1024b9b78]  contact.c:633
+      + ! :     1 sl_tree_query  (in sl_bench) + 352  [0x1024bacf8]  tree.c:437
+      + ! 20 sl_world_step  (in sl_bench) + 1612  [0x1024b0cf0]  step.c:213
+      + ! : 6 sl_sleep_travel  (in sl_bench) + 120  [0x1024afac8]  sleep.c:283
+      + ! : | 4 DYLD-STUB$$atan2f  (in sl_bench) + 4  [0x1024bb114]
+      + ! : | 2 atan2f  (in libsystem_m.dylib) + 4,84  [0x19d090724,0x19d090774]
+      + ! : 3 sl_world_step  (in sl_bench) + 1320  [0x1024b0bcc]  step.c:193
+      + ! : 2 atan2f  (in libsystem_m.dylib) + 116  [0x19d090794]
+      + ! : 2 sl_world_step  (in sl_bench) + 1344  [0x1024b0be4]  step.c:199
+      + ! : 1 sl_sleep_travel  (in sl_bench) + 384  [0x1024afbd0]  sleep.c:0
+      + ! : 1 sl_sleep_travel  (in sl_bench) + 0  [0x1024afa50]  sleep.c:275
+      + ! : 1 sl_sleep_travel  (in sl_bench) + 204  [0x1024afb1c]  sleep.c:289
+      + ! : | 1 hypot  (in libsystem_m.dylib) + 16  [0x19d0904d0]
+      + ! : 1 sl_sleep_travel  (in sl_bench) + 188  [0x1024afb0c]  sleep.c:289
+      + ! : 1 sl_world_step  (in sl_bench) + 1256  [0x1024b0b8c]  step.c:188
+      + ! : 1 sl_world_step  (in sl_bench) + 1400  [0x1024b0c1c]  step.c:204
+      + ! : 1 sl_world_step  (in sl_bench) + 1488  [0x1024b0c74]  step.c:207
+      + ! 9 sl_world_step  (in sl_bench) + 928  [0x1024b0a44]  step.c:175
+      + ! : 3 sl_world_step  (in sl_bench) + 1004  [0x1024b0a90]  step.c:143
+      + ! : 2 linear_velocity_cap  (in sl_bench) + 0  [0x1024b128c]  step.c:14
+      + ! : 1 sl_world_step  (in sl_bench) + 968  [0x1024b0a6c]  step.c:0
+      + ! : 1 sl_world_step  (in sl_bench) + 1076  [0x1024b0ad8]  step.c:163
+      + ! : 1 sl_world_step  (in sl_bench) + 1160  [0x1024b0b2c]  step.c:171
+      + ! : 1 sl_world_step  (in sl_bench) + 948  [0x1024b0a58]  step.c:176
+      + ! 9 sl_world_step  (in sl_bench) + 1228  [0x1024b0b70]  step.c:183
+      + ! : 9 sl_solver_solve  (in sl_bench) + 160  [0x1024b3474]  solver.c:665
+      + ! :   5 sl_solver_solve  (in sl_bench) + 336,884,...  [0x1024b3524,0x1024b3748,...]  solver.c:671
+      + ! :   2 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 56  [0x1024aed64]  sleep.c:35
+      + ! :   1 sl_solver_solve  (in sl_bench) + 136  [0x1024b345c]  solver.c:662
+      + ! 7 sl_world_step  (in sl_bench) + 620  [0x1024b0910]  step.c:118
+      + ! : 1 sl_islands_build  (in sl_bench) + 328  [0x1024b0064]  island.c:116
+      + ! : 1 sl_islands_build  (in sl_bench) + 648  [0x1024b01a4]  island.c:119
+      + ! : 1 sl_islands_build  (in sl_bench) + 956  [0x1024b02d8]  island.c:137
+      + ! : 1 sl_islands_build  (in sl_bench) + 928  [0x1024b02bc]  island.c:144
+      + ! : 1 sl_islands_build  (in sl_bench) + 1136  [0x1024b038c]  island.c:159
+      + ! : 1 sl_islands_build  (in sl_bench) + 144  [0x1024affac]  island.c:88
+      + ! : 1 sl_islands_build  (in sl_bench) + 176  [0x1024affcc]  island.c:89
+      + ! :   1 edge_join  (in sl_bench) + 96  [0x1024b0564]  island.c:47
+      + ! 6 sl_world_step  (in sl_bench) + 852  [0x1024b09f8]  step.c:217
+      + ! : 6 sl_joint_solve  (in sl_bench) + 152  [0x1024b6330]  joint.c:980
+      + ! :   2 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! :   2 sl_joint_solve  (in sl_bench) + 2056  [0x1024b6aa0]  joint.c:0
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + ! :   1 sl_joint_solve  (in sl_bench) + 164  [0x1024b633c]  joint.c:984
+      + ! 6 sl_world_step  (in sl_bench) + 1880  [0x1024b0dfc]  step.c:247
+      + ! : 5 sl_sleep_step_end  (in sl_bench) + 240  [0x1024afce0]  sleep.c:313
+      + ! : | 2 sl_sleep_step_end  (in sl_bench) + 100  [0x1024afc54]  sleep.c:299
+      + ! : | 2 sl_sleep_step_end  (in sl_bench) + 252,376  [0x1024afcec,0x1024afd68]  sleep.c:313
+      + ! : | 1 sl_sleep_step_end  (in sl_bench) + 780  [0x1024afefc]  sleep.c:0
+      + ! : 1 sl_sleep_step_end  (in sl_bench) + 776  [0x1024afef8]  sleep.c:307
+      + ! :   1 sl_sleep_step_end  (in sl_bench) + 160  [0x1024afc90]  sleep.c:0
+      + ! 4 sl_world_step  (in sl_bench) + 1984  [0x1024b0e64]  step.c:254
+      + ! : 4 sl_contact_step_end  (in sl_bench) + 48  [0x1024b97bc]  contact.c:708
+      + ! :   2 sl_contact_body_update  (in sl_bench) + 80  [0x1024b8908]  contact.c:313
+      + ! :   | 1 body_tight_aabb  (in sl_bench) + 32  [0x1024b86e0]  contact.c:215
+      + ! :   | 1 body_tight_aabb  (in sl_bench) + 84  [0x1024b8714]  contact.c:216
+      + ! :   1 sl_contact_body_update  (in sl_bench) + 192  [0x1024b8978]  contact.c:314
+      + ! :   1 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + ! :     1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 388  [0x1024baf28]  tree.c:233
+      + ! 3 sl_world_step  (in sl_bench) + 1200  [0x1024b0b54]  step.c:181
+      + ! : 3 sl_solver_warm_start  (in sl_bench) + 120  [0x1024b31d0]  solver.c:364
+      + ! :   2 sl_solver_warm_start  (in sl_bench) + 320,504  [0x1024b3298,0x1024b3350]  solver.c:378
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! 2 sl_world_step  (in sl_bench) + 1568  [0x1024b0cc4]  step.c:210
+      + ! : 1 sl_rotation_integrate  (in sl_bench) + 0  [0x1024b12e4]  math.h:256
+      + ! : 1 sl_rotation_integrate  (in sl_bench) + 52  [0x1024b1318]  math.h:261
+      + ! 2 sl_world_step  (in sl_bench) + 868  [0x1024b0a08]  step.c:218
+      + ! : 2 sl_solver_solve  (in sl_bench) + 160  [0x1024b3474]  solver.c:665
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! :   1 sl_solver_solve  (in sl_bench) + 760  [0x1024b36cc]  solver.c:671
+      + ! 2 sl_world_step  (in sl_bench) + 1792  [0x1024b0da4]  step.c:237
+      + ! : 1 sl_rotation_normalize  (in sl_bench) + 0  [0x1024b142c]  math.h:232
+      + ! : 1 sl_world_step  (in sl_bench) + 1724  [0x1024b0d60]  step.c:234
+      + ! 1 sl_sleep_travel  (in sl_bench) + 412  [0x1024afbec]  sleep.c:292
+      + ! 1 sl_world_step  (in sl_bench) + 664  [0x1024b093c]  step.c:121
+      + ! : 1 sl_solver_prepare  (in sl_bench) + 160  [0x1024b2be8]  solver.c:280
+      + ! :   1 sl_solver_prepare  (in sl_bench) + 128  [0x1024b2bc8]  solver.c:278
+      + ! 1 sl_world_step  (in sl_bench) + 1212  [0x1024b0b60]  step.c:182
+      + ! : 1 sl_joint_solve  (in sl_bench) + 152  [0x1024b6330]  joint.c:980
+      + ! :   1 sl_island_is_sleeping  (in sl_bench) + 44  [0x1024aed58]  sleep.c:36
+      + ! 1 sl_world_step  (in sl_bench) + 1632  [0x1024b0d04]  step.c:221
+      + ! : 1 sl_solver_restitution  (in sl_bench) + 128  [0x1024b419c]  solver.c:683
+      + ! :   1 sl_solver_restitution  (in sl_bench) + 184  [0x1024b41d4]  solver.c:689
+      + ! 1 sl_world_step  (in sl_bench) + 1840  [0x1024b0dd4]  step.c:243
+      + !   1 sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+      + 12 main  (in sl_bench) + 1760  [0x1024a8fc0]  main.c:883
+      + ! 2 scene_mutate  (in sl_bench) + 248  [0x1024ab878]  main.c:445
+      + ! : 2 sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+      + ! :   2 sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+      + ! :     2 sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+      + ! :       2 sl_tree_leaf_insert  (in sl_bench) + 104,520  [0x1024ba1e0,0x1024ba380]  tree.c:0
+      + ! 2 scene_mutate  (in sl_bench) + 632  [0x1024ab9f8]  main.c:445
+      + ! : 2 sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+      + ! :   2 sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+      + ! :     2 sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+      + ! :       1 sl_tree_leaf_insert  (in sl_bench) + 964  [0x1024ba53c]  tree.c:0
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 560  [0x1024bafd4]  tree.c:228
+      + ! 2 scene_mutate  (in sl_bench) + 552  [0x1024ab9a8]  main.c:451
+      + ! : 2 sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+      + ! :   2 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + ! :     1 sl_tree_proxy_move  (in sl_bench) + 520  [0x1024bab5c]  tree.c:411
+      + ! :     | 1 sl_tree_refit_upward  (in sl_bench) + 388  [0x1024baf28]  tree.c:233
+      + ! :     1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 508  [0x1024bafa0]  tree.c:228
+      + ! 1 scene_mutate  (in sl_bench) + 196  [0x1024ab844]  main.c:438
+      + ! : 1 sl_world_body_destroy  (in sl_bench) + 136  [0x1024ad700]  world.c:775
+      + ! :   1 sl_contact_body_destroy  (in sl_bench) + 160  [0x1024b8874]  contact.c:288
+      + ! :     1 sl_tree_proxy_destroy  (in sl_bench) + 356  [0x1024ba8fc]  tree.c:398
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 424  [0x1024baf4c]  tree.c:228
+      + ! 1 scene_mutate  (in sl_bench) + 312  [0x1024ab8b8]  main.c:438
+      + ! : 1 sl_world_body_destroy  (in sl_bench) + 136  [0x1024ad700]  world.c:775
+      + ! :   1 sl_contact_body_destroy  (in sl_bench) + 160  [0x1024b8874]  contact.c:288
+      + ! :     1 sl_contact_body_destroy  (in sl_bench) + 160  [0x1024b8874]  contact.c:288
+      + ! :       1 sl_tree_proxy_destroy  (in sl_bench) + 224  [0x1024ba878]  tree.c:398
+      + ! 1 scene_mutate  (in sl_bench) + 444  [0x1024ab93c]  main.c:438
+      + ! : 1 sl_world_body_destroy  (in sl_bench) + 104  [0x1024ad6e0]  world.c:773
+      + ! :   1 sl_wake_finish  (in sl_bench) + 164  [0x1024aeef4]  sleep.c:95
+      + ! 1 scene_mutate  (in sl_bench) + 504  [0x1024ab978]  main.c:445
+      + ! : 1 sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+      + ! :   1 sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+      + ! :     1 sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+      + ! :       1 sl_tree_leaf_insert  (in sl_bench) + 1140  [0x1024ba5ec]  tree.c:278
+      + ! 1 scene_mutate  (in sl_bench) + 424  [0x1024ab928]  main.c:451
+      + ! : 1 sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+      + ! :   1 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + ! :     1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + ! :       1 sl_tree_leaf_insert  (in sl_bench) + 412  [0x1024ba314]  tree.c:264
+      + ! 1 scene_mutate  (in sl_bench) + 680  [0x1024aba28]  main.c:451
+      + !   1 sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+      + !     1 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + !       1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + !         1 sl_tree_refit_upward  (in sl_bench) + 388  [0x1024baf28]  tree.c:233
+      + 12 main  (in sl_bench) + 2024  [0x1024a90c8]  main.c:883
+      + ! 2 scene_mutate  (in sl_bench) + 572  [0x1024ab9bc]  main.c:438
+      + ! : 1 sl_world_body_destroy  (in sl_bench) + 104  [0x1024ad6e0]  world.c:773
+      + ! : | 1 sl_sleep_body_changed  (in sl_bench) + 244  [0x1024af2e0]  sleep.c:127
+      + ! : 1 sl_world_body_destroy  (in sl_bench) + 136  [0x1024ad700]  world.c:775
+      + ! :   1 sl_contact_body_destroy  (in sl_bench) + 160  [0x1024b8874]  contact.c:288
+      + ! :     1 sl_tree_proxy_destroy  (in sl_bench) + 356  [0x1024ba8fc]  tree.c:398
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 400  [0x1024baf34]  tree.c:226
+      + ! 2 scene_mutate  (in sl_bench) + 376  [0x1024ab8f8]  main.c:445
+      + ! : 2 sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+      + ! :   2 sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+      + ! :     2 sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+      + ! :       2 sl_tree_leaf_insert  (in sl_bench) + 944  [0x1024ba528]  tree.c:0
+      + ! 2 scene_mutate  (in sl_bench) + 504  [0x1024ab978]  main.c:445
+      + ! : 1 sl_world_body_create  (in sl_bench) + 1024  [0x1024ad570]  world.c:731
+      + ! : 1 sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+      + ! :   1 sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+      + ! :     1 sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+      + ! :       1 sl_tree_leaf_insert  (in sl_bench) + 944  [0x1024ba528]  tree.c:0
+      + ! 2 scene_mutate  (in sl_bench) + 424  [0x1024ab928]  main.c:451
+      + ! : 1 sl_world_body_set_position  (in sl_bench) + 132  [0x1024adc38]  world.c:1063
+      + ! : | 1 sl_wake_finish  (in sl_bench) + 32  [0x1024aee70]  sleep.c:92
+      + ! : 1 sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+      + ! :   1 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + ! :     1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + ! :       1 sl_tree_leaf_insert  (in sl_bench) + 124  [0x1024ba1f4]  tree.c:251
+      + ! 2 scene_mutate  (in sl_bench) + 680  [0x1024aba28]  main.c:451
+      + ! : 2 sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+      + ! :   2 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + ! :     2 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + ! :       1 sl_tree_leaf_insert  (in sl_bench) + 1108  [0x1024ba5cc]  tree.c:278
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 400  [0x1024baf34]  tree.c:226
+      + ! 1 scene_mutate  (in sl_bench) + 632  [0x1024ab9f8]  main.c:445
+      + ! : 1 sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+      + ! :   1 sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+      + ! :     1 sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+      + ! :       1 sl_tree_refit_upward  (in sl_bench) + 500  [0x1024baf98]  tree.c:228
+      + ! 1 scene_mutate  (in sl_bench) + 552  [0x1024ab9a8]  main.c:451
+      + !   1 sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+      + !     1 sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+      + !       1 sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+      + !         1 sl_tree_leaf_insert  (in sl_bench) + 332  [0x1024ba2c4]  tree.c:264
+      + 5 main  (in sl_bench) + 2640  [0x1024a9330]  main.c:883
+      + ! 3 main  (in sl_bench) + 2664,2656  [0x1024a9348,0x1024a9340]  main.c:883
+      + ! 1 sl_bench_penetration  (in sl_bench) + 1244  [0x1024abf48]  math.h:0
+      + ! 1 sl_bench_penetration  (in sl_bench) + 32  [0x1024aba8c]  quality.c:39
+      + 4 main  (in sl_bench) + 2596  [0x1024a9304]  main.c:883
+      + ! 3 sl_world_body_get_transform  (in sl_bench) + 44  [0x1024adbac]  world.c:1047
+      + ! 1 main  (in sl_bench) + 2624  [0x1024a9320]  main.c:883
+      + 3 main  (in sl_bench) + 2568  [0x1024a92e8]  main.c:883
+      + ! 3 sl_world_body_get_transform  (in sl_bench) + 44  [0x1024adbac]  world.c:1047
+      + 1 main  (in sl_bench) + 2552  [0x1024a92d8]  main.c:883
+      + ! 1 sl_world_body_get_shape  (in sl_bench) + 20  [0x1024adb70]  world.c:1036
+      + 1 main  (in sl_bench) + 3104  [0x1024a9500]  main.c:883
+      + ! 1 sl_world_body_get_velocity  (in sl_bench) + 28  [0x1024ada10]  world.c:931
+      + 1 main  (in sl_bench) + 3124  [0x1024a9514]  main.c:883
+      + ! 1 main  (in sl_bench) + 3152  [0x1024a9530]  main.c:883
+      + 1 sl_bench_penetration  (in sl_bench) + 1272  [0x1024abf64]  quality.c:80
+      1 start  (in dyld) + 7040  [0x18cf0c514]
+        1 dyld4::LibSystemHelpersWrapper::exit(int) const  (in dyld) + 164  [0x18cf0c5f0]
+          1 dyld4::LibSystemHelpers::exit(int) const  (in libdyld.dylib) + 20  [0x18ced42e4]
+            1 exit  (in libsystem_c.dylib) + 0  [0x18d18c5b0]
+
+Total number in stack (recursive counted multiple, when >=5):
+        13       sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:36
+        8       sl_contact_body_update  (in sl_bench) + 544  [0x1024b8ad8]  contact.c:319
+        8       sl_island_is_sleeping  (in sl_bench) + 0  [0x1024aed2c]  sleep.c:35
+        8       sl_tree_proxy_move  (in sl_bench) + 572  [0x1024bab90]  tree.c:413
+        6       sl_contact_body_create  (in sl_bench) + 388  [0x1024b85d0]  contact.c:266
+        6       sl_tree_proxy_create  (in sl_bench) + 248  [0x1024ba148]  tree.c:387
+        6       sl_world_body_create  (in sl_bench) + 1264  [0x1024ad660]  world.c:743
+        6       sl_world_body_set_position  (in sl_bench) + 172  [0x1024adc60]  world.c:1067
+        5       sl_tree_leaf_insert  (in sl_bench) + 0  [0x1024ba178]  tree.c:0
+
+Sort by top of stack, same collapsed (when >= 5):
+        sl_world_step  (in sl_bench)        41
+        sl_island_is_sleeping  (in sl_bench)        33
+        sl_collide_shapes  (in sl_bench)        25
+        sl_solver_solve  (in sl_bench)        20
+        contact_refresh  (in sl_bench)        17
+        sl_sleep_travel  (in sl_bench)        17
+        sl_tree_leaf_insert  (in sl_bench)        12
+        sl_contact_step_begin  (in sl_bench)        11
+        atan2f  (in libsystem_m.dylib)        10
+        sl_islands_build  (in sl_bench)        10
+        sl_sleep_step_end  (in sl_bench)        10
+        sl_solver_warm_start  (in sl_bench)        10
+        sl_tree_refit_upward  (in sl_bench)        9
+        sl_body_is_valid  (in sl_bench)        8
+        sl_joint_solve  (in sl_bench)        8
+        linear_velocity_cap  (in sl_bench)        6
+        sl_world_body_get_transform  (in sl_bench)        6
+        DYLD-STUB$$atan2f  (in sl_bench)        5
+        hypot  (in libsystem_m.dylib)        5
+        main  (in sl_bench)        5
+
+Binary Images:
+       0x1024a8000 -        0x1024bbf27 +sl_bench (0) <55BF8E43-C050-3B58-8FA6-8057CA81DFAA> /Users/*/sl_bench
+       0x18ce64000 -        0x18ceb6b4b  libobjc.A.dylib (951.7) <03BD9E32-CF0A-37B0-898A-3CE8DE06D842> /usr/lib/libobjc.A.dylib
+       0x18ceb7000 -        0x18ceebd58  libdyld.dylib (1387) <957F93B3-8805-39C7-9C51-EDD1715F550E> /usr/lib/system/libdyld.dylib
+       0x18ceec000 -        0x18cf9f4ff  dyld (1.0.0 - 1387) <74E52480-C2BD-3C8D-812D-95FE2B74A096> /usr/lib/dyld
+       0x18cfa0000 -        0x18cfa3228  libsystem_blocks.dylib (96) <E0AC1231-27AA-3A13-8FAC-41D5802B1F3C> /usr/lib/system/libsystem_blocks.dylib
+       0x18cfa4000 -        0x18cff855f  libxpc.dylib (3102.160.5) <33E44C2D-D65E-37A6-B85F-1A4CF524A050> /usr/lib/system/libxpc.dylib
+       0x18cff9000 -        0x18d0199ff  libsystem_trace.dylib (1861.160.4) <93F1DD8C-6CD9-32B9-B222-D23DA5D161B4> /usr/lib/system/libsystem_trace.dylib
+       0x18d01a000 -        0x18d0c85f7  libcorecrypto.dylib (1922.160.10) <0642DDAD-4771-3C82-805C-E7C6701C1461> /usr/lib/system/libcorecrypto.dylib
+       0x18d0c9000 -        0x18d119257  libsystem_malloc.dylib (812.160.5) <D969A907-3E43-3951-9365-8C2DB3812E9D> /usr/lib/system/libsystem_malloc.dylib
+       0x18d11a000 -        0x18d16123f  libdispatch.dylib (1542.160.2) <B2000CD5-F580-314A-A141-E036719D854E> /usr/lib/system/libdispatch.dylib
+       0x18d162000 -        0x18d164ffb  libsystem_featureflags.dylib (103) <FEE12F9C-344B-33B3-8EDD-283580EF1C67> /usr/lib/system/libsystem_featureflags.dylib
+       0x18d165000 -        0x18d1e61e7  libsystem_c.dylib (1752.160.4) <D77CEB62-AFF6-3CEC-BA9B-4F057FBE2EB5> /usr/lib/system/libsystem_c.dylib
+       0x18d1e7000 -        0x18d277ae7  libc++.1.dylib (2100.43) <F0FD393C-15BC-3C75-A19D-897F7B225C78> /usr/lib/libc++.1.dylib
+       0x18d278000 -        0x18d29275f  libc++abi.dylib (2100.43) <F38A9C58-22AB-3798-BBAE-8DCD9CC0CE27> /usr/lib/libc++abi.dylib
+       0x18d293000 -        0x18d2d02e7  libsystem_kernel.dylib (12377.161.14) <C6A4A4CB-92E6-3BAF-AAE0-E8306259209A> /usr/lib/system/libsystem_kernel.dylib
+       0x18d2d1000 -        0x18d2ddb3b  libsystem_pthread.dylib (539.100.4) <A373F0B0-9880-326A-88B4-DD8BE4E33072> /usr/lib/system/libsystem_pthread.dylib
+       0x18d2de000 -        0x18d2e6963  libsystem_platform.dylib (375.120.2) <EDB83A19-EC17-32DE-9350-6145970A85D6> /usr/lib/system/libsystem_platform.dylib
+       0x18d2e7000 -        0x18d3166eb  libsystem_info.dylib (600) <9B5FB84B-31AD-3EA7-8F89-8C700D369DC8> /usr/lib/system/libsystem_info.dylib
+       0x1912b4000 -        0x1912bde5f  libsystem_darwin.dylib (1752.160.4) <8E07D22E-CE5A-38A0-B091-5B0338C326F5> /usr/lib/system/libsystem_darwin.dylib
+       0x19171f000 -        0x1917311b6  libsystem_notify.dylib (348.160.3) <15799128-6CBD-30D6-A2BB-B9D02B4470C0> /usr/lib/system/libsystem_notify.dylib
+       0x1939f0000 -        0x193a0af7b  libsystem_networkextension.dylib (2226.161.1) <9C7B1EEB-47BE-3791-93A9-CFC693CB9417> /usr/lib/system/libsystem_networkextension.dylib
+       0x193a8d000 -        0x193aa4fdf  libsystem_asl.dylib (406) <54439739-33EE-3273-839F-CBA67D7F5CB1> /usr/lib/system/libsystem_asl.dylib
+       0x195646000 -        0x19564e387  libsystem_symptoms.dylib (2169.160.3) <229122B9-B8B1-3F2F-870E-8650AE3C4FB5> /usr/lib/system/libsystem_symptoms.dylib
+       0x1998eb000 -        0x1999235b7  libsystem_containermanager.dylib (725.160.3) <14B2A47F-19C8-392F-8FDB-FE8AE375DD41> /usr/lib/system/libsystem_containermanager.dylib
+       0x19acfd000 -        0x19ad015d7  libsystem_configuration.dylib (1405.160.3) <D8D6280B-783D-3550-BDBA-2861AE40604F> /usr/lib/system/libsystem_configuration.dylib
+       0x19ad02000 -        0x19ad0899f  libsystem_sandbox.dylib (2680.160.6) <54688162-B50D-3D31-A1E8-7B9766D3530D> /usr/lib/system/libsystem_sandbox.dylib
+       0x19c35d000 -        0x19c3601fb  libquarantine.dylib (196.160.2) <EEE5AADB-52E1-3C4C-881A-70405770B1F1> /usr/lib/system/libquarantine.dylib
+       0x19cafc000 -        0x19cb02d03  libsystem_coreservices.dylib (191.5.1) <D4ACD2AC-5702-3C45-85A0-300B2C2D19E1> /usr/lib/system/libsystem_coreservices.dylib
+       0x19d08b000 -        0x19d0c8a77  libsystem_m.dylib (3312.100.1) <B54FBE99-DB0B-32C7-ABDD-C2206DF606A4> /usr/lib/system/libsystem_m.dylib
+       0x19d0ca000 -        0x19d0cd527  libmacho.dylib (1387) <949131E5-BDA2-39BA-AA50-62651BB51802> /usr/lib/system/libmacho.dylib
+       0x19d0e7000 -        0x19d0f43a7  libcommonCrypto.dylib (600035) <3B110564-5278-3CB0-85F1-2CE8431FF935> /usr/lib/system/libcommonCrypto.dylib
+       0x19d0f5000 -        0x19d0feca3  libunwind.dylib (2100.2) <05FD0014-55B1-3B8A-A6BA-6C7A389C4123> /usr/lib/system/libunwind.dylib
+       0x19d107000 -        0x19d111bef  libcopyfile.dylib (240.160.2.0.1) <D0009B8A-8ECC-3D56-9206-7E1839707F93> /usr/lib/system/libcopyfile.dylib
+       0x19d112000 -        0x19d115987  libcompiler_rt.dylib (103.3) <6FB345CA-7F5C-3263-A23F-143F7539FD8A> /usr/lib/system/libcompiler_rt.dylib
+       0x19d116000 -        0x19d11a78b  libsystem_collections.dylib (1752.160.4) <C8160BD2-5941-3DC0-BB40-F8C2B8156EC4> /usr/lib/system/libsystem_collections.dylib
+       0x19d11b000 -        0x19d11e4cf  libsystem_secinit.dylib (168.100.7) <ECABC024-8F02-374A-BB7E-29437CEA2ABD> /usr/lib/system/libsystem_secinit.dylib
+       0x19d11f000 -        0x19d121bf7  libremovefile.dylib (85.100.6) <7460B5AE-469A-36A0-A7EC-6C7D69628E86> /usr/lib/system/libremovefile.dylib
+       0x19d122000 -        0x19d122f27  libkeymgr.dylib (31) <7E863FCA-F3FF-32C7-8A8C-F983E946AFC3> /usr/lib/system/libkeymgr.dylib
+       0x19d123000 -        0x19d12be37  libsystem_dnssd.dylib (2881.160.4) <305F4398-E688-3384-B351-02D865EC8A04> /usr/lib/system/libsystem_dnssd.dylib
+       0x19d12c000 -        0x19d13109b  libcache.dylib (95) <9CD7B1E1-3E47-339C-A193-2392E3E0ED23> /usr/lib/system/libcache.dylib
+       0x19d132000 -        0x19d133ce3  libSystem.B.dylib (1356) <4FED5EE2-5D3E-35B1-A170-9859C4B683BB> /usr/lib/libSystem.B.dylib
+       0x2910f5000 -        0x2910fc349  libRosetta.dylib (367.9) <0C7397C6-D747-31F2-8BC1-4096213BDE5C> /usr/lib/libRosetta.dylib
+       0x292d08000 -        0x292d0ba4b  libsystem_darwindirectory.dylib (122) <971A4F65-493D-39F3-846D-0D33FA2769FD> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x292d0c000 -        0x292d1639b  libsystem_eligibility.dylib (319.160.17) <750CA446-92EA-3A56-9A7B-CC0841686C50> /usr/lib/system/libsystem_eligibility.dylib
+       0x292d17000 -        0x292d1e88b  libsystem_sanitizers.dylib (26.1) <D88EC709-9AA8-3083-B22B-D3CB39678D71> /usr/lib/system/libsystem_sanitizers.dylib
+       0x292d1f000 -        0x292d1fbb7  libsystem_trial.dylib (474.2.18.2) <7194FF5B-A6C5-3D67-B00A-90209F10D603> /usr/lib/system/libsystem_trial.dylib

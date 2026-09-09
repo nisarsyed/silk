@@ -185,3 +185,43 @@ piles and 60% lower for chains than sleep-off, while rain was about 7% higher.
 Churn's sleep-disabled path was about 32% higher than the island parent, with
 another 22% increase when enabled. Those moving-body costs remain visible in
 the evidence; settled-scene savings do not imply a universal speed improvement.
+
+## Workset investigation
+
+[Decision records and raw measurements](../bench/reports/worksets/decisions.json)
+start from merged main `0b22cb6` on an Apple M4 Pro with AppleClang 21,
+`-O3 -DNDEBUG`. Profiling uses a separate `-g` build and macOS `sample`; its
+stacks include setup, warm-up and quality evaluation. They identify candidates,
+not isolated function timings or hardware-counter measurements.
+
+The first adopted change skips joint stages when no joint constraints were
+prepared. Previously, four substeps caused thirteen full island traversals for
+joint warm start, solves and storage even in worlds without joints. One count
+check per stage now avoids those metadata reads and sleep-predicate calls.
+Nonempty constraint order and allocation size are unchanged. Five alternating
+baseline/candidate runs confirmed about 10% lower churn total-step time in both
+sleep modes, with every non-timing report field unchanged. Other fixture timing
+spreads remain in the raw reports; this is not a universal 10% improvement.
+
+`build/release/bin/sl_bench_query` measures queries separately from steps. It
+builds 1,024 static circles of radius 1/32 on a 1/8-unit grid, permuting creation
+order by multiplication by 561 modulo 1,024. Each fixture warms up and measures
+65,536 queries with an eight-handle buffer. Point queries alternate exact centers
+and gaps that overlap fat proxies; broad queries cover the entire grid and
+truncate. Geometric counts and ordered handles are checked outside timing.
+Repeat the executable five times against each measured library, alternating
+execution order. Its small JSON array is experiment output, separate from the
+versioned simulation report schema; compare digests and per-batch milliseconds.
+
+Filtering exact query matches before sorting was rejected: confirming runs
+improved the point fixture by 10.7% but slowed the broad fixture by 1.7%.
+Compaction adds writes and changes geometry access order, despite reducing
+sorting from candidate count to match count. The archived patch reproduces the
+experiment against the baseline; it is not a runtime alternative.
+
+Compiler investigation uses `-Rpass=loop-vectorize`,
+`-Rpass-missed=loop-vectorize`, `-Rpass-analysis=loop-vectorize`, and
+`-Rpass=slp-vectorizer`. Build with `-j 1` to keep diagnostics readable. Compare
+the same baseline with `-fno-vectorize -fno-slp-vectorize`; both sleep modes pass
+quality gates and retain physical digests. Initial median timing differences
+of roughly -0.5% to +2.6% do not establish a useful whole-workload change.

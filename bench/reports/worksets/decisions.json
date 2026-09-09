@@ -1,0 +1,49 @@
+{
+  "baseline_revision": "0b22cb600d99fbf733c9c6703d6bdd452f256c89",
+  "joint_implementation_revision": "0d5699f",
+  "candidate_metadata_note": "Joint runs were collected before committing, and correctly report the parent revision with a dirty suffix. The only engine change is the joint.c diff in 0d5699f.",
+  "host": {
+    "cpu": "Apple M4 Pro",
+    "memory_bytes": 25769803776,
+    "compiler": "AppleClang 21.0.0.21000101",
+    "flags": "-O3 -DNDEBUG",
+    "platform": "macOS arm64"
+  },
+  "joint": {
+    "decision": "adopt",
+    "cost_before": "At four substeps, warm start, biased/relaxed solve and store visit each island 13 times even with zero joints. Each visit reads range metadata and calls the sleep predicate. Preparation also scans islands with reserved but unused capacity.",
+    "cost_after": "A single prepared-count load/branch per stage skips all island reads when no joint constraints execute. Nonempty stages retain exactly the same traversal. No new allocations, arrays or public APIs.",
+    "memory_delta_bytes": 0,
+    "deterministic_result_fields_equal": true,
+    "confirming_repetitions": 5,
+    "confirmation_order": "Alternating parent/candidate order on successive repetitions, both sleep modes, all seven fixtures, 120 warmup and 600 measured steps.",
+    "median_churn_change_percent": {
+      "off": -9.721631938543073,
+      "on": -10.078500886300324
+    }
+  },
+  "query": {
+    "decision": "reject",
+    "cost_before": "C candidates: C exact tests plus O(C log C) bounded heapsort; caller writes bounded by capacity.",
+    "cost_candidate": "C exact tests plus compaction writes and O(M log M) sorting of M exact matches. Same scratch capacity. Avoids sorting count-only queries.",
+    "reason": "Point misses improved 10.7%, but all-body broad queries regressed 1.7% in the confirming batch. No demonstrated application workload justifies that tradeoff.",
+    "patch": "query-compaction.patch",
+    "fixture": "bench/query.c",
+    "repetitions": 5,
+    "queries_per_batch": 65536,
+    "warmup_batches": 1,
+    "memory_delta_bytes": 0,
+    "digest_equal": true
+  },
+  "vectorization": {
+    "status": "compiler comparison complete; targeted SIMD investigation pending",
+    "flags_disabled": "-fno-vectorize -fno-slp-vectorize",
+    "physical_digests_equal": true
+  },
+  "profiling": {
+    "command": "sample <benchmark-pid> 1 1 -file <output>",
+    "benchmark_arguments": "--scene churn|rain --sleep off|on --warmup 10000 --steps 10000",
+    "build_flags": "-O3 -DNDEBUG -g",
+    "limitation": "CLI sampling includes setup, warmup and quality work and supplies statistical stacks, not hardware counters or isolated function timings. Full Xcode/Instruments is unavailable."
+  }
+}

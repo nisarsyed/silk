@@ -1,0 +1,1657 @@
+[  5%] Building C object src/CMakeFiles/silk.dir/silk.c.o
+[ 10%] Building C object src/CMakeFiles/silk.dir/world.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:149:31: remark: Stores SLP vectorized with cost -4 and with tree size 7 [-Rpass=slp-vectorizer]
+  149 |     resolved->sleep_speed_max = config->sleep_speed_max == 0.0f
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:162:32: remark: Stores SLP vectorized with cost -8 and with tree size 7 [-Rpass=slp-vectorizer]
+  162 |     resolved->linear_speed_max = (config->linear_speed_max == 0.0f)
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:175:37: remark: Stores SLP vectorized with cost -2 and with tree size 7 [-Rpass=slp-vectorizer]
+  175 |     resolved->restitution_threshold = (config->restitution_threshold == 0.0f)
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:600:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  600 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:600:44: remark: loop not vectorized: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+Unknown data dependence. Memory location is the same as accessed at worksets-source/src/world.c:601:9 [-Rpass-analysis=loop-vectorize]
+  600 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:600:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  600 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:622:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  622 |     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:622:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:622:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:625:31: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+  625 |         world->slots[i].dense = SL_BODY_DENSE_NONE;
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:612:28: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  612 |     world->sleep_speed_max = resolved.sleep_speed_max;
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:559:24: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  559 |     world->linear_drag = config->linear_drag;
+      |                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:563:26: remark: Stores SLP vectorized with cost -6 and with tree size 2 [-Rpass=slp-vectorizer]
+  563 |     world->contact_hertz = resolved.contact_hertz;
+      |                          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:567:24: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  567 |     world->joint_hertz = resolved.joint_hertz;
+      |                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:553:24: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  553 |     world->moved_count = 0u;
+      |                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:655:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  655 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:655:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:670:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  670 |     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:670:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:662:28: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  662 |     world->body_count_high = 0u;
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:728:37: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  728 |     world->delta_rotations[dense] = sl_rotation_identity();
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:724:28: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  724 |     world->forces[dense] = sl_vec2_make(0.0f, 0.0f);
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:725:37: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  725 |     world->delta_positions[dense] = sl_vec2_make(0.0f, 0.0f);
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1229:9: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+ 1229 |         for (uint32_t i = 0u; i < a->polygon.count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1229:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1302:28: remark: Stores SLP vectorized with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+ 1302 |     world->forces[dense] = summed;
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1366:28: remark: Stores SLP vectorized with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+ 1366 |     world->forces[dense] = force_sum;
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1383:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+ 1383 |     for (uint32_t row = 0u; row < world->body_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1383:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1392:26: remark: Stores SLP vectorized with cost -2 and with tree size 4 [-Rpass=slp-vectorizer]
+ 1392 |     result.contact_count = world->contact_count;
+      |                          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/world.c:1376:29: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+ 1376 |     sl_world_stats result = {
+      |                             ^
+[ 15%] Building C object src/CMakeFiles/silk.dir/query.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   54 |         if (child + 1u < count && slots[child] < slots[child + 1u])
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:54:32: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/query.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:344:39: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  344 |     return sl_vec2_is_finite(b.lower) && sl_vec2_is_finite(b.upper) &&
+      |                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:92:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   92 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:92:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:92:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:103:13: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  103 |         if (!match)
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:92:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   92 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:92:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:92:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/query.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:358:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  358 |     if (!sl_aabb_is_valid(a) || !sl_aabb_is_valid(b)) {
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:173:9: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  173 |         }
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:160:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  160 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:160:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/query.c:160:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[ 21%] Building C object src/CMakeFiles/silk.dir/sleep.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:101:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  101 |             for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:101:13: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:61:10: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   61 |     if ((world->island_parents[slot] & 1u) == 0u) {
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:101:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  101 |             for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:101:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:101:13: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:61:10: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   61 |     if ((world->island_parents[slot] & 1u) == 0u) {
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:101:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  101 |             for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:74:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   74 |     for (uint32_t count = 0u;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:74:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:61:10: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   61 |     if ((world->island_parents[slot] & 1u) == 0u) {
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:74:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   74 |     for (uint32_t count = 0u;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:129:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  129 |             SL_WORK_ADD(world, wake_visits, 1u);
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:128:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  128 |         for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:61:10: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   61 |     if ((world->island_parents[slot] & 1u) == 0u) {
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:128:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  128 |         for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:177:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  177 |         for (uint32_t row = 0u; row < world->body_count; ++row) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:177:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:26:9: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   26 |     if (world->sleeping[row] != 0u) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:177:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  177 |         for (uint32_t row = 0u; row < world->body_count; ++row) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:212:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  212 |     for (uint32_t id = 0u; id < world->island_count; ++id) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:212:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:217:9: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  217 |         boundary_mark(world, c->body_a.index, c->body_b.index);
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:215:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  215 |     for (uint32_t i = 0u; i < world->island_contact_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:215:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:215:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:222:9: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  222 |         boundary_mark(world, world->joint_bodies_a[row].index,
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:221:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  221 |     for (uint32_t row = 0u; row < world->joint_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:221:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:221:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:237:13: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  237 |             for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:26:9: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   26 |     if (world->sleeping[row] != 0u) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:237:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  237 |             for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:230:71: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  230 |                 world->slots[world->island_bodies[island->body_offset + i]]
+      |                                                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:230:17: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  230 |                 world->slots[world->island_bodies[island->body_offset + i]]
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:228:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  228 |         for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:230:71: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  230 |                 world->slots[world->island_bodies[island->body_offset + i]]
+      |                                                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:230:17: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  230 |                 world->slots[world->island_bodies[island->body_offset + i]]
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:228:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  228 |         for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:255:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  255 |         for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:255:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:323:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  323 |         for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:331:13: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  331 |             world->quiet_steps[row] = steps;
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:323:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  323 |         for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:323:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:20:5: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   20 |     world->quiet_translation[row] = 0.0f;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:323:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  323 |         for (uint32_t i = 0u; i < island->body_count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:255:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  255 |         for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:255:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/sleep.c:334:42: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  334 |                 world->velocities[row] = sl_vec2_make(0.0f, 0.0f);
+      |                                          ^
+[ 26%] Building C object src/CMakeFiles/silk.dir/island.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:79:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+   79 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:79:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:91:9: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+   91 |         }
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:85:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   85 |     for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:85:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:85:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:85:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:95:9: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   95 |         edge_join(world, world->joint_bodies_a[row].index,
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:93:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+   93 |     for (uint32_t row = 0u; row < world->joint_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:93:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:93:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:99:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+   99 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:99:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   22 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:23:33: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   23 |         const uint32_t parent = world->island_parents[slot];
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   22 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   14 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:125:32: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  125 |             world->islands[id].contact_count += 1u;
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:119:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  119 |     for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:132:28: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  132 |         world->islands[id].joint_count += 1u;
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:128:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  128 |     for (uint32_t row = 0u; row < world->joint_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:137:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  137 |     for (uint32_t id = 0u; id < world->island_count; ++id) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:137:40: remark: loop not vectorized: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+Unknown data dependence. Memory location is the same as accessed at worksets-source/src/island.c:78:12 [-Rpass-analysis=loop-vectorize]
+  137 |     for (uint32_t id = 0u; id < world->island_count; ++id) {
+      |                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:137:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  137 |     for (uint32_t id = 0u; id < world->island_count; ++id) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:148:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  148 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:148:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:152:34: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  152 |             world->island_bodies[world->island_parents[id]++] = slot;
+      |                                  ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:148:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  148 |     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:155:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  155 |     for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:155:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:161:36: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  161 |             world->island_contacts[world->island_sizes[id]++] = row;
+      |                                    ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:155:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  155 |     for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:164:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  164 |     for (uint32_t id = 0u; id < world->island_count; ++id) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:164:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:167:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  167 |     for (uint32_t row = 0u; row < world->joint_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:171:30: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  171 |         world->island_joints[world->island_parents[id]++] = row;
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:167:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  167 |     for (uint32_t row = 0u; row < world->joint_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:173:5: remark: Stores SLP vectorized with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  173 |     SL_WORK_ADD(world, graph_body_visits, bodies);
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   14 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   22 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:23:33: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   23 |         const uint32_t parent = world->island_parents[slot];
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   22 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   14 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:14:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   22 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:23:33: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+   23 |         const uint32_t parent = world->island_parents[slot];
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/island.c:22:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   22 |     for (uint32_t depth = 0u; depth < world->body_capacity; ++depth) {
+      |     ^
+[ 31%] Building C object src/CMakeFiles/silk.dir/step.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:214:13: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  214 |             }
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:187:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  187 |         for (uint32_t index = 0u;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:187:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:187:9: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:187:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:175:17: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  175 |                 linear_velocity_cap(velocity, world->linear_speed_max);
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:158:32: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  158 |             sl_vec2 velocity = world->velocities[i];
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:137:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  137 |         for (uint32_t index = 0u;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:237:35: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  237 |             world->rotations[i] = sl_rotation_normalize(sl_rotation_mul(
+      |                                   ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:235:13: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  235 |             world->positions[i] =
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:226:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  226 |     for (uint32_t i = 0u; i < world->body_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:243:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  243 |             sl_island_is_sleeping(world, id) ? 1u : 0u;
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:241:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  241 |     for (uint32_t id = 0u; id < world->island_count; ++id) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:241:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:241:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:249:37: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  249 |         world->delta_positions[i] = sl_vec2_make(0.0f, 0.0f);
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:250:37: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  250 |         world->delta_rotations[i] = sl_rotation_identity();
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:251:28: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  251 |         world->forces[i] = sl_vec2_make(0.0f, 0.0f);
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:236:17: remark: Stores SLP vectorized with cost -5 and with tree size 4 [-Rpass=slp-vectorizer]
+  236 |                 sl_vec2_add(world->positions[i], world->delta_positions[i]);
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:60:6: note: could not determine the original source location for worksets-source/src/step.c:0:0
+   60 | void sl_world_step(sl_world *owner, float dt)
+      |      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:60:6: remark: SLP vectorized with cost -7 and with tree size 18 [-Rpass=slp-vectorizer]
+   60 | void sl_world_step(sl_world *owner, float dt)
+      |      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:60:6: note: could not determine the original source location for worksets-source/src/step.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:126:37: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  126 |         world->delta_positions[i] = sl_vec2_make(0.0f, 0.0f);
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:127:37: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  127 |         world->delta_rotations[i] = sl_rotation_identity();
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:297:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  297 |     while (available >= stepper->timestep && steps < SL_STEP_COUNT_MAX) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:297:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:297:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/step.c:297:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[ 36%] Building C object src/CMakeFiles/silk.dir/shape.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:36:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+   36 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:36:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:154:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  154 |     for (uint32_t i = 0u; i < polygon->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:154:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:192:29: remark: Stores SLP vectorized with cost -7 and with tree size 17 [-Rpass=slp-vectorizer]
+  192 |         built.vertices[i] = sl_vec2_sub(built.vertices[i], residual);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:176:29: remark: Stores SLP vectorized with cost -5 and with tree size 4 [-Rpass=slp-vectorizer]
+  176 |         built.vertices[i] = sl_vec2_sub(points[i], centroid);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:154:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  154 |     for (uint32_t i = 0u; i < polygon->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:154:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:36:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+   36 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:36:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:262:14: note: could not determine the original source location for worksets-source/src/shape.c:0:0
+  262 | sl_mass_data sl_shape_mass_data(const sl_shape *shape)
+      |              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:262:14: remark: SLP vectorized with cost -1 and with tree size 18 [-Rpass=slp-vectorizer]
+  262 | sl_mass_data sl_shape_mass_data(const sl_shape *shape)
+      |              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:262:14: note: could not determine the original source location for worksets-source/src/shape.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:333:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  333 |         for (uint32_t i = 1u; i < p->count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:333:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:373:9: remark: loop not vectorized: Cannot vectorize early exit loop [-Rpass-analysis=loop-vectorize]
+  373 |         for (uint32_t i = 0u; i < p->count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:373:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:373:9: remark: loop not vectorized: Cannot vectorize early exit loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:373:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:454:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  454 |     for (uint32_t i = 0u; i < p->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:454:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:454:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:431:19: remark: Stores SLP vectorized with cost -1 and with tree size 3 [-Rpass=slp-vectorizer]
+  431 |     hit->fraction = (float)fraction;
+      |                   ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:80:5: remark: loop not vectorized: Cannot vectorize potentially faulting early exit loop [-Rpass-analysis=loop-vectorize]
+   80 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:80:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:90:5: remark: loop not vectorized: Cannot vectorize early exit loop with writes to memory [-Rpass-analysis=loop-vectorize]
+   90 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:90:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:102:5: remark: loop not vectorized: Cannot vectorize potentially faulting early exit loop [-Rpass-analysis=loop-vectorize]
+  102 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:102:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:36:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+   36 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:36:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:130:5: remark: loop not vectorized: Cannot vectorize potentially faulting early exit loop [-Rpass-analysis=loop-vectorize]
+  130 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:130:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/shape.h:7:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: SLP vectorized with cost -2 and with tree size 20 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:50:17: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+   50 |     *centroid = sl_vec2_add(
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:123:17: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  123 |     *centroid = sl_vec2_make(0.0f, 0.0f);
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/shape.c:91:20: remark: Stores SLP vectorized with cost -5 and with tree size 4 [-Rpass=slp-vectorizer]
+   91 |         edges[i] = edge_between(points, count, i);
+      |                    ^
+[ 42%] Building C object src/CMakeFiles/silk.dir/solver.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:133:30: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  133 |     const float rotation_a = world->inv_inertias[dense_a] * square_a;
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:315:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  315 |             for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:135:33: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  135 |     if (!sl_is_finite(square_a) || !sl_is_finite(square_b) ||
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:135:33: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:298:34: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  298 |             constraint->friction = contact->friction;
+      |                                  ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:373:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  373 |             for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:373:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:221:56: remark: Stores SLP vectorized with cost -3 and with tree size 22 [-Rpass=slp-vectorizer]
+  221 |         world->velocities[constraint->dense_b] = pair->linear_b;
+      |                                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:217:56: remark: Stores SLP vectorized with cost -2 and with tree size 16 [-Rpass=slp-vectorizer]
+  217 |         world->velocities[constraint->dense_a] = pair->linear_a;
+      |                                                        ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.h:7:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -5 and with tree size 4 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:650:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  650 |     for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:628:28: remark: loop not vectorized: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+Unknown data dependence. [-Rpass-analysis=loop-vectorize]
+  628 |     point->tangent_impulse = next_impulse;
+      |                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:650:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  650 |     for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:643:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  643 |         for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:391:9: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  391 |         world->delta_rotations[constraint->dense_a], point->anchor_a);
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:643:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  643 |         for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |         ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.h:7:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.h:7:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:5:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/math.h:207:23: remark: SLP vectorized with cost -1 and with tree size 10 [-Rpass=slp-vectorizer]
+  207 |     return __x == __x && __builtin_fabsf(__x) != __builtin_inff();
+      |                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:694:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  694 |             for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:722:43: remark: loop not vectorized: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+Unknown data dependence. [-Rpass-analysis=loop-vectorize]
+  722 |                 point->max_normal_impulse =
+      |                                           ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:694:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  694 |             for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/solver.h:7:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:676:6: note: could not determine the original source location for worksets-source/src/solver.c:0:0
+  676 | void sl_solver_restitution(sl_world_state *world)
+      |      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:676:6: remark: SLP vectorized with cost -1 and with tree size 19 [-Rpass=slp-vectorizer]
+  676 | void sl_solver_restitution(sl_world_state *world)
+      |      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:676:6: note: could not determine the original source location for worksets-source/src/solver.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:709:45: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  709 |                 if (!sl_is_finite(velocity) || !sl_is_finite(target) ||
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:746:13: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+  746 |             for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:746:13: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:755:48: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  755 |                 manifold_point->normal_impulse = point->normal_impulse;
+      |                                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:774:9: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  774 |         for (uint32_t j = 0u; j < c->point_count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/solver.c:774:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[ 47%] Building C object src/CMakeFiles/silk.dir/joint.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:193:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  193 |     for (uint32_t i = 0u; i < world->joint_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:193:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:203:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  203 |     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:203:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:200:41: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  200 |         world->joint_edge_nexts[2u * i] = SL_JOINT_EDGE_NONE;
+      |                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:198:41: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  198 |         world->joint_edge_prevs[2u * i] = SL_JOINT_EDGE_NONE;
+      |                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:194:37: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+  194 |         world->joint_slots[i].dense = SL_BODY_DENSE_NONE;
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:225:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  225 |     for (uint32_t i = 0u; i < world->joint_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:225:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:236:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  236 |     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:236:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:231:41: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  231 |         world->joint_edge_prevs[2u * i] = SL_JOINT_EDGE_NONE;
+      |                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:233:41: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  233 |         world->joint_edge_nexts[2u * i] = SL_JOINT_EDGE_NONE;
+      |                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:320:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  320 |     for (uint32_t visited = 0u;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:320:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:320:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:435:45: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  435 |     world->joint_revolute_impulses[dense] = sl_vec2_make(0.0f, 0.0f);
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:436:43: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  436 |     world->joint_linear_impulses[dense] = sl_vec2_make(0.0f, 0.0f);
+      |                                           ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.h:8:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:79:29: remark: SLP vectorized with cost -2 and with tree size 19 [-Rpass=slp-vectorizer]
+   79 |     return sl_vec2_make(v.x * s, v.y * s);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:320:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  320 |     for (uint32_t visited = 0u;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:320:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:320:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:501:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  501 |     while (world->body_joint_heads[body_slot] != SL_JOINT_EDGE_NONE) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:501:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:501:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:501:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:517:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  517 |     for (uint32_t visited = 0u; edge != SL_JOINT_EDGE_NONE &&
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:517:5: remark: loop not vectorized: Cannot vectorize early exit loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:523:9: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  523 |         world->joint_distance_impulses[dense] = 0.0f;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:517:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  517 |     for (uint32_t visited = 0u; edge != SL_JOINT_EDGE_NONE &&
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:524:49: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  524 |         world->joint_revolute_impulses[dense] = sl_vec2_make(0.0f, 0.0f);
+      |                                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:525:47: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  525 |         world->joint_linear_impulses[dense] = sl_vec2_make(0.0f, 0.0f);
+      |                                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:773:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  773 |             memset(constraint, 0, sizeof(*constraint));
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:769:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  769 |         for (uint32_t index = island->joint_offset;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:769:9: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:769:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:801:40: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  801 |                 constraint->axial_mass =
+      |                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:797:40: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  797 |                     constraint->axis = sl_vec2_make(1.0f, 0.0f);
+      |                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:817:43: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  817 |                     constraint->impulse = sl_vec2_make(0.0f, 0.0f);
+      |                                           ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:790:40: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  790 |             constraint->step_impulse = sl_vec2_make(0.0f, 0.0f);
+      |                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:787:17: remark: Stores SLP vectorized with cost -4 and with tree size 4 [-Rpass=slp-vectorizer]
+  787 |                 sl_vec2_sub(world->positions[constraint->dense_b],
+      |                 ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.h:8:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:64:5: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   64 |     return v;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:835:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  835 |         for (uint32_t row = island->joint_offset;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:606:21: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  606 |         .linear_a = world->velocities[dense_a],
+      |                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:835:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  835 |         for (uint32_t row = island->joint_offset;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:629:56: remark: Stores SLP vectorized with cost -3 and with tree size 14 [-Rpass=slp-vectorizer]
+  629 |         world->velocities[constraint->dense_b] = pair->linear_b;
+      |                                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:625:56: remark: Stores SLP vectorized with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+  625 |         world->velocities[constraint->dense_a] = pair->linear_a;
+      |                                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:860:44: remark: Stores SLP vectorized with cost -3 and with tree size 4 [-Rpass=slp-vectorizer]
+  860 |                 constraint->step_impulse = step_impulse;
+      |                                            ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.h:8:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -5 and with tree size 4 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:79:29: remark: SLP vectorized with cost -4 and with tree size 21 [-Rpass=slp-vectorizer]
+   79 |     return sl_vec2_make(v.x * s, v.y * s);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:64:5: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   64 |     return v;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:984:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  984 |         for (uint32_t row = island->joint_offset;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:606:21: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  606 |         .linear_a = world->velocities[dense_a],
+      |                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:984:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  984 |         for (uint32_t row = island->joint_offset;
+      |         ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/joint.h:8:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/world_internal.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:79:29: remark: SLP vectorized with cost -4 and with tree size 21 [-Rpass=slp-vectorizer]
+   79 |     return sl_vec2_make(v.x * s, v.y * s);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:169:30: remark: Vectorized horizontal reduction with cost -1 and with tree size 4 [-Rpass=slp-vectorizer]
+  169 |     return sl_is_finite(v.x) && sl_is_finite(v.y);
+      |                              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:79:29: remark: SLP vectorized with cost -12 and with tree size 11 [-Rpass=slp-vectorizer]
+   79 |     return sl_vec2_make(v.x * s, v.y * s);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1012:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+ 1012 |         for (uint32_t row = island->joint_offset;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1012:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1021:17: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+ 1021 |                 world->joint_revolute_impulses[constraint->joint_row] =
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1012:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+ 1012 |         for (uint32_t row = island->joint_offset;
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1028:52: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+ 1028 |                 valid ? constraint->step_impulse : sl_vec2_make(0.0f, 0.0f);
+      |                                                    ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1022:51: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+ 1022 |                     valid ? constraint->impulse : sl_vec2_make(0.0f, 0.0f);
+      |                                                   ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1056:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+ 1056 |     for (uint32_t i = island->joint_offset;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/joint.c:1056:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[ 52%] Building C object src/CMakeFiles/silk.dir/collide.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:77:73: remark: loop not vectorized: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+Unknown data dependence. Memory location is the same as accessed at worksets-source/src/collide.c:75:58 [-Rpass-analysis=loop-vectorize]
+   77 |         manifold.points[i].id = sl_feature_pair_flip(manifold.points[i].id);
+      |                                                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:73:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   73 |     for (uint32_t i = 0u; i < manifold.point_count; ++i) {
+      |     ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/collide.h:4:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:64:5: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   64 |     return v;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:87:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   87 |     for (uint32_t i = 0u; i < polygon->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:103:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  103 |     for (uint32_t i = 0u; i < reference->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:103:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/collide.h:4:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:64:5: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   64 |     return v;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:87:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   87 |     for (uint32_t i = 0u; i < polygon->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:105:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  105 |         for (uint32_t j = 0u; j < other->count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:105:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:105:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:105:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:103:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  103 |     for (uint32_t i = 0u; i < reference->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:103:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:77:73: remark: loop not vectorized: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+Unknown data dependence. Memory location is the same as accessed at worksets-source/src/collide.c:75:58 [-Rpass-analysis=loop-vectorize]
+   77 |         manifold.points[i].id = sl_feature_pair_flip(manifold.points[i].id);
+      |                                                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:73:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   73 |     for (uint32_t i = 0u; i < manifold.point_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:298:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  298 |         for (uint32_t j = 0u; j < world_b->count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:298:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:424:13: remark: SLP vectorized with cost -3 and with tree size 4 [-Rpass=slp-vectorizer]
+  424 | sl_manifold sl_collide_shapes(const sl_shape *shape_a, sl_transform transform_a,
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:75:58: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+   75 |         manifold.points[i].anchor_a = manifold.points[i].anchor_b;
+      |                                                          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:72:23: remark: Stores SLP vectorized with cost -3 and with tree size 3 [-Rpass=slp-vectorizer]
+   72 |     manifold.normal = sl_vec2_neg(manifold.normal);
+      |                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:75:58: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+   75 |         manifold.points[i].anchor_a = manifold.points[i].anchor_b;
+      |                                                          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:72:23: remark: Stores SLP vectorized with cost -3 and with tree size 3 [-Rpass=slp-vectorizer]
+   72 |     manifold.normal = sl_vec2_neg(manifold.normal);
+      |                       ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/collide.h:4:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:64:5: remark: loop not vectorized: instruction return type cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   64 |     return v;
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:87:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   87 |     for (uint32_t i = 0u; i < polygon->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:225:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  225 |     for (uint32_t i = 0u; i < world.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:225:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:124:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  124 |     for (uint32_t i = 0u; i < polygon->count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:124:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:379:9: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  379 |         }
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:368:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  368 |     for (uint32_t i = 0u; i < count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:368:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:368:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:375:55: remark: Stores SLP vectorized with cost -2 and with tree size 11 [-Rpass=slp-vectorizer]
+  375 |             manifold.points[manifold.point_count++] = sl_manifold_point_make(
+      |                                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:367:23: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+  367 |     manifold.normal = normal;
+      |                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:367:23: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:167:34: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  167 |         output[output_count++] = input[1];
+      |                                  ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:161:13: remark: Stores SLP vectorized with cost -4 and with tree size 7 [-Rpass=slp-vectorizer]
+  161 |             sl_vec2_lerp(input[0].point, input[1].point, fraction);
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/collide.c:155:34: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+  155 |         output[output_count++] = input[0];
+      |                                  ^
+[ 57%] Building C object src/CMakeFiles/silk.dir/contact.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:83:10: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   83 | uint32_t sl_contact_pair_capacity(uint32_t contact_capacity)
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:83:10: note: could not determine the original source location for worksets-source/src/contact.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:90:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+   90 |     while (capacity < required) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:90:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:90:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:96:8: note: could not determine the original source location for worksets-source/src/contact.c:0:0
+   96 | size_t sl_contact_world_memory_layout(uint32_t body_capacity,
+      |        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:96:8: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   96 | size_t sl_contact_world_memory_layout(uint32_t body_capacity,
+      |        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:96:8: note: could not determine the original source location for worksets-source/src/contact.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:90:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+   90 |     while (capacity < required) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:90:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:90:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:192:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  192 |     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:192:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:240:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  240 |     for (uint32_t read = 0u; read < world->moved_count; ++read) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:240:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:242:13: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  242 |             world->moved_slots[write] = world->moved_slots[read];
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:240:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  240 |     for (uint32_t read = 0u; read < world->moved_count; ++read) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:240:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:240:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:242:13: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  242 |             world->moved_slots[write] = world->moved_slots[read];
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:240:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  240 |     for (uint32_t read = 0u; read < world->moved_count; ++read) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:348:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  348 |     for (uint32_t i = 0u; i < world->body_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:348:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  375 |     for (uint32_t probe = 0u; probe < world->pair_capacity; ++probe) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:514:5: remark: loop not vectorized: Cannot vectorize potentially faulting early exit loop [-Rpass-analysis=loop-vectorize]
+  514 |     for (uint32_t row = 0u; row < world->contact_count; ++row) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:514:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  375 |     for (uint32_t probe = 0u; probe < world->pair_capacity; ++probe) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:541:51: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  541 |     if (!sl_body_is_valid(world, contact->body_a) ||
+      |                                                   ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:562:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  562 |     while (row < world->contact_count) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:562:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:562:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:562:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:661:33: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  661 |         if (world->types[dense] == (uint8_t)SL_BODY_DYNAMIC) {
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:662:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  662 |             query_root(world, slot, SL_TREE_ROOT_STATIC, &dropped);
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:649:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  649 |     for (uint32_t i = 0u; i < snapshot_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:649:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:677:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  677 |     for (uint32_t i = 0u; i < snapshot_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:685:13: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  685 |             world->moved_slots[next_count] = slot;
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:677:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  677 |     for (uint32_t i = 0u; i < snapshot_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:695:6: remark: Vectorized horizontal reduction with cost -4 and with tree size 5 [-Rpass=slp-vectorizer]
+  695 | void sl_contact_step_begin(sl_world_state *world)
+      |      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:708:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  708 |             sl_contact_body_update(world, dense, world->slot_of[dense]);
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:706:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  706 |     for (uint32_t dense = 0u; dense < world->body_count; ++dense) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:706:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:706:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:449:9: remark: loop not vectorized: Cannot vectorize potentially faulting early exit loop [-Rpass-analysis=loop-vectorize]
+  449 |         for (uint32_t j = 0u; j < previous->point_count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:449:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:446:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-analysis=loop-vectorize]
+  446 |     for (uint32_t i = 0u; i < manifold->point_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:452:39: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]
+  452 |                 point->normal_impulse = old->normal_impulse;
+      |                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  375 |     for (uint32_t probe = 0u; probe < world->pair_capacity; ++probe) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/contact.c:375:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[ 63%] Building C object src/CMakeFiles/silk.dir/tree.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:77:32: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   77 |         tree->nodes[i].child_2 = SL_TREE_NODE_NONE;
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:73:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+   73 |     for (uint32_t i = 0u; i < node_capacity; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:73:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:96:18: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+   96 |     node->parent = SL_TREE_NODE_NONE;
+      |                  ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:249:14: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  249 |     uint32_t sibling_id = root_id;
+      |              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:251:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  251 |     while (!sl_tree_node_is_leaf(&tree->nodes[sibling_id])) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:251:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:291:24: remark: Stores SLP vectorized with cost -7 and with tree size 7 [-Rpass=slp-vectorizer]
+  291 |     new_parent->aabb = sl_aabb_union(leaf_aabb, tree->nodes[sibling_id].aabb);
+      |                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:96:18: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+   96 |     node->parent = SL_TREE_NODE_NONE;
+      |                  ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 15 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 15 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:391:44: remark: SLP vectorized with cost -5 and with tree size 15 [-Rpass=slp-vectorizer]
+  391 |     const double width = (double)b.upper.x - (double)b.lower.x;
+      |                                            ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:238:13: remark: Vectorized horizontal reduction with cost -5 and with tree size 5 [-Rpass=slp-vectorizer]
+  238 | static void sl_tree_leaf_insert(sl_tree *tree, sl_tree_root_kind root,
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:359:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  359 |     for (uint32_t steps = 0u; steps < tree->node_capacity; ++steps) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:359:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:359:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:118:22: remark: Stores SLP vectorized with cost -3 and with tree size 4 [-Rpass=slp-vectorizer]
+  118 |     tree->node_count -= 1u;
+      |                      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:359:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  359 |     for (uint32_t steps = 0u; steps < tree->node_capacity; ++steps) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:359:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:359:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/src/tree.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:344:39: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  344 |     return sl_vec2_is_finite(b.lower) && sl_vec2_is_finite(b.upper) &&
+      |                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:344:39: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:344:39: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:344:39: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:226:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  226 |     while (node_id != SL_TREE_NODE_NONE && steps < tree->node_capacity) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:226:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:145:26: remark: loop not vectorized: cannot identify array bounds [-Rpass-analysis=loop-vectorize]
+  145 |             parent_node->child_2 = new_child;
+      |                          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:226:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  226 |     while (node_id != SL_TREE_NODE_NONE && steps < tree->node_capacity) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:129:18: remark: Stores SLP vectorized with cost -13 and with tree size 7 [-Rpass=slp-vectorizer]
+  129 |     node->aabb = sl_aabb_union(child_1->aabb, child_2->aabb);
+      |                  ^
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:129:18: remark: Stores SLP vectorized with cost -3 and with tree size 24 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:129:18: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/src/tree.c:129:18: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+[ 68%] Linking C static library libsilk.a
+[ 68%] Built target silk
+[ 73%] Building C object bench/CMakeFiles/sl_bench.dir/main.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:775:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  775 |     for (uint32_t i = 0u; s[i] != '\0'; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:775:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:775:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:775:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:775:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:775:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Loop contains an unsupported switch [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:655:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  655 |             putchar('\\');
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  653 |     for (const unsigned char *p = (const unsigned char *)value; *p != 0u; ++p) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized: could not determine number of loop iterations [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:653:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:538:32: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  538 |         const sl_transform t = sl_world_body_get_transform(world, body);
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:536:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  536 |     for (uint32_t i = 0u; i < scene->body_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:536:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:536:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:538:32: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  538 |         const sl_transform t = sl_world_body_get_transform(world, body);
+      |                                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:536:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  536 |     for (uint32_t i = 0u; i < scene->body_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:536:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:536:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:523:40: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  523 |         const sl_joint_handle handle = sl_world_joint_at(world, i);
+      |                                        ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:522:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  522 |     for (uint32_t i = 0u; i < sl_world_joint_count(world); ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:522:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:522:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:514:65: remark: loop not vectorized: Control flow cannot be substituted for a select [-Rpass-analysis=loop-vectorize]
+  514 |             } else if (sl_world_body_get_type(world, c->body_b) ==
+      |                                                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:510:17: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  510 |             if (sl_world_body_get_type(world, c->body_a) == SL_BODY_STATIC) {
+      |                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:506:9: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  506 |         for (uint32_t j = 0u; j < c->manifold.point_count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:506:9: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:506:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:491:13: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  491 |             sl_world_body_get_transform(&scene->world, scene->bodies[i]);
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:489:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+  489 |     for (uint32_t i = 0u; i < scene->body_count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:489:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:489:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:579:14: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  579 |         if (!scene_mutate(scene, i)) {
+      |              ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:578:5: remark: loop not vectorized: Cannot vectorize early exit loop with writes to memory [-Rpass-analysis=loop-vectorize]
+  578 |     for (uint32_t i = 0u; i < options->warmup; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:578:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:578:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:558:33: remark: Stores SLP vectorized with cost -2 and with tree size 7 [-Rpass=slp-vectorizer]
+  558 |             q->linear_speed_max =
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:104:16: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  104 |     if (scene->body_count >= BENCH_BODY_COUNT_MAX) {
+      |                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:163:9: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  163 |         for (uint32_t column = 0u; column < row_body_count; ++column) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:163:9: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:163:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:164:39: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  164 |             const sl_body_desc desc = {
+      |                                       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:164:39: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:152:21: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  152 |         .position = { 0.0f, -0.5f },
+      |                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:151:38: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  151 |     const sl_body_desc ground_desc = {
+      |                                      ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:151:38: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:135:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  135 |     if (!scene_world_init(
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:104:16: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  104 |     if (scene->body_count >= BENCH_BODY_COUNT_MAX) {
+      |                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:231:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  231 |     for (uint32_t i = 0u; i < BENCH_RAIN_CIRCLE_COUNT; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:231:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:231:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:234:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  234 |         const sl_body_desc desc = {
+      |                                   ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:234:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:241:25: remark: Stores SLP vectorized with cost -2 and with tree size 10 [-Rpass=slp-vectorizer]
+  241 |             .velocity = {
+      |                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:204:21: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  204 |         .position = { 0.0f, -0.2f },
+      |                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:203:37: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  203 |     const sl_body_desc floor_desc = {
+      |                                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:203:37: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:211:21: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  211 |         .position = { -8.2f, 12.0f },
+      |                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:210:41: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  210 |     const sl_body_desc wall_left_desc = {
+      |                                         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:210:41: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:218:21: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  218 |         .position = { 8.2f, 12.0f },
+      |                     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:217:42: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  217 |     const sl_body_desc wall_right_desc = {
+      |                                          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:217:42: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:184:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  184 |     if (!scene_world_init(
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:184:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:184:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:104:16: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  104 |     if (scene->body_count >= BENCH_BODY_COUNT_MAX) {
+      |                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:287:9: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  287 |         for (uint32_t row = 0u; row < 10u; ++row) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:287:9: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:287:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:270:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  270 |     if (!scene_world_init(scene, "piles",
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:107:33: remark: loop not vectorized: call instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+  107 |     const sl_body_handle body = sl_world_body_create(&scene->world, desc);
+      |                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:314:9: remark: loop not vectorized: Cannot vectorize early exit loop with reductions or recurrences [-Rpass-analysis=loop-vectorize]
+  314 |         for (uint32_t row = 0u; row < 13u; ++row) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:314:9: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:314:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:326:65: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+  326 |                                               .local_anchor_a = { 0.0f, -0.4f },
+      |                                                                 ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:298:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  298 |     if (!scene_world_init(scene, "chains",
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:298:10: remark: Stores SLP vectorized with cost -3 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:298:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:104:16: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  104 |     if (scene->body_count >= BENCH_BODY_COUNT_MAX) {
+      |                ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:356:5: remark: loop not vectorized: Cannot vectorize early exit loop with more than one early exit [-Rpass-analysis=loop-vectorize]
+  356 |     for (uint32_t i = 0u; i < 128u; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:356:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:356:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -2 and with tree size 7 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:342:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  342 |     if (!scene_world_init(scene, "churn",
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:366:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  366 |     if (!scene_world_init(scene, "table",
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:45: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:390:10: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  390 |     if (!scene_world_init(scene, "inverted",
+      |          ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  260 |     const sl_body_desc desc = { .position = { x, y },
+      |                               ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:260:31: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  439 |         const sl_body_desc desc = { .mass = 1.0f,
+      |                                   ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/main.c:439:35: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+[ 78%] Building C object bench/CMakeFiles/sl_bench.dir/quality.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:69:29: remark: SLP vectorized with cost -1 and with tree size 11 [-Rpass=slp-vectorizer]
+   69 |     return sl_vec2_make(a.x + b.x, a.y + b.y);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:135:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  135 |             for (uint32_t j = 0u; j < shape->polygon.count; ++j) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:135:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:148:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  148 |         for (uint32_t j = 0u; j < c->manifold.point_count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:148:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  162 |     for (uint32_t i = 0u; i < sl_world_joint_count(world); ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[ 84%] Linking C executable ../bin/sl_bench
+[ 84%] Built target sl_bench
+[ 89%] Building C object bench/CMakeFiles/sl_bench_check.dir/check.c.o
+[ 94%] Building C object bench/CMakeFiles/sl_bench_check.dir/quality.c.o
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+   37 | float sl_bench_penetration(const sl_shape *a, sl_transform ta,
+      |       ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:37:7: note: could not determine the original source location for worksets-source/bench/quality.c:0:0
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:17:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   17 |     for (uint32_t i = 0u; i < shape->polygon.count; ++i) {
+      |     ^
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:1:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.h:3:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/world.h:9:
+In file included from /Users/nisar/personal/projects/engine/build/worksets-source/include/silk/contact.h:8:
+/Users/nisar/personal/projects/engine/build/worksets-source/include/silk/math.h:69:29: remark: SLP vectorized with cost -1 and with tree size 11 [-Rpass=slp-vectorizer]
+   69 |     return sl_vec2_make(a.x + b.x, a.y + b.y);
+      |                             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:135:13: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  135 |             for (uint32_t j = 0u; j < shape->polygon.count; ++j) {
+      |             ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:135:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:148:9: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  148 |         for (uint32_t j = 0u; j < c->manifold.point_count; ++j) {
+      |         ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:148:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized: value that could not be identified as reduction is used outside the loop [-Rpass-analysis=loop-vectorize]
+  162 |     for (uint32_t i = 0u; i < sl_world_joint_count(world); ++i) {
+      |     ^
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized: Cannot vectorize uncountable loop [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized: instruction cannot be vectorized [-Rpass-analysis=loop-vectorize]
+/Users/nisar/personal/projects/engine/build/worksets-source/bench/quality.c:162:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+[100%] Linking C executable ../bin/sl_bench_check
+[100%] Built target sl_bench_check
