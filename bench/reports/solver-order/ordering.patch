@@ -1,0 +1,476 @@
+--- /dev/null
++++ b/src/study_graph.h
+@@ -0,0 +1,272 @@
++/* Isolated solver experiment; never included by the production source tree. */
++#ifndef SILK_STUDY_GRAPH_H
++#define SILK_STUDY_GRAPH_H
++
++#define STUDY_ZERO_GRAVITY 1u
++#define STUDY_JOINT 2u
++#define STUDY_KINEMATIC 4u
++#define STUDY_EQUAL_HEIGHT 8u
++#define STUDY_UNROOTED 16u
++#define STUDY_CYCLE 32u
++
++typedef struct study_context {
++    uint32_t *heads;
++    uint32_t *indegrees;
++    uint32_t *layers;
++    uint32_t *queue; /* After traversal: per-island fallback mask. */
++    uint32_t *next;  /* After traversal: per-contact layer sort key. */
++    uint32_t *order;
++    uint64_t graph_body_visits;
++    uint64_t graph_contact_visits;
++    uint64_t constraint_evaluations;
++    uint64_t ordered_island_steps;
++    uint64_t fallback_island_steps[6];
++} study_context;
++
++static size_t study_align(size_t size)
++{
++    return (size + 7u) & ~(size_t)7u;
++}
++
++static size_t study_memory_bytes(uint32_t bodies, uint32_t contacts)
++{
++    return study_align(sizeof(study_context)) +
++           4u * study_align((size_t)bodies * sizeof(uint32_t)) +
++           2u * study_align((size_t)contacts * sizeof(uint32_t));
++}
++
++static study_context *study_get(const sl_world_state *world)
++{
++    return (study_context *)((unsigned char *)world->contact_constraints +
++                             (size_t)world->contact_capacity *
++                                 sizeof(sl_contact_constraint));
++}
++
++static void study_init(sl_world_state *world)
++{
++    study_context *study = study_get(world);
++    unsigned char *base = (unsigned char *)study + study_align(sizeof(*study));
++    const size_t bodies =
++        study_align((size_t)world->body_capacity * sizeof(uint32_t));
++    const size_t contacts =
++        study_align((size_t)world->contact_capacity * sizeof(uint32_t));
++    study->heads = (uint32_t *)base;
++    base += bodies;
++    study->indegrees = (uint32_t *)base;
++    base += bodies;
++    study->layers = (uint32_t *)base;
++    base += bodies;
++    study->queue = (uint32_t *)base;
++    base += bodies;
++    study->next = (uint32_t *)base;
++    base += contacts;
++    study->order = (uint32_t *)base;
++}
++
++static bool study_dynamic(const sl_world_state *world, uint32_t slot)
++{
++    const uint32_t dense = world->slots[slot].dense;
++    return dense != SL_BODY_DENSE_NONE &&
++           world->types[dense] == (uint8_t)SL_BODY_DYNAMIC;
++}
++
++static double study_height(const sl_world_state *world, uint32_t slot)
++{
++    const sl_vec2 position = world->positions[world->slots[slot].dense];
++    return -(double)world->gravity.x * (double)position.x -
++           (double)world->gravity.y * (double)position.y;
++}
++
++static void study_endpoints(const sl_world_state *world, uint32_t index,
++                            uint32_t *lower, uint32_t *upper)
++{
++    const sl_contact *contact = &world->contacts[world->island_contacts[index]];
++    const uint32_t a = contact->body_a.index, b = contact->body_b.index;
++    const bool a_lower = study_height(world, a) < study_height(world, b);
++    *lower = a_lower ? a : b;
++    *upper = a_lower ? b : a;
++}
++
++static void study_push(uint32_t *queue, uint32_t *count, uint32_t slot)
++{
++    uint32_t at = (*count)++;
++    while (at > 0u) {
++        const uint32_t parent = (at - 1u) / 2u;
++        if (queue[parent] <= slot) {
++            break;
++        }
++        queue[at] = queue[parent];
++        at = parent;
++    }
++    queue[at] = slot;
++}
++
++static uint32_t study_pop(uint32_t *queue, uint32_t *count)
++{
++    const uint32_t result = queue[0], value = queue[--*count];
++    uint32_t at = 0u;
++    while (at < *count / 2u) {
++        uint32_t child = 2u * at + 1u;
++        if (child + 1u < *count && queue[child + 1u] < queue[child]) {
++            ++child;
++        }
++        if (value <= queue[child]) {
++            break;
++        }
++        queue[at] = queue[child];
++        at = child;
++    }
++    if (*count > 0u) {
++        queue[at] = value;
++    }
++    return result;
++}
++
++static bool study_less(const study_context *study, uint32_t a, uint32_t b)
++{
++    return study->next[a] < study->next[b] ||
++           (study->next[a] == study->next[b] && a < b);
++}
++
++static void study_sift(study_context *study, uint32_t *order, uint32_t count,
++                       uint32_t root)
++{
++    while (root < count / 2u) {
++        uint32_t child = 2u * root + 1u;
++        if (child + 1u < count &&
++            study_less(study, order[child], order[child + 1u])) {
++            ++child;
++        }
++        if (!study_less(study, order[root], order[child])) {
++            break;
++        }
++        const uint32_t swap = order[root];
++        order[root] = order[child];
++        order[child] = swap;
++        root = child;
++    }
++}
++
++static void study_build(sl_world_state *world)
++{
++    study_context *study = study_get(world);
++    uint64_t bodies = 0u, contacts = 0u;
++    for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
++        study->heads[slot] = UINT32_MAX;
++        study->indegrees[slot] = 0u;
++        study->layers[slot] = 0u;
++        ++bodies;
++    }
++    for (uint32_t index = 0u; index < world->island_contact_count; ++index) {
++        uint32_t lower, upper;
++        study_endpoints(world, index, &lower, &upper);
++        study->order[index] = index;
++        study->next[index] = UINT32_MAX;
++        ++contacts;
++        if (!study_dynamic(world, upper) ||
++            study_height(world, lower) == study_height(world, upper)) {
++            continue;
++        }
++        if (study_dynamic(world, lower)) {
++            study->next[index] = study->heads[lower];
++            study->heads[lower] = index;
++            ++study->indegrees[upper];
++        } else if (world->types[world->slots[lower].dense] ==
++                   (uint8_t)SL_BODY_STATIC) {
++            study->layers[upper] = 1u;
++        }
++    }
++    uint32_t count = 0u;
++    for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
++        ++bodies;
++        if (study_dynamic(world, slot) && study->indegrees[slot] == 0u) {
++            study_push(study->queue, &count, slot);
++        }
++    }
++    for (uint32_t visited = 0u; count > 0u && visited < world->body_capacity;
++         ++visited) {
++        const uint32_t slot = study_pop(study->queue, &count);
++        ++bodies;
++        uint32_t edge = study->heads[slot];
++        for (uint32_t n = 0u; edge != UINT32_MAX && n < world->contact_capacity;
++             ++n) {
++            uint32_t lower, upper;
++            study_endpoints(world, edge, &lower, &upper);
++            SL_ASSERT(lower == slot);
++            ++contacts;
++            if (study->layers[lower] > 0u &&
++                study->layers[upper] <= study->layers[lower]) {
++                study->layers[upper] = study->layers[lower] + 1u;
++            }
++            SL_ASSERT(study->indegrees[upper] > 0u);
++            if (--study->indegrees[upper] == 0u) {
++                study_push(study->queue, &count, upper);
++            }
++            edge = study->next[edge];
++        }
++    }
++    for (uint32_t id = 0u; id < world->island_count; ++id) {
++        const sl_island *island = &world->islands[id];
++        uint32_t reason = world->gravity.x == 0.0f && world->gravity.y == 0.0f
++                              ? STUDY_ZERO_GRAVITY
++                              : 0u;
++        if (island->joint_count > 0u) {
++            reason |= STUDY_JOINT;
++        }
++        for (uint32_t i = 0u; i < island->body_count; ++i) {
++            const uint32_t slot = world->island_bodies[island->body_offset + i];
++            ++bodies;
++            if (study->layers[slot] == 0u) {
++                reason |= STUDY_UNROOTED;
++            }
++            if (study->indegrees[slot] > 0u) {
++                reason |= STUDY_CYCLE;
++            }
++        }
++        for (uint32_t i = 0u; i < island->contact_count; ++i) {
++            const uint32_t index = island->contact_offset + i;
++            uint32_t lower, upper;
++            study_endpoints(world, index, &lower, &upper);
++            ++contacts;
++            if (study_height(world, lower) == study_height(world, upper)) {
++                reason |= STUDY_EQUAL_HEIGHT;
++            }
++            if (world->types[world->slots[lower].dense] ==
++                    (uint8_t)SL_BODY_KINEMATIC ||
++                world->types[world->slots[upper].dense] ==
++                    (uint8_t)SL_BODY_KINEMATIC) {
++                reason |= STUDY_KINEMATIC;
++            }
++            if (!study_dynamic(world, upper)) {
++                reason |= STUDY_UNROOTED;
++            }
++            study->next[index] = study->layers[upper];
++        }
++        study->queue[id] = reason;
++        if (reason == 0u) {
++            study->ordered_island_steps =
++                sl_stats_sum(study->ordered_island_steps, 1u);
++            uint32_t *order = study->order + island->contact_offset;
++            for (uint32_t i = island->contact_count / 2u; i > 0u; --i) {
++                study_sift(study, order, island->contact_count, i - 1u);
++            }
++            for (uint32_t i = island->contact_count; i > 1u; --i) {
++                const uint32_t swap = order[0];
++                order[0] = order[i - 1u];
++                order[i - 1u] = swap;
++                study_sift(study, order, i - 1u, 0u);
++            }
++        } else {
++            for (uint32_t bit = 0u; bit < 6u; ++bit) {
++                if ((reason & (1u << bit)) != 0u) {
++                    study->fallback_island_steps[bit] =
++                        sl_stats_sum(study->fallback_island_steps[bit], 1u);
++                }
++            }
++        }
++    }
++    study->graph_body_visits = sl_stats_sum(study->graph_body_visits, bodies);
++    study->graph_contact_visits =
++        sl_stats_sum(study->graph_contact_visits, contacts);
++}
++#endif
+--- /dev/null
++++ b/include/silk/study.h
+@@ -0,0 +1,11 @@
++/* Copied diagnostics for isolated experiments only; not a production API. */
++#ifndef SILK_STUDY_H
++#define SILK_STUDY_H
++#include "silk/world.h"
++typedef struct sl_study_stats {
++    uint64_t graph_body_visits, graph_contact_visits, constraint_evaluations;
++    uint64_t ordered_island_steps, fallback_island_steps[6];
++    size_t extra_bytes;
++} sl_study_stats;
++sl_study_stats sl_world_study_stats_get(const sl_world *world);
++#endif
+--- a/src/solver.c
++++ b/src/solver.c
+@@ -7,6 +7,8 @@
+ #include <string.h>
+
+ #include "silk/assert.h"
++#include "silk/study.h"
++#include "stats.h"
+
+ typedef struct sl_contact_softness {
+     float bias_rate;
+@@ -54,9 +56,12 @@
+ _Static_assert(sizeof(sl_contact_constraint) == 144u,
+                "constraint layout changed; re-pin the world arena budget");
+
+-size_t sl_solver_memory_bytes(uint32_t contact_capacity)
+-{
+-    if (contact_capacity < 1u || contact_capacity > SL_CONTACT_COUNT_MAX ||
++#include "study_graph.h"
++
++size_t sl_solver_memory_bytes(uint32_t body_capacity, uint32_t contact_capacity)
++{
++    if (body_capacity < 1u || body_capacity > SL_BODY_COUNT_MAX ||
++        contact_capacity < 1u || contact_capacity > SL_CONTACT_COUNT_MAX ||
+         sizeof(sl_contact_constraint) > SIZE_MAX / contact_capacity) {
+         return 0u;
+     }
+@@ -65,13 +70,15 @@
+     if (bytes > SIZE_MAX - (SL_SOLVER_CARVE_ALIGN - 1u)) {
+         return 0u;
+     }
+-    return (bytes + SL_SOLVER_CARVE_ALIGN - 1u) & ~(SL_SOLVER_CARVE_ALIGN - 1u);
++    return study_align(bytes) +
++           study_memory_bytes(body_capacity, contact_capacity);
+ }
+
+ bool sl_solver_init(sl_world_state *world, void *memory, size_t memory_bytes)
+ {
+     SL_ASSERT(world != NULL);
+-    const size_t required = sl_solver_memory_bytes(world->contact_capacity);
++    const size_t required =
++        sl_solver_memory_bytes(world->body_capacity, world->contact_capacity);
+     if (memory == NULL || required == 0u || memory_bytes < required ||
+         ((uintptr_t)memory & (SL_SOLVER_CARVE_ALIGN - 1u)) != 0u) {
+         return false;
+@@ -79,6 +86,7 @@
+     memset(memory, 0, required);
+     world->contact_constraints = memory;
+     world->contact_constraint_count = 0u;
++    study_init(world);
+     return true;
+ }
+
+@@ -352,6 +360,7 @@
+         }
+     }
+     world->contact_constraint_count = constraint_count;
++    study_build(world);
+ }
+
+ void sl_solver_warm_start(sl_world_state *world)
+@@ -668,7 +677,13 @@
+
+         for (uint32_t row = island->contact_offset;
+              row < island->contact_offset + island->contact_count; ++row) {
+-            constraint_solve(world, &constraints[row], inverse_h, use_bias);
++            study_context *study = study_get(world);
++            const uint32_t index = use_bias && study->queue[island_id] == 0u
++                                       ? study->order[row]
++                                       : row;
++            study->constraint_evaluations =
++                sl_stats_sum(study->constraint_evaluations, 1u);
++            constraint_solve(world, &constraints[index], inverse_h, use_bias);
+         }
+     }
+ }
+@@ -782,3 +797,23 @@
+     }
+     return true;
+ }
++
++sl_study_stats sl_world_study_stats_get(const sl_world *owner)
++{
++    sl_study_stats out = { 0 };
++    if (owner == NULL || owner->state == NULL) {
++        return out;
++    }
++    const sl_world_state *world = owner->state;
++    const study_context *study = study_get(world);
++    out.graph_body_visits = study->graph_body_visits;
++    out.graph_contact_visits = study->graph_contact_visits;
++    out.constraint_evaluations = study->constraint_evaluations;
++    out.ordered_island_steps = study->ordered_island_steps;
++    for (uint32_t i = 0u; i < 6u; ++i) {
++        out.fallback_island_steps[i] = study->fallback_island_steps[i];
++    }
++    out.extra_bytes =
++        study_memory_bytes(world->body_capacity, world->contact_capacity);
++    return out;
++}
+--- a/src/solver.h
++++ b/src/solver.h
+@@ -6,7 +6,8 @@
+
+ #include "world_internal.h"
+
+-size_t sl_solver_memory_bytes(uint32_t contact_capacity);
++size_t sl_solver_memory_bytes(uint32_t body_capacity,
++                              uint32_t contact_capacity);
+ bool sl_solver_init(sl_world_state *world, void *memory, size_t memory_bytes);
+
+ void sl_solver_prepare(sl_world_state *world, float h, float inverse_h);
+--- a/src/world.c
++++ b/src/world.c
+@@ -221,7 +221,8 @@
+         world_body_layout(resolved.body_capacity, &result.body_bytes);
+     const size_t contact = sl_contact_world_memory_layout(
+         resolved.body_capacity, resolved.contact_capacity, &result);
+-    const size_t solver = sl_solver_memory_bytes(resolved.contact_capacity);
++    const size_t solver = sl_solver_memory_bytes(resolved.body_capacity,
++                                                 resolved.contact_capacity);
+     const size_t joint = sl_joint_memory_layout(
+         resolved.body_capacity, resolved.joint_capacity, &result.joint_bytes);
+     const size_t island =
+@@ -485,8 +486,8 @@
+     const size_t body_bytes = world_memory_bytes_for(capacity);
+     const size_t contact_bytes = sl_contact_world_memory_bytes(
+         config->body_capacity, resolved.contact_capacity);
+-    const size_t solver_bytes =
+-        sl_solver_memory_bytes(resolved.contact_capacity);
++    const size_t solver_bytes = sl_solver_memory_bytes(
++        resolved.body_capacity, resolved.contact_capacity);
+     const size_t joint_bytes =
+         sl_joint_memory_bytes(config->body_capacity, resolved.joint_capacity);
+     size_t island_payload = 0u;
+--- a/bench/main.c
++++ b/bench/main.c
+@@ -18,6 +18,7 @@
+
+ #include "quality.h"
+ #include "sl_bench_config.h"
++#include <silk/study.h>
+
+ #define BENCH_PYRAMID_ROW_COUNT 20u
+ #define BENCH_PYRAMID_BODY_COUNT                                               \
+@@ -680,6 +681,15 @@
+ static void result_json(const bench_scene *scene, const bench_result *r,
+                         const bench_options *o)
+ {
++    const sl_study_stats experiment = sl_world_study_stats_get(&scene->world);
++    fprintf(stderr, "STUDY %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %zu",
++            experiment.graph_body_visits, experiment.graph_contact_visits,
++            experiment.constraint_evaluations, experiment.ordered_island_steps,
++            experiment.extra_bytes);
++    for (uint32_t bit = 0u; bit < 6u; ++bit) {
++        fprintf(stderr, " %" PRIu64, experiment.fallback_island_steps[bit]);
++    }
++    fputc('\n', stderr);
+     printf("{\"scene\":");
+     json_string(scene->name);
+     printf(
+--- a/bench/study.c
++++ b/bench/study.c
+@@ -10,6 +10,7 @@
+
+ #include "quality.h"
+ #include "sl_bench_config.h"
++#include <silk/study.h>
+
+ #define STUDY_BODY_MAX 16u
+ #define STUDY_WARMUP 120u
+@@ -273,6 +274,15 @@
+             live[count++] = scene->bodies[i];
+         }
+     }
++    const sl_study_stats experiment = sl_world_study_stats_get(&scene->world);
++    fprintf(stderr, "STUDY %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %zu",
++            experiment.graph_body_visits, experiment.graph_contact_visits,
++            experiment.constraint_evaluations, experiment.ordered_island_steps,
++            experiment.extra_bytes);
++    for (uint32_t bit = 0u; bit < 6u; ++bit) {
++        fprintf(stderr, " %" PRIu64, experiment.fallback_island_steps[bit]);
++    }
++    fputc('\n', stderr);
+     const sl_world_stats stats = sl_world_get_stats(&scene->world);
+     printf("\"drop_max\":%.9g,\"horizontal_motion_max\":%.9g,\"rotation_"
+            "excursion_max\":%.9g,",
