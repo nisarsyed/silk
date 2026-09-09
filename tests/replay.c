@@ -82,6 +82,20 @@ bool sl_replay_compare(const sl_world *owner_a, const sl_world *owner_b,
     U(body_count);
     U(body_capacity);
     U(free_count);
+    U(sleep_enabled);
+    F(sleep_speed_max);
+    F(sleep_angular_speed_max);
+    F(sleep_time_min);
+    F(sleep_dt);
+    U(sleep_steps_required);
+    U(step_stats.island_executed_count);
+    U(step_stats.island_skipped_count);
+    U(work_total.wake_visits);
+    U(work_total.body_wakes);
+    U(work_total.body_sleeps);
+    U(step_stats.work.wake_visits);
+    U(step_stats.work.body_wakes);
+    U(step_stats.work.body_sleeps);
     U(island_count);
     U(island_body_count);
     U(island_contact_count);
@@ -164,6 +178,10 @@ bool sl_replay_compare(const sl_world *owner_a, const sl_world *owner_b,
         U(free_indices[i]);
     }
     for (i = 0u; i < a->body_count; ++i) {
+        U(quiet_steps[i]);
+        U(sleeping[i]);
+        F(quiet_translation[i]);
+        F(quiet_rotation[i]);
         U(slot_of[i]);
         U(types[i]);
         U(proxies[i]);

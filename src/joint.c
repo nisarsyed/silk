@@ -410,6 +410,10 @@ sl_joint_handle sl_world_joint_create(sl_world *owner,
         }
     }
 
+    sl_wake_begin(world);
+    sl_wake_seed(world, desc->body_a.index);
+    sl_wake_seed(world, desc->body_b.index);
+    sl_wake_finish(world);
     const uint32_t slot =
         world->joint_free_indices[world->joint_free_count - 1u];
     const uint32_t dense = world->joint_count;
@@ -745,90 +749,117 @@ void sl_joint_prepare(sl_world_state *world, float h, float inverse_h)
         world->joint_constraint_count = 0u;
         return;
     }
+    world->joint_constraint_count = 0u;
+    if (world->sleep_enabled) {
+        for (uint32_t row = 0u; row < world->joint_count; ++row) {
+            world->joint_linear_impulses[row] = sl_vec2_make(0.0f, 0.0f);
+        }
+    }
     sl_joint_constraint *constraints = world->joint_constraints;
     const float hertz = sl_min(world->joint_hertz, 0.125f * inverse_h);
     const sl_joint_softness softness =
         softness_make(hertz, world->joint_damping_ratio, h);
-    for (uint32_t index = 0u; index < world->island_joint_count; ++index) {
-        const uint32_t row = world->island_joints[index];
-        sl_joint_constraint *constraint = &constraints[index];
-        memset(constraint, 0, sizeof(*constraint));
-        constraint->joint_row = row;
-        constraint->dense_a =
-            world->slots[world->joint_bodies_a[row].index].dense;
-        constraint->dense_b =
-            world->slots[world->joint_bodies_b[row].index].dense;
-        constraint->kind = world->joint_kinds[row];
-        constraint->anchor_a =
-            sl_rotation_apply(world->rotations[constraint->dense_a],
-                              world->joint_local_anchors_a[row]);
-        constraint->anchor_b =
-            sl_rotation_apply(world->rotations[constraint->dense_b],
-                              world->joint_local_anchors_b[row]);
-        constraint->base_delta =
-            sl_vec2_sub(world->positions[constraint->dense_b],
-                        world->positions[constraint->dense_a]);
-        constraint->softness = softness;
-        constraint->step_impulse = sl_vec2_make(0.0f, 0.0f);
-        if (constraint->kind == (uint32_t)SL_JOINT_DISTANCE) {
-            const sl_vec2 delta = sl_vec2_add(
-                constraint->base_delta,
-                sl_vec2_sub(constraint->anchor_b, constraint->anchor_a));
-            constraint->axis = sl_vec2_normalize(delta);
-            if (sl_vec2_length_sq(constraint->axis) == 0.0f) {
-                constraint->axis = sl_vec2_make(1.0f, 0.0f);
-            }
-            constraint->distance_length = world->joint_distance_lengths[row];
-            constraint->axial_mass = axial_mass_make(
-                world, constraint->dense_a, constraint->dense_b,
-                constraint->anchor_a, constraint->anchor_b, constraint->axis);
-            constraint->axial_impulse = world->joint_distance_impulses[row];
-            if (constraint->axial_mass == 0.0f) {
-                constraint->kind = SL_JOINT_KIND_INVALID;
-                constraint->axial_impulse = 0.0f;
-            }
-        } else {
-            constraint->impulse = world->joint_revolute_impulses[row];
-            const sl_mat2 matrix = effective_matrix_make(
-                world, constraint->dense_a, constraint->dense_b,
-                constraint->anchor_a, constraint->anchor_b);
-            if (!effective_matrix_solvable(matrix)) {
-                constraint->kind = SL_JOINT_KIND_INVALID;
-                constraint->impulse = sl_vec2_make(0.0f, 0.0f);
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
+            continue;
+        }
+        world->joint_constraint_count += island->joint_count;
+        for (uint32_t index = island->joint_offset;
+             index < island->joint_offset + island->joint_count; ++index) {
+            const uint32_t row = world->island_joints[index];
+            sl_joint_constraint *constraint = &constraints[index];
+            memset(constraint, 0, sizeof(*constraint));
+            constraint->joint_row = row;
+            constraint->dense_a =
+                world->slots[world->joint_bodies_a[row].index].dense;
+            constraint->dense_b =
+                world->slots[world->joint_bodies_b[row].index].dense;
+            constraint->kind = world->joint_kinds[row];
+            constraint->anchor_a =
+                sl_rotation_apply(world->rotations[constraint->dense_a],
+                                  world->joint_local_anchors_a[row]);
+            constraint->anchor_b =
+                sl_rotation_apply(world->rotations[constraint->dense_b],
+                                  world->joint_local_anchors_b[row]);
+            constraint->base_delta =
+                sl_vec2_sub(world->positions[constraint->dense_b],
+                            world->positions[constraint->dense_a]);
+            constraint->softness = softness;
+            constraint->step_impulse = sl_vec2_make(0.0f, 0.0f);
+            if (constraint->kind == (uint32_t)SL_JOINT_DISTANCE) {
+                const sl_vec2 delta = sl_vec2_add(
+                    constraint->base_delta,
+                    sl_vec2_sub(constraint->anchor_b, constraint->anchor_a));
+                constraint->axis = sl_vec2_normalize(delta);
+                if (sl_vec2_length_sq(constraint->axis) == 0.0f) {
+                    constraint->axis = sl_vec2_make(1.0f, 0.0f);
+                }
+                constraint->distance_length =
+                    world->joint_distance_lengths[row];
+                constraint->axial_mass =
+                    axial_mass_make(world, constraint->dense_a,
+                                    constraint->dense_b, constraint->anchor_a,
+                                    constraint->anchor_b, constraint->axis);
+                constraint->axial_impulse = world->joint_distance_impulses[row];
+                if (constraint->axial_mass == 0.0f) {
+                    constraint->kind = SL_JOINT_KIND_INVALID;
+                    constraint->axial_impulse = 0.0f;
+                }
+            } else {
+                constraint->impulse = world->joint_revolute_impulses[row];
+                const sl_mat2 matrix = effective_matrix_make(
+                    world, constraint->dense_a, constraint->dense_b,
+                    constraint->anchor_a, constraint->anchor_b);
+                if (!effective_matrix_solvable(matrix)) {
+                    constraint->kind = SL_JOINT_KIND_INVALID;
+                    constraint->impulse = sl_vec2_make(0.0f, 0.0f);
+                }
             }
         }
     }
-    world->joint_constraint_count = world->joint_count;
 }
 
 void sl_joint_warm_start(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_joint_constraint *constraints = world->joint_constraints;
-    for (uint32_t row = 0u; row < world->joint_constraint_count; ++row) {
-        sl_joint_constraint *constraint = &constraints[row];
-        if (constraint->kind == SL_JOINT_KIND_INVALID) {
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
             continue;
         }
-        sl_joint_velocity_pair pair = velocity_pair_load(world, constraint);
-        const sl_vec2 anchor_a = sl_rotation_apply(
-            world->delta_rotations[constraint->dense_a], constraint->anchor_a);
-        const sl_vec2 anchor_b = sl_rotation_apply(
-            world->delta_rotations[constraint->dense_b], constraint->anchor_b);
-        sl_vec2 impulse = constraint->impulse;
-        if (constraint->kind == (uint32_t)SL_JOINT_DISTANCE) {
-            const sl_vec2 axis =
-                sl_vec2_normalize(separation_current(world, constraint));
-            const sl_vec2 fallback =
-                (sl_vec2_length_sq(axis) > 0.0f) ? axis : constraint->axis;
-            impulse = sl_vec2_scale(fallback, constraint->axial_impulse);
-        }
-        const sl_vec2 step_impulse =
-            sl_vec2_add(constraint->step_impulse, impulse);
-        if (sl_vec2_is_finite(step_impulse) &&
-            impulse_apply(&pair, anchor_a, anchor_b, impulse)) {
-            constraint->step_impulse = step_impulse;
-            velocity_pair_store(world, constraint, &pair);
+
+        for (uint32_t row = island->joint_offset;
+             row < island->joint_offset + island->joint_count; ++row) {
+            sl_joint_constraint *constraint = &constraints[row];
+            if (constraint->kind == SL_JOINT_KIND_INVALID) {
+                continue;
+            }
+            sl_joint_velocity_pair pair = velocity_pair_load(world, constraint);
+            const sl_vec2 anchor_a =
+                sl_rotation_apply(world->delta_rotations[constraint->dense_a],
+                                  constraint->anchor_a);
+            const sl_vec2 anchor_b =
+                sl_rotation_apply(world->delta_rotations[constraint->dense_b],
+                                  constraint->anchor_b);
+            sl_vec2 impulse = constraint->impulse;
+            if (constraint->kind == (uint32_t)SL_JOINT_DISTANCE) {
+                const sl_vec2 axis =
+                    sl_vec2_normalize(separation_current(world, constraint));
+                const sl_vec2 fallback =
+                    (sl_vec2_length_sq(axis) > 0.0f) ? axis : constraint->axis;
+                impulse = sl_vec2_scale(fallback, constraint->axial_impulse);
+            }
+            const sl_vec2 step_impulse =
+                sl_vec2_add(constraint->step_impulse, impulse);
+            if (sl_vec2_is_finite(step_impulse) &&
+                impulse_apply(&pair, anchor_a, anchor_b, impulse)) {
+                constraint->step_impulse = step_impulse;
+                velocity_pair_store(world, constraint, &pair);
+            }
         }
     }
 }
@@ -943,18 +974,27 @@ void sl_joint_solve(sl_world_state *world, bool use_bias)
 {
     SL_ASSERT(world != NULL);
     sl_joint_constraint *constraints = world->joint_constraints;
-    for (uint32_t row = 0u; row < world->joint_constraint_count; ++row) {
-        sl_joint_constraint *constraint = &constraints[row];
-        if (constraint->kind == SL_JOINT_KIND_INVALID) {
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
             continue;
         }
-        sl_joint_velocity_pair pair = velocity_pair_load(world, constraint);
-        if (constraint->kind == (uint32_t)SL_JOINT_DISTANCE) {
-            distance_solve(world, constraint, &pair, use_bias);
-        } else {
-            revolute_solve(world, constraint, &pair, use_bias);
+
+        for (uint32_t row = island->joint_offset;
+             row < island->joint_offset + island->joint_count; ++row) {
+            sl_joint_constraint *constraint = &constraints[row];
+            if (constraint->kind == SL_JOINT_KIND_INVALID) {
+                continue;
+            }
+            sl_joint_velocity_pair pair = velocity_pair_load(world, constraint);
+            if (constraint->kind == (uint32_t)SL_JOINT_DISTANCE) {
+                distance_solve(world, constraint, &pair, use_bias);
+            } else {
+                revolute_solve(world, constraint, &pair, use_bias);
+            }
+            velocity_pair_store(world, constraint, &pair);
         }
-        velocity_pair_store(world, constraint, &pair);
     }
 }
 
@@ -962,22 +1002,31 @@ void sl_joint_store(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_joint_constraint *constraints = world->joint_constraints;
-    for (uint32_t row = 0u; row < world->joint_constraint_count; ++row) {
-        const sl_joint_constraint *constraint = &constraints[row];
-        const bool valid = constraint->kind != SL_JOINT_KIND_INVALID;
-        if (world->joint_kinds[constraint->joint_row] ==
-            (uint8_t)SL_JOINT_DISTANCE) {
-            world->joint_distance_impulses[constraint->joint_row] =
-                valid ? constraint->axial_impulse : 0.0f;
-        } else {
-            world->joint_revolute_impulses[constraint->joint_row] =
-                valid ? constraint->impulse : sl_vec2_make(0.0f, 0.0f);
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
+            continue;
         }
-        /* The cache is one substep's lambda. The public value instead sums
-         * every successful application over all substeps, so a steady load
-         * reports force * dt rather than force * h. */
-        world->joint_linear_impulses[constraint->joint_row] =
-            valid ? constraint->step_impulse : sl_vec2_make(0.0f, 0.0f);
+
+        for (uint32_t row = island->joint_offset;
+             row < island->joint_offset + island->joint_count; ++row) {
+            const sl_joint_constraint *constraint = &constraints[row];
+            const bool valid = constraint->kind != SL_JOINT_KIND_INVALID;
+            if (world->joint_kinds[constraint->joint_row] ==
+                (uint8_t)SL_JOINT_DISTANCE) {
+                world->joint_distance_impulses[constraint->joint_row] =
+                    valid ? constraint->axial_impulse : 0.0f;
+            } else {
+                world->joint_revolute_impulses[constraint->joint_row] =
+                    valid ? constraint->impulse : sl_vec2_make(0.0f, 0.0f);
+            }
+            /* The cache is one substep's lambda. The public value instead sums
+             * every successful application over all substeps, so a steady load
+             * reports force * dt rather than force * h. */
+            world->joint_linear_impulses[constraint->joint_row] =
+                valid ? constraint->step_impulse : sl_vec2_make(0.0f, 0.0f);
+        }
     }
 }
 
@@ -989,6 +1038,34 @@ bool sl_world_joint_is_valid(const sl_world *world, sl_joint_handle handle)
 void sl_world_joint_destroy(sl_world *world, sl_joint_handle handle)
 {
     SL_ASSERT(world != NULL);
-    if (world->state != NULL)
-        sl_joint_destroy(world->state, handle);
+    if (world->state != NULL && sl_joint_is_valid(world->state, handle)) {
+        sl_world_state *state = world->state;
+        const uint32_t row = state->joint_slots[handle.index].dense;
+        sl_wake_begin(state);
+        sl_wake_seed(state, state->joint_bodies_a[row].index);
+        sl_wake_seed(state, state->joint_bodies_b[row].index);
+        sl_wake_finish(state);
+        sl_joint_destroy(state, handle);
+    }
+}
+
+bool sl_joint_island_quiet(const sl_world_state *world, uint32_t id)
+{
+    const sl_island *island = &world->islands[id];
+    const sl_joint_constraint *constraints = world->joint_constraints;
+    for (uint32_t i = island->joint_offset;
+         i < island->joint_offset + island->joint_count; ++i) {
+        const sl_joint_constraint *c = &constraints[i];
+        if (c->kind == SL_JOINT_KIND_INVALID) {
+            return false;
+        }
+        const float length = sl_vec2_length(separation_current(world, c));
+        const float error = c->kind == (uint32_t)SL_JOINT_DISTANCE
+                                ? sl_abs(length - c->distance_length)
+                                : length;
+        if (!sl_is_finite(error) || error > 2.0f * SL_LINEAR_SLOP) {
+            return false;
+        }
+    }
+    return true;
 }

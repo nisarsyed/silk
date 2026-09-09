@@ -15,4 +15,6 @@ void sl_solver_solve(sl_world_state *world, float inverse_h, bool use_bias);
 void sl_solver_restitution(sl_world_state *world);
 void sl_solver_store(sl_world_state *world);
 
+bool sl_solver_island_quiet(const sl_world_state *world, uint32_t id);
+
 #endif /* SILK_SOLVER_H */

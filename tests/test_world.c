@@ -119,8 +119,9 @@ static void test_create_roundtrips_state(void)
     sl_world_destroy(&world);
 }
 
-/* Graph storage adds 44 bytes/body and four bytes/constraint, plus
- * independently aligned slices. Pin the expanded allocation exactly. */
+/* Graph storage adds 44 bytes/body and four bytes/constraint; sleep adds
+ * 13 bytes/body, plus independently aligned slices. Pin the expanded allocation
+ * exactly. */
 static void test_memory_bytes_at_capacity_max_within_budget(void)
 {
     const sl_world_config worst_config = {
@@ -128,9 +129,9 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     };
     const size_t state_bytes = (sizeof(sl_world_state) + 7u) & ~(size_t)7u;
     const size_t worst = sl_world_memory_bytes(&worst_config);
-    SL_EXPECT(worst == ((size_t)95813688u + (size_t)60u * SL_BODY_COUNT_MAX +
+    SL_EXPECT(worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX +
                         state_bytes));
-    SL_EXPECT(worst <= (size_t)96u << 20);
+    SL_EXPECT(worst <= (size_t)97u << 20);
 
     const sl_world_config with_joints = {
         .body_capacity = SL_BODY_COUNT_MAX,
@@ -138,7 +139,7 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     };
     const size_t joint_worst = sl_world_memory_bytes(&with_joints);
     SL_EXPECT(joint_worst ==
-              ((size_t)108003384u + (size_t)60u * SL_BODY_COUNT_MAX +
+              ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX +
                (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes));
     SL_EXPECT(joint_worst <= (size_t)108u << 20);
 
@@ -154,13 +155,13 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
      * SL_BODY_COUNT_MAX * sizeof(uint32_t) bytes at maximum capacity. */
     const sl_world_config small_config = { .body_capacity = 4u };
     const size_t small = sl_world_memory_bytes(&small_config);
-    SL_EXPECT(small == ((size_t)6152u + state_bytes));
+    SL_EXPECT(small == ((size_t)6208u + state_bytes));
     const sl_world_config small_joints = {
         .body_capacity = 4u,
         .joint_capacity = 2u,
     };
     SL_EXPECT(sl_world_memory_bytes(&small_joints) ==
-              ((size_t)6560u + state_bytes));
+              ((size_t)6616u + state_bytes));
 }
 
 static void test_create_rejects_non_finite_state(void)

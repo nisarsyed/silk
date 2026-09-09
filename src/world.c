@@ -86,6 +86,13 @@ static size_t island_layout(uint32_t bodies, uint32_t contacts, uint32_t joints,
            slice_bytes(joints, sizeof(uint32_t));
 }
 
+static size_t sleep_layout(size_t capacity)
+{
+    return slice_bytes(capacity, sizeof(uint32_t)) +
+           2u * slice_bytes(capacity, sizeof(float)) +
+           slice_bytes(capacity, sizeof(uint8_t));
+}
+
 static size_t world_memory_bytes_for(size_t capacity)
 {
     size_t payload = 0u;
@@ -97,6 +104,14 @@ static bool world_config_resolve(const sl_world_config *config,
 {
     if (config == NULL || config->body_capacity < 1u ||
         config->body_capacity > SL_BODY_COUNT_MAX) {
+        return false;
+    }
+    if (!sl_is_finite(config->sleep_speed_max) ||
+        config->sleep_speed_max < 0.0f ||
+        !sl_is_finite(config->sleep_angular_speed_max) ||
+        config->sleep_angular_speed_max < 0.0f ||
+        !sl_is_finite(config->sleep_time_min) ||
+        config->sleep_time_min < 0.0f) {
         return false;
     }
     if (!sl_vec2_is_finite(config->gravity) ||
@@ -131,6 +146,15 @@ static bool world_config_resolve(const sl_world_config *config,
     }
 
     *resolved = *config;
+    resolved->sleep_speed_max = config->sleep_speed_max == 0.0f
+                                    ? SL_SLEEP_SPEED_MAX_DEFAULT
+                                    : config->sleep_speed_max;
+    resolved->sleep_angular_speed_max = config->sleep_angular_speed_max == 0.0f
+                                            ? SL_SLEEP_ANGULAR_SPEED_MAX_DEFAULT
+                                            : config->sleep_angular_speed_max;
+    resolved->sleep_time_min = config->sleep_time_min == 0.0f
+                                   ? SL_SLEEP_TIME_MIN_DEFAULT
+                                   : config->sleep_time_min;
     resolved->contact_capacity = contacts;
     resolved->substep_count = (config->substep_count == 0u)
                                   ? SL_SUBSTEP_COUNT_DEFAULT
@@ -210,6 +234,9 @@ bool sl_world_memory_breakdown_get(const sl_world_config *config,
         return false;
     }
     /* Solver records are pinned to an 8-byte multiple in solver.c. */
+    result.sleep_bytes = (size_t)resolved.body_capacity * 13u;
+    result.padding_bytes +=
+        sleep_layout(resolved.body_capacity) - result.sleep_bytes;
     result.contact_solver_bytes = solver;
     result.padding_bytes += body - result.body_bytes + joint -
                             result.joint_bytes + island - result.island_bytes;
@@ -217,7 +244,8 @@ bool sl_world_memory_breakdown_get(const sl_world_config *config,
     result.padding_bytes +=
         align_up(sizeof(sl_world_state)) - sizeof(sl_world_state);
     result.arena_bytes = align_up(sizeof(sl_world_state)) + body + contact +
-                         solver + joint + island;
+                         solver + joint + island +
+                         sleep_layout(resolved.body_capacity);
     result.world_bytes = sizeof(sl_world);
     *out = result;
     return true;
@@ -467,7 +495,7 @@ bool sl_world_init(sl_world *owner, const sl_world_config *config)
                       resolved.joint_capacity, &island_payload);
     const size_t total_bytes = align_up(sizeof(sl_world_state)) + body_bytes +
                                contact_bytes + solver_bytes + joint_bytes +
-                               island_bytes;
+                               island_bytes + sleep_layout(capacity);
 
     unsigned char *base = malloc(total_bytes);
     if (base == NULL) {
@@ -572,6 +600,18 @@ bool sl_world_init(sl_world *owner, const sl_world_config *config)
     for (uint32_t slot = 0u; slot < world->body_capacity; ++slot) {
         world->body_islands[slot] = SL_BODY_DENSE_NONE;
     }
+    world->quiet_steps =
+        (uint32_t *)carve(base, &offset, capacity, sizeof(uint32_t));
+    world->quiet_translation =
+        (float *)carve(base, &offset, capacity, sizeof(float));
+    world->quiet_rotation =
+        (float *)carve(base, &offset, capacity, sizeof(float));
+    world->sleeping =
+        (uint8_t *)carve(base, &offset, capacity, sizeof(uint8_t));
+    world->sleep_enabled = resolved.sleep_enabled;
+    world->sleep_speed_max = resolved.sleep_speed_max;
+    world->sleep_angular_speed_max = resolved.sleep_angular_speed_max;
+    world->sleep_time_min = resolved.sleep_time_min;
     SL_ASSERT(offset == total_bytes);
     if (!sl_joint_world_init(world, joint_memory, joint_bytes)) {
         free(base);
@@ -604,6 +644,10 @@ void sl_world_reset(sl_world *owner)
     sl_world_state *world = owner->state;
     SL_ASSERT(world != NULL);
 
+    world->sleep_dt = 0.0f;
+    world->sleep_steps_required = 0u;
+    world->wake_count = 0u;
+    world->wake_batch = false;
     world->island_count = 0u;
     world->island_body_count = 0u;
     world->island_contact_count = 0u;
@@ -660,6 +704,10 @@ sl_body_handle sl_world_body_create(sl_world *owner, const sl_body_desc *desc)
 
     const uint32_t dense = world->body_count;
     world->body_count++;
+    world->quiet_steps[dense] = 0u;
+    world->quiet_translation[dense] = 0.0f;
+    world->quiet_rotation[dense] = 0.0f;
+    world->sleeping[dense] = 0u;
     if (world->body_count > world->body_count_high) {
         world->body_count_high = world->body_count;
     }
@@ -722,9 +770,14 @@ void sl_world_body_destroy(sl_world *owner, sl_body_handle handle)
      * this copy chain and create's initialization. */
     const uint32_t dense = slot->dense;
     const uint32_t last = world->body_count - 1u;
+    sl_sleep_body_changed(world, handle.index);
     sl_joint_body_destroy(world, handle.index);
     sl_contact_body_destroy(world, dense, handle.index);
     if (dense != last) {
+        world->quiet_steps[dense] = world->quiet_steps[last];
+        world->quiet_translation[dense] = world->quiet_translation[last];
+        world->quiet_rotation[dense] = world->quiet_rotation[last];
+        world->sleeping[dense] = world->sleeping[last];
         world->positions[dense] = world->positions[last];
         world->velocities[dense] = world->velocities[last];
         world->masses[dense] = world->masses[last];
@@ -1005,6 +1058,10 @@ bool sl_world_body_set_position(sl_world *owner, sl_body_handle handle,
         return false;
     }
     const uint32_t dense = world->slots[handle.index].dense;
+    if (world->positions[dense].x != position.x ||
+        world->positions[dense].y != position.y) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     world->positions[dense] = position;
     sl_joint_body_cache_clear(world, handle.index);
     const bool updated = sl_contact_body_update(world, dense, handle.index);
@@ -1030,6 +1087,10 @@ bool sl_world_body_set_velocity(sl_world *owner, sl_body_handle handle,
         !(velocity.x == 0.0f && velocity.y == 0.0f)) {
         return false;
     }
+    if (world->velocities[dense].x != velocity.x ||
+        world->velocities[dense].y != velocity.y) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     world->velocities[dense] = velocity;
     return true;
 }
@@ -1045,7 +1106,13 @@ bool sl_world_body_set_angle(sl_world *owner, sl_body_handle handle,
         return false;
     }
     const uint32_t dense = world->slots[handle.index].dense;
-    world->rotations[dense] = sl_rotation_make(sl_angle_wrap(angle));
+    const sl_rotation rotation = sl_rotation_make(sl_angle_wrap(angle));
+    if (sl_angle_wrap(angle) != sl_rotation_angle(world->rotations[dense]) &&
+        (world->rotations[dense].c != rotation.c ||
+         world->rotations[dense].s != rotation.s)) {
+        sl_sleep_body_changed(world, handle.index);
+    }
+    world->rotations[dense] = rotation;
     sl_joint_body_cache_clear(world, handle.index);
     const bool updated = sl_contact_body_update(world, dense, handle.index);
     SL_ASSERT(updated);
@@ -1068,6 +1135,9 @@ bool sl_world_body_set_angular_velocity(sl_world *owner, sl_body_handle handle,
         angular_velocity != 0.0f) {
         return false;
     }
+    if (world->angular_velocities[dense] != angular_velocity) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     world->angular_velocities[dense] = angular_velocity;
     return true;
 }
@@ -1081,6 +1151,9 @@ bool sl_world_body_set_friction(sl_world *owner, sl_body_handle handle,
     SL_ASSERT(sl_body_is_valid(world, handle));
     if (!sl_is_finite(friction) || friction < 0.0f) {
         return false;
+    }
+    if (world->frictions[world->slots[handle.index].dense] != friction) {
+        sl_sleep_body_changed(world, handle.index);
     }
     world->frictions[world->slots[handle.index].dense] = friction;
     return true;
@@ -1096,6 +1169,9 @@ bool sl_world_body_set_restitution(sl_world *owner, sl_body_handle handle,
     if (!sl_is_finite(restitution) || restitution < 0.0f ||
         restitution > 1.0f) {
         return false;
+    }
+    if (world->restitutions[world->slots[handle.index].dense] != restitution) {
+        sl_sleep_body_changed(world, handle.index);
     }
     world->restitutions[world->slots[handle.index].dense] = restitution;
     return true;
@@ -1128,10 +1204,35 @@ bool sl_world_body_set_mass(sl_world *owner, sl_body_handle handle, float mass)
         !angular_accel_finite(world->torques[dense], inv_inertia)) {
         return false;
     }
+    if (world->masses[dense] != mass) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     world->masses[dense] = mass;
     world->inv_masses[dense] = inv_mass;
     body_write_inertia(world, dense, inertia);
     sl_joint_body_cache_clear(world, handle.index);
+    return true;
+}
+
+static bool shape_equal(const sl_shape *a, const sl_shape *b)
+{
+    if (a->kind != b->kind) {
+        return false;
+    }
+    if (a->kind == SL_SHAPE_CIRCLE) {
+        return a->circle.radius == b->circle.radius;
+    }
+    if (a->kind == SL_SHAPE_POLYGON) {
+        if (a->polygon.count != b->polygon.count) {
+            return false;
+        }
+        for (uint32_t i = 0u; i < a->polygon.count; ++i) {
+            if (a->polygon.vertices[i].x != b->polygon.vertices[i].x ||
+                a->polygon.vertices[i].y != b->polygon.vertices[i].y) {
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -1162,6 +1263,10 @@ bool sl_world_body_set_shape(sl_world *owner, sl_body_handle handle,
                               inverse_or_zero(inertia))) {
         return false;
     }
+    const sl_shape none = sl_shape_none();
+    if (!shape_equal(&world->shapes[dense], shape == NULL ? &none : shape)) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     if (shape == NULL) {
         world->shapes[dense] = sl_shape_none();
     } else {
@@ -1190,6 +1295,9 @@ bool sl_world_body_apply_force(sl_world *owner, sl_body_handle handle,
     if (!sl_vec2_is_finite(force) ||
         !force_sum_ok(world, dense, force, &summed)) {
         return false;
+    }
+    if (force.x != 0.0f || force.y != 0.0f) {
+        sl_sleep_body_changed(world, handle.index);
     }
     world->forces[dense] = summed;
     return true;
@@ -1220,6 +1328,9 @@ bool sl_world_body_apply_torque(sl_world *owner, sl_body_handle handle,
         !torque_sum_ok(world, dense, torque, &summed)) {
         return false;
     }
+    if (torque != 0.0f) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     world->torques[dense] = summed;
     return true;
 }
@@ -1249,6 +1360,9 @@ bool sl_world_body_apply_force_at_point(sl_world *owner, sl_body_handle handle,
         return false;
     }
 
+    if (force.x != 0.0f || force.y != 0.0f) {
+        sl_sleep_body_changed(world, handle.index);
+    }
     world->forces[dense] = force_sum;
     world->torques[dense] = torque_sum;
     return true;
@@ -1266,6 +1380,13 @@ sl_world_stats sl_world_get_stats(const sl_world *owner)
         .contact_count_high = world->contact_count_high,
         .joint_count_high = world->joint_count_high,
     };
+    for (uint32_t row = 0u; row < world->body_count; ++row) {
+        if (world->types[row] == (uint8_t)SL_BODY_DYNAMIC) {
+            result.awake_dynamic_count += world->sleeping[row] == 0u ? 1u : 0u;
+            result.sleeping_dynamic_count +=
+                world->sleeping[row] != 0u ? 1u : 0u;
+        }
+    }
     result.body_count = world->body_count;
     result.body_capacity = world->body_capacity;
     result.contact_count = world->contact_count;

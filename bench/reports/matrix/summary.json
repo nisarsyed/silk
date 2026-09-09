@@ -6,7 +6,9 @@
     "--warmup",
     "120",
     "--steps",
-    "600"
+    "600",
+    "--sleep",
+    "off"
   ],
   "repetitions": 5,
   "metadata": {
@@ -18,99 +20,99 @@
     "host": "Darwin",
     "host_version": "25.6.0",
     "processor": "arm64",
-    "revision": "480b6652b60ffb4ef79f3812723569b3ac1556d1"
+    "revision": "8528623d8e5196aa4ac5ea787eab3557bdaace7e"
   },
   "scenes": [
     {
       "scene": "pyramid",
       "average_ms_runs": [
-        0.249351667,
-        0.24112,
-        0.24307,
-        0.246136667,
-        0.242803333
+        0.248403333,
+        0.245258333,
+        0.254308333,
+        0.246566667,
+        0.245238333
       ],
-      "median_average_ms": 0.24307,
-      "minimum_average_ms": 0.24112,
-      "maximum_average_ms": 0.249351667
+      "median_average_ms": 0.246566667,
+      "minimum_average_ms": 0.245238333,
+      "maximum_average_ms": 0.254308333
     },
     {
       "scene": "rain",
       "average_ms_runs": [
-        1.05409833,
-        1.037575,
-        1.04180833,
-        1.041965,
-        1.03868
+        1.04501167,
+        1.05936333,
+        1.04989667,
+        1.046435,
+        1.07445667
       ],
-      "median_average_ms": 1.04180833,
-      "minimum_average_ms": 1.037575,
-      "maximum_average_ms": 1.05409833
+      "median_average_ms": 1.04989667,
+      "minimum_average_ms": 1.04501167,
+      "maximum_average_ms": 1.07445667
     },
     {
       "scene": "piles",
       "average_ms_runs": [
-        0.0787433333,
-        0.0764733333,
-        0.0764616667,
-        0.0773166667,
-        0.0772683333
+        0.0776116667,
+        0.0773083333,
+        0.0769216667,
+        0.0769983333,
+        0.0742566667
       ],
-      "median_average_ms": 0.0772683333,
-      "minimum_average_ms": 0.0764616667,
-      "maximum_average_ms": 0.0787433333
+      "median_average_ms": 0.0769983333,
+      "minimum_average_ms": 0.0742566667,
+      "maximum_average_ms": 0.0776116667
     },
     {
       "scene": "chains",
       "average_ms_runs": [
-        0.0179083333,
-        0.0175133333,
-        0.0175766667,
-        0.017415,
-        0.01729
+        0.01719,
+        0.017985,
+        0.017305,
+        0.01766,
+        0.0175466667
       ],
-      "median_average_ms": 0.0175133333,
-      "minimum_average_ms": 0.01729,
-      "maximum_average_ms": 0.0179083333
+      "median_average_ms": 0.0175466667,
+      "minimum_average_ms": 0.01719,
+      "maximum_average_ms": 0.017985
     },
     {
       "scene": "churn",
       "average_ms_runs": [
-        0.0123433333,
-        0.0119433333,
-        0.0118816667,
-        0.0118683333,
-        0.01193
+        0.0156583333,
+        0.0157233333,
+        0.01576,
+        0.0157933333,
+        0.01547
       ],
-      "median_average_ms": 0.01193,
-      "minimum_average_ms": 0.0118683333,
-      "maximum_average_ms": 0.0123433333
+      "median_average_ms": 0.0157233333,
+      "minimum_average_ms": 0.01547,
+      "maximum_average_ms": 0.0157933333
     },
     {
       "scene": "table",
       "average_ms_runs": [
-        0.00198666667,
-        0.001895,
-        0.00188,
-        0.00195,
-        0.001835
+        0.00200833333,
+        0.00202166667,
+        0.00184166667,
+        0.00197833333,
+        0.00213
       ],
-      "median_average_ms": 0.001895,
-      "minimum_average_ms": 0.001835,
-      "maximum_average_ms": 0.00198666667
+      "median_average_ms": 0.00200833333,
+      "minimum_average_ms": 0.00184166667,
+      "maximum_average_ms": 0.00213
     },
     {
       "scene": "inverted",
       "average_ms_runs": [
-        0.00288666667,
-        0.00272333333,
-        0.00288333333,
-        0.00267166667,
-        0.00280333333
+        0.00289333333,
+        0.00293666667,
+        0.00271833333,
+        0.00287666667,
+        0.00293
       ],
-      "median_average_ms": 0.00280333333,
-      "minimum_average_ms": 0.00267166667,
-      "maximum_average_ms": 0.00288666667
+      "median_average_ms": 0.00289333333,
+      "minimum_average_ms": 0.00271833333,
+      "maximum_average_ms": 0.00293666667
     }
   ]
 }

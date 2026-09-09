@@ -3,6 +3,7 @@
 #ifndef SILK_SUITES_H
 #define SILK_SUITES_H
 
+int sl_sleep_suite(void);
 int sl_island_suite(void);
 int sl_stats_suite(void);
 int sl_replay_suite(void);

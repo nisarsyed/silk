@@ -86,7 +86,24 @@ typedef struct sl_body_desc {
     float restitution;
 } sl_body_desc;
 
+/* Conservative defaults pinned by settled pile/chain tests. */
+#define SL_SLEEP_SPEED_MAX_DEFAULT 0.02f
+#define SL_SLEEP_ANGULAR_SPEED_MAX_DEFAULT 0.01f
+#define SL_SLEEP_TIME_MIN_DEFAULT 0.5f
+
 typedef struct sl_world_config {
+    /* Opt-in whole-component sleeping. Zero thresholds select defaults;
+     * otherwise finite positive values. Surface speed includes radius * spin.
+     * Quiet travel is limited to one linear slop and 0.005 radians; constraint
+     * error to two linear slops. A valid fixed-dt change restarts settling.
+     * Required quiet intervals beyond UINT32_MAX steps keep bodies awake.
+     * Sleeping holds transforms, preserves query visibility and solver caches,
+     * and skips integration/constraint work. Changed body/support properties,
+     * nonzero forces/torques, joint edits and new contacts wake components. */
+    bool sleep_enabled;
+    float sleep_speed_max;         /* world units / second */
+    float sleep_angular_speed_max; /* radians / second */
+    float sleep_time_min;          /* seconds */
     uint32_t body_capacity; /* in [1, SL_BODY_COUNT_MAX], fixed at init */
     /* 0 selects min(4 * body_capacity, SL_CONTACT_COUNT_MAX). */
     uint32_t contact_capacity;
@@ -118,6 +135,11 @@ typedef struct sl_world_work {
     uint64_t tree_node_visits;
     uint64_t pair_candidates;
     uint64_t pair_probes;
+    /* Inspected wake queue, membership, boundary and adjacency entries,
+     * including clearing bounded visitation scratch. */
+    uint64_t wake_visits;
+    uint64_t body_wakes;  /* sleeping -> awake transitions */
+    uint64_t body_sleeps; /* awake -> sleeping transitions */
     /* Actual inspected graph entries, including repeated construction passes
      * and parent reads during union/find. Saturate with other work counters. */
     uint64_t graph_body_visits;
@@ -132,13 +154,16 @@ typedef struct sl_world_work {
 /* Prepared constraint records, not scalar equations or successful impulses.
  * Each substep executes warm start and biased/relax contact/joint sweeps;
  * contact restitution executes once. Step work is independent of cumulative
- * saturation. An empty valid step has zero workload and configured substeps. */
+ * saturation. Empty steps have no constraint workload; capacity-based graph
+ * and wake scratch scans are still reported. */
 typedef struct sl_world_step_stats {
     sl_world_work work;
     uint32_t dynamic_body_count;
     uint32_t kinematic_body_count;
     uint32_t contact_constraint_count;
     uint32_t joint_constraint_count;
+    uint32_t island_executed_count;
+    uint32_t island_skipped_count;
     uint32_t island_count;
     uint32_t island_body_count_max;
     uint32_t substep_count;
@@ -147,6 +172,8 @@ typedef struct sl_world_step_stats {
 typedef struct sl_world_stats {
     sl_world_step_stats step; /* most recently completed valid step */
     sl_world_work cumulative; /* since initialization/reset */
+    uint32_t awake_dynamic_count;
+    uint32_t sleeping_dynamic_count;
     uint32_t body_count;
     uint32_t body_capacity;
     uint32_t contact_count;
@@ -166,6 +193,7 @@ typedef struct sl_world_stats {
  * between arena slices. Joint bytes include solver scratch/body adjacency and
  * are zero when joints are disabled. */
 typedef struct sl_world_memory_breakdown {
+    size_t sleep_bytes;  /* 13 bytes/body capacity, excluding alignment gaps */
     size_t island_bytes; /* bounded graph arrays, excluding alignment gaps */
     size_t world_state_bytes; /* private metadata in the allocation */
     size_t body_bytes;
@@ -239,6 +267,12 @@ void sl_world_body_destroy(sl_world *world, sl_body_handle handle);
 
 /* True when handle names a live body in this world; safe on arbitrary
  * handles, where the accessors would assert. */
+/* Kinematics are awake, statics/invalid handles are not. Queries and these
+ * reads do not wake bodies or invalidate snapshots. Explicit wake accepts
+ * dynamics only, waking their affected component and restarting its quiet
+ * interval even if already awake. */
+bool sl_world_body_is_awake(const sl_world *world, sl_body_handle handle);
+bool sl_world_body_wake(sl_world *world, sl_body_handle handle);
 bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle);
 
 uint32_t sl_world_body_count(const sl_world *world);
@@ -260,7 +294,8 @@ sl_joint_handle sl_world_joint_at(const sl_world *world, uint32_t row);
 sl_joint_desc sl_world_joint_get_desc(const sl_world *world,
                                       sl_joint_handle handle);
 /* Constraint impulse applied to body_b during the most recently completed
- * step, in linear impulse units. */
+ * step, in linear impulse units. Zero when skipped during a sleeping step;
+ * warm-start caches remain retained. A transition step reports its work. */
 sl_vec2 sl_world_joint_get_linear_impulse(const sl_world *world,
                                           sl_joint_handle handle);
 

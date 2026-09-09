@@ -3,6 +3,7 @@ add_executable(sl_tests
     replay.c
     test_replay.c
     test_query.c
+    test_sleep.c
     test_island.c
     test_stats.c
     test_core.c

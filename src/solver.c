@@ -274,72 +274,81 @@ void sl_solver_prepare(sl_world_state *world, float h, float inverse_h)
     sl_contact_constraint *constraints = world_constraints(world);
     uint32_t constraint_count = 0u;
 
-    for (uint32_t index = 0u; index < world->island_contact_count; ++index) {
-        const uint32_t row = world->island_contacts[index];
-        const sl_contact *contact = &world->contacts[row];
-        if (!contact->touching) {
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
             continue;
         }
-        SL_ASSERT(constraint_count < world->contact_capacity);
-        sl_contact_constraint *constraint = &constraints[constraint_count];
-        memset(constraint, 0, sizeof(*constraint));
-        constraint_count += 1u;
 
-        constraint->contact_row = row;
-        constraint->dense_a = world->slots[contact->body_a.index].dense;
-        constraint->dense_b = world->slots[contact->body_b.index].dense;
-        constraint->normal = contact->manifold.normal;
-        constraint->friction = contact->friction;
-        constraint->restitution = contact->restitution;
-        constraint->point_count = contact->manifold.point_count;
+        for (uint32_t index = island->contact_offset;
+             index < island->contact_offset + island->contact_count; ++index) {
+            const uint32_t row = world->island_contacts[index];
+            const sl_contact *contact = &world->contacts[row];
+            SL_ASSERT(contact->touching);
+            SL_ASSERT(constraint_count < world->contact_capacity);
+            sl_contact_constraint *constraint = &constraints[index];
+            memset(constraint, 0, sizeof(*constraint));
+            constraint_count += 1u;
 
-        float hertz = world->contact_hertz;
-        const bool static_partner =
-            world->types[constraint->dense_a] == (uint8_t)SL_BODY_STATIC ||
-            world->types[constraint->dense_b] == (uint8_t)SL_BODY_STATIC;
-        if (static_partner) {
-            hertz *= 2.0f;
-        }
-        hertz = sl_min(hertz, 0.25f * inverse_h);
-        constraint->softness =
-            softness_make(hertz, world->contact_damping_ratio, h);
+            constraint->contact_row = row;
+            constraint->dense_a = world->slots[contact->body_a.index].dense;
+            constraint->dense_b = world->slots[contact->body_b.index].dense;
+            constraint->normal = contact->manifold.normal;
+            constraint->friction = contact->friction;
+            constraint->restitution = contact->restitution;
+            constraint->point_count = contact->manifold.point_count;
 
-        const sl_velocity_pair pair = velocity_pair_load(world, constraint);
-        const sl_vec2 tangent = sl_vec2_right_perp(constraint->normal);
-        for (uint32_t i = 0u; i < constraint->point_count; ++i) {
-            const sl_manifold_point *manifold_point =
-                &contact->manifold.points[i];
-            sl_contact_constraint_point *point = &constraint->points[i];
-            point->anchor_a = manifold_point->anchor_a;
-            point->anchor_b = manifold_point->anchor_b;
-            point->base_separation =
-                manifold_point->separation -
-                sl_vec2_dot(sl_vec2_sub(point->anchor_b, point->anchor_a),
-                            constraint->normal);
-            point->normal_mass = effective_mass(
-                world, constraint->dense_a, constraint->dense_b,
-                point->anchor_a, point->anchor_b, constraint->normal);
-            point->tangent_mass =
-                effective_mass(world, constraint->dense_a, constraint->dense_b,
-                               point->anchor_a, point->anchor_b, tangent);
-            point->initial_normal_velocity = relative_velocity(
-                &pair, point->anchor_a, point->anchor_b, constraint->normal);
-            point->id = manifold_point->id;
-            if (point->normal_mass > 0.0f) {
-                point->normal_impulse = manifold_point->normal_impulse;
+            float hertz = world->contact_hertz;
+            const bool static_partner =
+                world->types[constraint->dense_a] == (uint8_t)SL_BODY_STATIC ||
+                world->types[constraint->dense_b] == (uint8_t)SL_BODY_STATIC;
+            if (static_partner) {
+                hertz *= 2.0f;
             }
-            if (point->tangent_mass > 0.0f) {
-                point->tangent_impulse = manifold_point->tangent_impulse;
+            hertz = sl_min(hertz, 0.25f * inverse_h);
+            constraint->softness =
+                softness_make(hertz, world->contact_damping_ratio, h);
+
+            const sl_velocity_pair pair = velocity_pair_load(world, constraint);
+            const sl_vec2 tangent = sl_vec2_right_perp(constraint->normal);
+            for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+                const sl_manifold_point *manifold_point =
+                    &contact->manifold.points[i];
+                sl_contact_constraint_point *point = &constraint->points[i];
+                point->anchor_a = manifold_point->anchor_a;
+                point->anchor_b = manifold_point->anchor_b;
+                point->base_separation =
+                    manifold_point->separation -
+                    sl_vec2_dot(sl_vec2_sub(point->anchor_b, point->anchor_a),
+                                constraint->normal);
+                point->normal_mass = effective_mass(
+                    world, constraint->dense_a, constraint->dense_b,
+                    point->anchor_a, point->anchor_b, constraint->normal);
+                point->tangent_mass = effective_mass(
+                    world, constraint->dense_a, constraint->dense_b,
+                    point->anchor_a, point->anchor_b, tangent);
+                point->initial_normal_velocity =
+                    relative_velocity(&pair, point->anchor_a, point->anchor_b,
+                                      constraint->normal);
+                point->id = manifold_point->id;
+                if (point->normal_mass > 0.0f) {
+                    point->normal_impulse = manifold_point->normal_impulse;
+                }
+                if (point->tangent_mass > 0.0f) {
+                    point->tangent_impulse = manifold_point->tangent_impulse;
+                }
             }
-        }
-        if (constraint->point_count == 2u &&
-            constraint->points[0].normal_mass > 0.0f &&
-            constraint->points[1].normal_mass > 0.0f) {
-            constraint->normal_coupling = effective_mass_coupling(
-                world, constraint->dense_a, constraint->dense_b,
-                constraint->points[0].anchor_a, constraint->points[0].anchor_b,
-                constraint->points[1].anchor_a, constraint->points[1].anchor_b,
-                constraint->normal);
+            if (constraint->point_count == 2u &&
+                constraint->points[0].normal_mass > 0.0f &&
+                constraint->points[1].normal_mass > 0.0f) {
+                constraint->normal_coupling = effective_mass_coupling(
+                    world, constraint->dense_a, constraint->dense_b,
+                    constraint->points[0].anchor_a,
+                    constraint->points[0].anchor_b,
+                    constraint->points[1].anchor_a,
+                    constraint->points[1].anchor_b, constraint->normal);
+            }
         }
     }
     world->contact_constraint_count = constraint_count;
@@ -349,19 +358,28 @@ void sl_solver_warm_start(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
-    for (uint32_t row = 0u; row < world->contact_constraint_count; ++row) {
-        sl_contact_constraint *constraint = &constraints[row];
-        sl_velocity_pair pair = velocity_pair_load(world, constraint);
-        const sl_vec2 tangent = sl_vec2_right_perp(constraint->normal);
-        for (uint32_t i = 0u; i < constraint->point_count; ++i) {
-            sl_contact_constraint_point *point = &constraint->points[i];
-            const sl_vec2 impulse = sl_vec2_add(
-                sl_vec2_scale(constraint->normal, point->normal_impulse),
-                sl_vec2_scale(tangent, point->tangent_impulse));
-            (void)impulse_apply(&pair, point->anchor_a, point->anchor_b,
-                                impulse);
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
+            continue;
         }
-        velocity_pair_store(world, constraint, &pair);
+
+        for (uint32_t row = island->contact_offset;
+             row < island->contact_offset + island->contact_count; ++row) {
+            sl_contact_constraint *constraint = &constraints[row];
+            sl_velocity_pair pair = velocity_pair_load(world, constraint);
+            const sl_vec2 tangent = sl_vec2_right_perp(constraint->normal);
+            for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+                sl_contact_constraint_point *point = &constraint->points[i];
+                const sl_vec2 impulse = sl_vec2_add(
+                    sl_vec2_scale(constraint->normal, point->normal_impulse),
+                    sl_vec2_scale(tangent, point->tangent_impulse));
+                (void)impulse_apply(&pair, point->anchor_a, point->anchor_b,
+                                    impulse);
+            }
+            velocity_pair_store(world, constraint, &pair);
+        }
     }
 }
 
@@ -641,8 +659,17 @@ void sl_solver_solve(sl_world_state *world, float inverse_h, bool use_bias)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
-    for (uint32_t row = 0u; row < world->contact_constraint_count; ++row) {
-        constraint_solve(world, &constraints[row], inverse_h, use_bias);
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
+            continue;
+        }
+
+        for (uint32_t row = island->contact_offset;
+             row < island->contact_offset + island->contact_count; ++row) {
+            constraint_solve(world, &constraints[row], inverse_h, use_bias);
+        }
     }
 }
 
@@ -650,42 +677,53 @@ void sl_solver_restitution(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
-    for (uint32_t row = 0u; row < world->contact_constraint_count; ++row) {
-        sl_contact_constraint *constraint = &constraints[row];
-        if (constraint->restitution == 0.0f) {
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
             continue;
         }
-        sl_velocity_pair pair = velocity_pair_load(world, constraint);
-        for (uint32_t i = 0u; i < constraint->point_count; ++i) {
-            sl_contact_constraint_point *point = &constraint->points[i];
-            if (point->normal_mass == 0.0f ||
-                point->initial_normal_velocity >=
-                    -world->restitution_threshold ||
-                point->max_normal_impulse <= 0.0f) {
+
+        for (uint32_t row = island->contact_offset;
+             row < island->contact_offset + island->contact_count; ++row) {
+            sl_contact_constraint *constraint = &constraints[row];
+            if (constraint->restitution == 0.0f) {
                 continue;
             }
-            const float velocity = relative_velocity(
-                &pair, point->anchor_a, point->anchor_b, constraint->normal);
-            const float target =
-                -constraint->restitution * point->initial_normal_velocity;
-            const float impulse = point->normal_mass * (target - velocity);
-            const float accumulated = point->normal_impulse + impulse;
-            if (!sl_is_finite(velocity) || !sl_is_finite(target) ||
-                !sl_is_finite(impulse) || !sl_is_finite(accumulated)) {
-                continue;
+            sl_velocity_pair pair = velocity_pair_load(world, constraint);
+            for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+                sl_contact_constraint_point *point = &constraint->points[i];
+                if (point->normal_mass == 0.0f ||
+                    point->initial_normal_velocity >=
+                        -world->restitution_threshold ||
+                    point->max_normal_impulse <= 0.0f) {
+                    continue;
+                }
+                const float velocity =
+                    relative_velocity(&pair, point->anchor_a, point->anchor_b,
+                                      constraint->normal);
+                const float target =
+                    -constraint->restitution * point->initial_normal_velocity;
+                const float impulse = point->normal_mass * (target - velocity);
+                const float accumulated = point->normal_impulse + impulse;
+                if (!sl_is_finite(velocity) || !sl_is_finite(target) ||
+                    !sl_is_finite(impulse) || !sl_is_finite(accumulated)) {
+                    continue;
+                }
+                const float next_impulse = sl_max(accumulated, 0.0f);
+                const float applied = next_impulse - point->normal_impulse;
+                const sl_vec2 vector =
+                    sl_vec2_scale(constraint->normal, applied);
+                if (!impulse_apply(&pair, point->anchor_a, point->anchor_b,
+                                   vector)) {
+                    continue;
+                }
+                point->normal_impulse = next_impulse;
+                point->max_normal_impulse =
+                    sl_max(point->max_normal_impulse, applied);
             }
-            const float next_impulse = sl_max(accumulated, 0.0f);
-            const float applied = next_impulse - point->normal_impulse;
-            const sl_vec2 vector = sl_vec2_scale(constraint->normal, applied);
-            if (!impulse_apply(&pair, point->anchor_a, point->anchor_b,
-                               vector)) {
-                continue;
-            }
-            point->normal_impulse = next_impulse;
-            point->max_normal_impulse =
-                sl_max(point->max_normal_impulse, applied);
+            velocity_pair_store(world, constraint, &pair);
         }
-        velocity_pair_store(world, constraint, &pair);
     }
 }
 
@@ -693,20 +731,54 @@ void sl_solver_store(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
     sl_contact_constraint *constraints = world_constraints(world);
-    for (uint32_t row = 0u; row < world->contact_constraint_count; ++row) {
-        const sl_contact_constraint *constraint = &constraints[row];
-        SL_ASSERT(constraint->contact_row < world->contact_count);
-        sl_contact *contact = &world->contacts[constraint->contact_row];
-        for (uint32_t i = 0u; i < constraint->point_count; ++i) {
-            const sl_contact_constraint_point *point = &constraint->points[i];
-            sl_manifold_point *manifold_point = &contact->manifold.points[i];
-            SL_ASSERT(manifold_point->id == point->id);
-            if (manifold_point->id != point->id) {
-                continue;
+    for (uint32_t island_id = 0u; island_id < world->island_count;
+         ++island_id) {
+        const sl_island *island = &world->islands[island_id];
+        if (sl_island_is_sleeping(world, island_id)) {
+            continue;
+        }
+
+        for (uint32_t row = island->contact_offset;
+             row < island->contact_offset + island->contact_count; ++row) {
+            const sl_contact_constraint *constraint = &constraints[row];
+            SL_ASSERT(constraint->contact_row < world->contact_count);
+            sl_contact *contact = &world->contacts[constraint->contact_row];
+            for (uint32_t i = 0u; i < constraint->point_count; ++i) {
+                const sl_contact_constraint_point *point =
+                    &constraint->points[i];
+                sl_manifold_point *manifold_point =
+                    &contact->manifold.points[i];
+                SL_ASSERT(manifold_point->id == point->id);
+                if (manifold_point->id != point->id) {
+                    continue;
+                }
+                manifold_point->normal_impulse = point->normal_impulse;
+                manifold_point->tangent_impulse = point->tangent_impulse;
+                manifold_point->normal_velocity =
+                    point->initial_normal_velocity;
             }
-            manifold_point->normal_impulse = point->normal_impulse;
-            manifold_point->tangent_impulse = point->tangent_impulse;
-            manifold_point->normal_velocity = point->initial_normal_velocity;
         }
     }
+}
+
+bool sl_solver_island_quiet(const sl_world_state *world, uint32_t id)
+{
+    const sl_island *island = &world->islands[id];
+    const sl_contact_constraint *constraints = world->contact_constraints;
+    for (uint32_t i = island->contact_offset;
+         i < island->contact_offset + island->contact_count; ++i) {
+        const sl_contact_constraint *c = &constraints[i];
+        if (c->point_count == 0u) {
+            return false;
+        }
+        for (uint32_t j = 0u; j < c->point_count; ++j) {
+            const float separation =
+                separation_current(world, c, &c->points[j]);
+            if (c->points[j].normal_mass <= 0.0f || !sl_is_finite(separation) ||
+                separation < -2.0f * SL_LINEAR_SLOP) {
+                return false;
+            }
+        }
+    }
+    return true;
 }

@@ -112,8 +112,11 @@ void sl_world_step(sl_world *owner, float dt)
 
     memset(&world->step_work, 0, sizeof(world->step_work));
     world->stats_stepping = true;
+    sl_sleep_step_begin(world, dt);
     sl_contact_step_begin(world);
+    sl_wake_finish(world);
     sl_islands_build(world);
+    sl_sleep_graph_ready(world);
     sl_joint_prepare(world, h, inverse_h);
     sl_solver_prepare(world, h, inverse_h);
 
@@ -148,7 +151,7 @@ void sl_world_step(sl_world *owner, float dt)
             SL_ASSERT(moving || (world->velocities[i].x == 0.0f &&
                                  world->velocities[i].y == 0.0f &&
                                  world->angular_velocities[i] == 0.0f));
-            if (!moving) {
+            if (!moving || world->sleeping[i] != 0u) {
                 continue;
             }
 
@@ -193,9 +196,11 @@ void sl_world_step(sl_world *owner, float dt)
             }
             const bool dynamic = type == (uint8_t)SL_BODY_DYNAMIC;
             const bool moving = dynamic || type == (uint8_t)SL_BODY_KINEMATIC;
-            if (!moving) {
+            if (!moving || world->sleeping[i] != 0u) {
                 continue;
             }
+            const sl_vec2 before = world->delta_positions[i];
+            const sl_rotation rotation_before = world->delta_rotations[i];
             position_delta_integrate(
                 world->positions[i].x, world->velocities[i].x, h, dynamic,
                 &world->delta_positions[i].x, &world->velocities[i].x);
@@ -204,6 +209,9 @@ void sl_world_step(sl_world *owner, float dt)
                 &world->delta_positions[i].y, &world->velocities[i].y);
             world->delta_rotations[i] = sl_rotation_integrate(
                 world->delta_rotations[i], world->angular_velocities[i] * h);
+            if (world->sleep_enabled) {
+                sl_sleep_travel(world, i, before, rotation_before);
+            }
         }
 
         sl_joint_solve(world, false);
@@ -217,13 +225,27 @@ void sl_world_step(sl_world *owner, float dt)
     sl_world_step_stats completed = { 0 };
     for (uint32_t i = 0u; i < world->body_count; ++i) {
         completed.dynamic_body_count +=
-            world->types[i] == (uint8_t)SL_BODY_DYNAMIC ? 1u : 0u;
+            world->types[i] == (uint8_t)SL_BODY_DYNAMIC &&
+                    world->sleeping[i] == 0u
+                ? 1u
+                : 0u;
         completed.kinematic_body_count +=
             world->types[i] == (uint8_t)SL_BODY_KINEMATIC ? 1u : 0u;
-        world->positions[i] =
-            sl_vec2_add(world->positions[i], world->delta_positions[i]);
-        world->rotations[i] = sl_rotation_normalize(
-            sl_rotation_mul(world->delta_rotations[i], world->rotations[i]));
+        if (world->sleeping[i] == 0u) {
+            world->positions[i] =
+                sl_vec2_add(world->positions[i], world->delta_positions[i]);
+            world->rotations[i] = sl_rotation_normalize(sl_rotation_mul(
+                world->delta_rotations[i], world->rotations[i]));
+        }
+    }
+    for (uint32_t id = 0u; id < world->island_count; ++id) {
+        completed.island_skipped_count +=
+            sl_island_is_sleeping(world, id) ? 1u : 0u;
+    }
+    completed.island_executed_count =
+        world->island_count - completed.island_skipped_count;
+    sl_sleep_step_end(world);
+    for (uint32_t i = 0u; i < world->body_count; ++i) {
         world->delta_positions[i] = sl_vec2_make(0.0f, 0.0f);
         world->delta_rotations[i] = sl_rotation_identity();
         world->forces[i] = sl_vec2_make(0.0f, 0.0f);
