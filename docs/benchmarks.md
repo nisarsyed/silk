@@ -287,3 +287,57 @@ larger components reduce available island parallelism. These are workload
 estimates, not measurements of scheduling overhead. Defer production threading
 until a larger independent-island workload demonstrates enough work to amortize
 dispatch, barriers, cache-line sharing and the remaining serial phases.
+
+## Solver-order study
+
+The [experiment protocol](../bench/reports/solver-order/protocol.json) fixes the
+baseline, graph policy, stage mapping and scratch budget before prototyping.
+The [primary method](https://doi.org/10.1145/3747867) and
+[author project](https://ziyanxiong.github.io/2PSP/) describe withholding lower-body
+responses during an upward pass and applying them during a downward pass.
+This differs from reversing the constraint sequence. The study separates
+ordering alone from a bounded two-pass adaptation; equal substeps do not mean
+equal constraint work. No solver alternative is enabled by the normal build.
+
+The public-only `sl_bench_study` executable adds five fixed adversarial fixtures
+to the unchanged main matrix. Each uses 16 body slots, 128 contact slots, four
+substeps, dt = binary32(1/60), 120 warm-up steps and 600 measured steps. Geometry,
+materials and events are committed in [study.c](../bench/study.c); no random
+seed or frame-clock input enters the worlds.
+
+| Fixture | Additional check |
+|---|---|
+| Bridge | A loaded beam transfers weight through two separated static supports |
+| Collapse | Remove the supporting platform at the first measured step; retain a lower catch floor |
+| Zero gravity | Two unequal masses exchange momentum in a restitution-one collision |
+| Cycle | Equal-height contacting bodies expose ambiguous gravity layering |
+| Topple | Give the top box horizontal velocity at the first measured step |
+
+```sh
+python3 bench/study.py build/release/bin/sl_bench_study --output build/study-off --quality
+python3 bench/study.py build/release/bin/sl_bench_study --output build/study-on --sleep on --quality
+python3 bench/test_study.py --executable build/release/bin/sl_bench_study
+```
+
+The runner defaults to five repetitions, checks finite output and deterministic
+fields, and records timing spread and quality violations. Omit `--quality` when
+collecting a candidate known to fail acceptance so its failures remain in the
+summary. The separate study format has one strict version and no legacy reader.
+
+All-pairs current-transform geometry measures penetration independently of
+contact discovery. The maximum spans measured steps; ten samples at 60-step
+intervals show its evolution. Drift and residual speeds use the final 60 steps.
+Drop, horizontal movement and rotation excursion cover the entire measured
+interval relative to the pre-event transforms. Momentum error covers warm-up
+and measured steps and applies only to the zero-gravity fixture, whose initial
+total momentum is zero. Lengths are world units, speeds units/s, angles radians,
+angular speeds radians/s, momentum kg×units/s and cached support force
+kg×units/s². Support values retain the cached-impulse caveat above.
+
+[Study quality limits](../bench/study_limits.json) are pinned before solver
+experiments. The unchanged solver reaches roughly 0.204 units of transient
+penetration on the falling-stack impact; its bound is 0.22. Bridge/cycle bounds
+use one linear slop, while toppling retains the 0.04 stress-scene bound. Motion
+minimums require the removed-support stack to fall and the disturbed stack to
+topple; a frozen but apparently stable candidate cannot pass. Existing main
+matrix thresholds remain unchanged.

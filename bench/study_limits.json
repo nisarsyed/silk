@@ -1,0 +1,7 @@
+{
+  "bridge": {"maximum": {"penetration_max": 0.005, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "support_weight": 68.67},
+  "collapse": {"maximum": {"penetration_max": 0.22, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "minimum": {"drop_max": 5.5, "rotation_excursion_max": 1.0}, "support_weight": 58.86},
+  "zero-gravity": {"maximum": {"penetration_max": 0.005, "translation_drift_max": 3.0, "rotation_drift_max": 0.8, "linear_speed_max": 3.0, "angular_speed_max": 0.8, "momentum_error_max": 0.00001}, "minimum": {"horizontal_motion_max": 20.0}},
+  "cycle": {"maximum": {"penetration_max": 0.005, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "support_weight": 39.24},
+  "topple": {"maximum": {"penetration_max": 0.04, "translation_drift_max": 0.005, "rotation_drift_max": 0.005, "linear_speed_max": 0.001, "angular_speed_max": 0.001}, "minimum": {"drop_max": 3.0, "horizontal_motion_max": 1.0, "rotation_excursion_max": 1.0}, "support_weight": 58.86}
+}
