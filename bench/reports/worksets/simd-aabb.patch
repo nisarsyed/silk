@@ -1,0 +1,23 @@
+--- a/include/silk/math.h
++++ b/include/silk/math.h
+@@ -1,6 +1,7 @@
+ #ifndef SILK_MATH_H
+ #define SILK_MATH_H
+
++#include <arm_neon.h>
+ #include <float.h>
+ #include <math.h>
+ #include <stdbool.h>
+@@ -358,8 +359,10 @@
+     if (!sl_aabb_is_valid(a) || !sl_aabb_is_valid(b)) {
+         return false;
+     }
+-    return a.lower.x <= b.upper.x && a.upper.x >= b.lower.x &&
+-           a.lower.y <= b.upper.y && a.upper.y >= b.lower.y;
++    /* Isolated ARM experiment: compare four interval ends in parallel. */
++    const float left[4] = { a.lower.x, b.lower.x, a.lower.y, b.lower.y };
++    const float right[4] = { b.upper.x, a.upper.x, b.upper.y, a.upper.y };
++    return vminvq_u32(vcleq_f32(vld1q_f32(left), vld1q_f32(right))) != 0u;
+ }
+
+ /* Boundary inclusive: true when the complete inner box lies in outer. */

@@ -36,7 +36,7 @@
     "digest_equal": true
   },
   "vectorization": {
-    "status": "compiler comparison complete; targeted SIMD investigation pending",
+    "status": "complete; retain compiler defaults",
     "flags_disabled": "-fno-vectorize -fno-slp-vectorize",
     "physical_digests_equal": true
   },
@@ -45,5 +45,65 @@
     "benchmark_arguments": "--scene churn|rain --sleep off|on --warmup 10000 --steps 10000",
     "build_flags": "-O3 -DNDEBUG -g",
     "limitation": "CLI sampling includes setup, warmup and quality work and supplies statistical stacks, not hardware counters or isolated function timings. Full Xcode/Instruments is unavailable."
+  },
+  "simd": {
+    "decision": "reject",
+    "patch": "simd-aabb.patch",
+    "target": "Four AABB interval comparisons in broad-phase/query overlap tests, preserving the existing finite-input validation.",
+    "cost_before": "After validation, four scalar comparisons and boolean combination. AABB payload is four floats (16 bytes); tree traversal is a dependent node walk.",
+    "cost_candidate": "Same inputs and allocation, but construct two four-lane vectors, compare and reduce. Wrapper assembly contains six lane moves plus comparison/reduction; vectorization does not remove node lookup or validation.",
+    "reason": "Five alternating full matrix runs show no repeatable whole-step gain beyond timing spread. No production architecture path is justified; the core remains portable C.",
+    "testing": "Apple M4 Pro/AppleClang only; release complete replay/physical tests and full quality gates passed; every non-timing matrix field matches parent across five runs in each sleep mode. Query digests match.",
+    "memory_delta_bytes": 0,
+    "query_results": [
+      {
+        "scene": "query-point",
+        "parent_ms": [
+          25.194,
+          21.553,
+          21.865,
+          22.433,
+          22.661
+        ],
+        "simd_ms": [
+          24.959,
+          21.706,
+          20.962,
+          21.873,
+          21.188
+        ],
+        "median_change_percent": -3.240761378326573
+      },
+      {
+        "scene": "query-broad",
+        "parent_ms": [
+          999.734,
+          992.852,
+          994.239,
+          988.896,
+          991.855
+        ],
+        "simd_ms": [
+          965.049,
+          965.812,
+          983.718,
+          969.661,
+          981.186
+        ],
+        "median_change_percent": -2.3357962717504788
+      }
+    ]
+  },
+  "threading": {
+    "decision": "defer",
+    "assessment": "docs/benchmarks.md: Threading feasibility",
+    "independent_work": "Disjoint dynamic island ranges with static/kinematic boundary reads. Preserve sequential constraint ordering within each island.",
+    "shared_state": "Tree/query scratch, wake/union scratch, contact and pair mutations, pools and diagnostic publication require serialization or bounded worker-local storage and deterministic merging.",
+    "cost": "Awake piles whole-step time gives an upper bound near 5 microseconds/component; chains near 2 microseconds/component. Sleeping removes most solver work; rain finishes as one 2000-body island. Scheduling/barrier overhead was not measured; no parallel speedup is claimed.",
+    "future_scope": "Separate measured coarse-island worker-contract experiment with fixed initialization-owned task/scratch storage, explicit kinematic barriers and deterministic completion; no scheduler or threading dependency is added."
+  },
+  "other_candidates": {
+    "pair_maintenance": "Defer: churn has 75276 cumulative pair probes versus 860526 graph constraint visits across the full run. Profiling identified empty joint-range traversal as a simpler supported change. Counts are not interchangeable cycle costs and do not prove hashing is free.",
+    "body_scans_and_wake_scratch": "Defer: avoid new persistent workset arrays or wake-generation metadata without a measured advantage after the count guard. Existing memory, wake semantics and full replay remain unchanged."
   }
 }

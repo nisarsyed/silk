@@ -225,3 +225,65 @@ Compiler investigation uses `-Rpass=loop-vectorize`,
 the same baseline with `-fno-vectorize -fno-slp-vectorize`; both sleep modes pass
 quality gates and retain physical digests. Initial median timing differences
 of roughly -0.5% to +2.6% do not establish a useful whole-workload change.
+
+The targeted SIMD experiment replaces the four interval comparisons in AABB
+overlap with an ARM NEON compare/reduction, retaining all input validation.
+The [experiment patch](../bench/reports/worksets/simd-aabb.patch) applies to
+baseline `0b22cb6` in an isolated source copy. It is not compiled by any normal
+target. Configure that copy with the same release settings and
+`-DSL_BENCH_REVISION=0b22cb6-simd-aabb-experiment`, then use the regular report
+runner for both sleep modes. The confirming reports record exact invocations.
+
+Release tests and every non-timing matrix field match the baseline. Five
+alternating runs show no repeatable whole-step improvement; separate query
+medians improve approximately 2–3%, with larger point-query spread. Both
+versions still load four-float AABBs and follow dependent tree nodes. The
+archived wrapper assembly shows six lane moves plus vector comparison/reduction
+after unchanged validity checks. This does not justify a platform-specific
+production path. Retain portable scalar source and normal compiler options.
+
+To reproduce the wrapper assembly, compile a function returning
+`sl_aabb_overlaps(a, b)` with `cc -std=c17 -O3 -DNDEBUG -S`, selecting the
+baseline or patched include directory. The archived step assembly also shows
+compiler-generated two-lane arithmetic already present in portable source.
+These observations are specific to the recorded compiler and host.
+
+Pair-table and wake-scratch rewrites remain deferred. Churn records 75,276
+cumulative pair probes and 860,526 graph constraint visits; those are different
+operations, not comparable cycle costs. The empty-stage profile supplied a
+smaller supported change without altering pair occupancy, wake metadata or
+memory layout. Broader changes need their own measured advantage.
+
+### Threading feasibility
+
+Dynamic islands are the useful future task boundary. Their body slots and
+prepared constraint ranges are disjoint, and velocity stores explicitly skip
+static and kinematic endpoints. Shared boundaries can therefore be read by
+multiple island solvers after the global kinematic update. Preserve source
+constraint order within each island: parallel updates to connected constraints
+would change the sequential solver and require a separate numerical design.
+
+The current whole-world functions are not worker entry points. Tree queries
+share a traversal stack and candidate buffer; wake propagation and union-find
+reuse the same scratch; contact insertion/removal, free lists, pair tables and
+diagnostic accumulation are mutable world state. Broad-phase parallelism would
+need bounded per-worker scratch and a deterministic merge before modifying
+contact order. Allocating that scratch and merging candidates could cost more
+than the saved queries. Caller queries remain non-reentrant.
+
+A future island experiment would require a caller-controlled worker contract,
+initialization-sized tasks, disjoint range execution, synchronization around
+global kinematic updates and step publication, and bounded local counters
+combined after completion. A platform thread pool or scheduler is outside this
+change. Do not add optional runtime allocation or depend on platform-specific
+thread APIs in the core merely to test this hypothesis.
+
+Current work sizes do not justify that machinery. The awake piles fixture takes
+about 0.08 ms for the *whole* step across sixteen components, or at most roughly
+5 microseconds per component if all work were distributable; chains take about
+0.018 ms across eight components. Actual independent solver work is smaller.
+Sleeping eliminates most of it while leaving contact/graph work active. Rain's
+larger components reduce available island parallelism. These are workload
+estimates, not measurements of scheduling overhead. Defer production threading
+until a larger independent-island workload demonstrates enough work to amortize
+dispatch, barriers, cache-line sharing and the remaining serial phases.
