@@ -14,8 +14,15 @@ add_library(silk STATIC
 )
 add_library(silk::silk ALIAS silk)
 
-target_include_directories(silk PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(silk PRIVATE silk_warnings)
+include(GNUInstallDirs)
+target_include_directories(silk PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_compile_features(silk PUBLIC c_std_17)
+# Static PRIVATE dependencies otherwise appear as LINK_ONLY export entries.
+# Keep first-party warnings local to this build and out of both export forms.
+target_link_libraries(silk PRIVATE $<BUILD_LOCAL_INTERFACE:silk_warnings>)
 
 # Public headers call <math.h> functions (sqrtf, sinf, cosf); glibc keeps
 # them in libm, so consumers of silk link it transitively. On macOS libm

@@ -67,3 +67,14 @@ option(SL_SANDBOX "Build the raylib sandbox example" OFF)
 if(SL_SANDBOX)
     add_subdirectory(examples/sandbox)
 endif()
+
+# Embedders opt in explicitly; default top-level builds can be installed.
+option(SL_INSTALL "Install the static library and public CMake package" ${PROJECT_IS_TOP_LEVEL})
+if(SL_INSTALL)
+    include(cmake/install.cmake)
+endif()
+
+option(SL_BUILD_EXAMPLE "Build the public headless example" OFF)
+if(SL_BUILD_EXAMPLE)
+    add_subdirectory(examples/headless)
+endif()

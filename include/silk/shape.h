@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "silk/math.h"
 
@@ -100,7 +101,8 @@ typedef struct sl_ray_hit {
  * whole record. */
 static inline sl_shape sl_shape_none(void)
 {
-    sl_shape s = { 0 };
+    sl_shape s;
+    memset(&s, 0, sizeof(s));
     s.kind = SL_SHAPE_NONE;
     return s;
 }

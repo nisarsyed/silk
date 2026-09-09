@@ -509,13 +509,12 @@ static inline bool sl_segment_distance(sl_vec2 a1, sl_vec2 a2, sl_vec2 b1,
         return false;
     }
 
-    const sl_segment_distance_result candidate = {
-        .point_a = sl_vec2_make((float)point_a_x, (float)point_a_y),
-        .point_b = sl_vec2_make((float)point_b_x, (float)point_b_y),
-        .fraction_a = (float)fraction_a,
-        .fraction_b = (float)fraction_b,
-        .distance_sq = (float)distance_sq,
-    };
+    sl_segment_distance_result candidate;
+    candidate.point_a = sl_vec2_make((float)point_a_x, (float)point_a_y);
+    candidate.point_b = sl_vec2_make((float)point_b_x, (float)point_b_y);
+    candidate.fraction_a = (float)fraction_a;
+    candidate.fraction_b = (float)fraction_b;
+    candidate.distance_sq = (float)distance_sq;
     *out = candidate;
     return true;
 }
