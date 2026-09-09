@@ -42,6 +42,8 @@ Operational guidance for coding agents is in [AGENTS.md](AGENTS.md).
 
 ### APIs, naming, and comments
 
+- Call the project language C in ordinary prose. Mention C17 only when the
+  specific standard matters, such as compiler requirements or compatibility.
 - Prefix public APIs with `sl_` and use `snake_case`. Use abbreviations only
   when established in the domain, such as `vec2` and `mat2`. Prefer fixed-width
   integers such as `uint32_t` over `int` or `long` for stored state and counts.
