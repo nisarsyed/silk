@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "protocol fixed before prototype; measurements pending",
+  "status": "complete; both candidates rejected, see decision.json",
   "baseline_revision": "0b22cb600d99fbf733c9c6703d6bdd452f256c89",
   "sources": [
     {

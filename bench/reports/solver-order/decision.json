@@ -1,0 +1,4089 @@
+{
+  "version": 1,
+  "decision": "retain existing Soft Step; reject both bounded candidates",
+  "baseline_revision": "894213f",
+  "production_engine_revision": "0b22cb600d99fbf733c9c6703d6bdd452f256c89",
+  "patch": "experiment.patch",
+  "patch_sha256": "1d64514b8e1af16f91aa0caad52ca25a834c7dcba17e7c4cfeab203f4757e2b7",
+  "repetitions": 5,
+  "settings": "Same committed fixtures, four substeps, 120 warm-up and 600 measured steps, each sleep mode compared separately.",
+  "timing_limits": "Sequential repeated runs on one host; retain full spread. Tiny fixtures show substantial process warm-up variation. Whole-step timings include graph, contacts and changed trajectories; they are not isolated solver cost or speedup evidence when quality fails.",
+  "decision_reasons": [
+    "Ordering passes quality but adds capacity-scaled memory exceeding existing budgets; timing and quality evidence does not justify adoption.",
+    "Two-pass improves bridge penetration but violates unchanged toppling, pyramid, piles, table and inverted-mass quality bounds and the existing ten-box stack drift assertion.",
+    "Keep all production solver code unchanged. This rejects the one-sweep bounded adaptation, not the published method or an unconstrained implementation."
+  ],
+  "work_contract": {
+    "interval": "720 complete steps, including warm-up; counters saturate at uint64 maximum",
+    "constraint_evaluations": "Actual manifold calls in biased and relaxation stages, including attempted two-pass work and rollback fallback; excludes warm start/restitution.",
+    "fallbacks": "Per island build; reason bits can overlap. Cycles cannot arise from strictly ordered height edges; equal heights are the exercised ambiguity fallback.",
+    "baseline_experiment_counters": "Unavailable: baseline is uninstrumented; do not substitute last-step counts for total work."
+  },
+  "scratch": {
+    "ordered": "16 bytes/body + 8 bytes/contact plus 128-byte context and alignment",
+    "two-pass": "40 bytes/body + 152 bytes/contact plus 176-byte context and alignment"
+  },
+  "checks": {
+    "ordered-debug": {
+      "exit_code": 1,
+      "failures": [
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)"
+      ],
+      "new_graph_tests_pass": true,
+      "sanitizer_diagnostics": false
+    },
+    "ordered-release": {
+      "exit_code": 1,
+      "failures": [
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)"
+      ],
+      "new_graph_tests_pass": true,
+      "sanitizer_diagnostics": false
+    },
+    "ordered-sanitize": {
+      "exit_code": 1,
+      "failures": [
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)"
+      ],
+      "new_graph_tests_pass": true,
+      "sanitizer_diagnostics": false
+    },
+    "two-pass-debug": {
+      "exit_code": 1,
+      "failures": [
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_solver.c:131: drift_max < 0.01f",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)"
+      ],
+      "new_graph_tests_pass": true,
+      "sanitizer_diagnostics": false
+    },
+    "two-pass-release": {
+      "exit_code": 1,
+      "failures": [
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_solver.c:131: drift_max < 0.01f",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)"
+      ],
+      "new_graph_tests_pass": true,
+      "sanitizer_diagnostics": false
+    },
+    "two-pass-sanitize": {
+      "exit_code": 1,
+      "failures": [
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_solver.c:131: drift_max < 0.01f",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)",
+        "FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)"
+      ],
+      "new_graph_tests_pass": true,
+      "sanitizer_diagnostics": false
+    }
+  },
+  "comparisons": [
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "study",
+      "scene": "bridge",
+      "baseline_average_ms_runs": [
+        0.003555,
+        0.00224166667,
+        0.001925,
+        0.00165333333,
+        0.00156
+      ],
+      "candidate_average_ms_runs": [
+        0.00412166667,
+        0.00223,
+        0.00187333333,
+        0.00173,
+        0.00161333333
+      ],
+      "median_change_percent": -2.6839828571428637,
+      "baseline_spread_ms": [
+        0.00156,
+        0.003555
+      ],
+      "candidate_spread_ms": [
+        0.00161333333,
+        0.00412166667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 5.96046448e-08,
+          "horizontal_motion_max": 2.18933565e-08,
+          "rotation_excursion_max": 2.99541716e-08,
+          "penetration_max": 0.000731408596,
+          "translation_drift_max": 3.76712705e-09,
+          "rotation_drift_max": 4.18786872e-09,
+          "linear_speed_max": 2.05061627e-08,
+          "angular_speed_max": 1.31710092e-08,
+          "cached_support_force_mean": 68.6700035,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000731348991,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596
+          ]
+        },
+        "after": {
+          "drop_max": 5.96046448e-08,
+          "horizontal_motion_max": 2.18933565e-08,
+          "rotation_excursion_max": 2.99541716e-08,
+          "penetration_max": 0.000731408596,
+          "translation_drift_max": 3.76712705e-09,
+          "rotation_drift_max": 4.18786872e-09,
+          "linear_speed_max": 2.05061627e-08,
+          "angular_speed_max": 1.31710092e-08,
+          "cached_support_force_mean": 68.6700035,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000731348991,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 5040,
+        "constraint_evaluations": 17280,
+        "ordered_island_steps": 720,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "study",
+      "scene": "collapse",
+      "baseline_average_ms_runs": [
+        0.00538,
+        0.003985,
+        0.00326,
+        0.00296833333,
+        0.0028
+      ],
+      "candidate_average_ms_runs": [
+        0.00595833333,
+        0.003485,
+        0.00285833333,
+        0.00272666667,
+        0.00249333333
+      ],
+      "median_change_percent": -12.321063496932505,
+      "baseline_spread_ms": [
+        0.0028,
+        0.00538
+      ],
+      "candidate_spread_ms": [
+        0.00249333333,
+        0.00595833333
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 10.9893551,
+          "horizontal_motion_max": 5.29105959,
+          "rotation_excursion_max": 3.14154021,
+          "penetration_max": 0.204098225,
+          "translation_drift_max": 4.79215413e-06,
+          "rotation_drift_max": 2.11658725e-05,
+          "linear_speed_max": 1.41789535e-05,
+          "angular_speed_max": 3.6159814e-05,
+          "cached_support_force_mean": 58.860199,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.00731992722,
+            0.00465488434,
+            0.00128221512,
+            0.00139760971,
+            0.000346660614,
+            0.000346660614,
+            0.000347137451,
+            0.000347137451,
+            0.000346660614
+          ]
+        },
+        "after": {
+          "drop_max": 10.9892602,
+          "horizontal_motion_max": 5.20279703,
+          "rotation_excursion_max": 3.14157988,
+          "penetration_max": 0.186603546,
+          "translation_drift_max": 5.81145287e-07,
+          "rotation_drift_max": 2.83529507e-07,
+          "linear_speed_max": 1.64186359e-05,
+          "angular_speed_max": 1.28469255e-05,
+          "cached_support_force_mean": 58.8600336,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.019548893,
+            0.00852251053,
+            0.000684261322,
+            0.000684261322,
+            0.000684261322,
+            0.000684261322,
+            0.000684261322,
+            0.000684261322,
+            0.000684261322
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 9415,
+        "constraint_evaluations": 31368,
+        "ordered_island_steps": 2348,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 399,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "study",
+      "scene": "zero-gravity",
+      "baseline_average_ms_runs": [
+        0.000233333333,
+        0.000366666667,
+        0.000313333333,
+        0.0003,
+        0.000271666667
+      ],
+      "candidate_average_ms_runs": [
+        0.000611666667,
+        0.000411666667,
+        0.000316666667,
+        0.000308333333,
+        0.000276666667
+      ],
+      "median_change_percent": 5.555555666666678,
+      "baseline_spread_ms": [
+        0.000233333333,
+        0.000366666667
+      ],
+      "candidate_spread_ms": [
+        0.000276666667,
+        0.000611666667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "after": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 4,
+        "constraint_evaluations": 16,
+        "ordered_island_steps": 0,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 1438,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 2,
+        "unrooted_fallbacks": 1438,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "study",
+      "scene": "cycle",
+      "baseline_average_ms_runs": [
+        0.00402333333,
+        0.002695,
+        0.00255166667,
+        0.00232,
+        0.00212833333
+      ],
+      "candidate_average_ms_runs": [
+        0.00475,
+        0.00311166667,
+        0.00272666667,
+        0.00243666667,
+        0.00228333333
+      ],
+      "median_change_percent": 6.858262564522177,
+      "baseline_spread_ms": [
+        0.00212833333,
+        0.00402333333
+      ],
+      "candidate_spread_ms": [
+        0.00228333333,
+        0.00475
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 1.1920929e-07,
+          "horizontal_motion_max": 5.28259261e-06,
+          "rotation_excursion_max": 5.21471518e-07,
+          "penetration_max": 0.00112256419,
+          "translation_drift_max": 5.73349098e-07,
+          "rotation_drift_max": 2.9910467e-08,
+          "linear_speed_max": 1.5388789e-06,
+          "angular_speed_max": 1.08795768e-06,
+          "cached_support_force_mean": 39.2400299,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00112226617,
+            0.00112205767,
+            0.00112214708,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747
+          ]
+        },
+        "after": {
+          "drop_max": 2.98023224e-08,
+          "horizontal_motion_max": 1.5188416e-06,
+          "rotation_excursion_max": 4.96947897e-08,
+          "penetration_max": 0.000924878637,
+          "translation_drift_max": 1.49215339e-07,
+          "rotation_drift_max": 2.33849274e-08,
+          "linear_speed_max": 1.23910813e-06,
+          "angular_speed_max": 6.79964273e-07,
+          "cached_support_force_mean": 39.2400613,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00092478923,
+            0.000924819033,
+            0.00092478923,
+            0.000924819033,
+            0.000924819033,
+            0.00092478923,
+            0.00092478923,
+            0.00092478923,
+            0.000924819033,
+            0.000924819033
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 27360,
+        "graph_contact_visits": 9359,
+        "constraint_evaluations": 28800,
+        "ordered_island_steps": 719,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "study",
+      "scene": "topple",
+      "baseline_average_ms_runs": [
+        0.004815,
+        0.003855,
+        0.00330166667,
+        0.00316833333,
+        0.002825
+      ],
+      "candidate_average_ms_runs": [
+        0.00545333333,
+        0.003905,
+        0.00342333333,
+        0.00316166667,
+        0.00292833333
+      ],
+      "median_change_percent": 3.6850073662948013,
+      "baseline_spread_ms": [
+        0.002825,
+        0.004815
+      ],
+      "candidate_spread_ms": [
+        0.00292833333,
+        0.00545333333
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 4.98949906,
+          "horizontal_motion_max": 2.10868874,
+          "rotation_excursion_max": 3.14157877,
+          "penetration_max": 0.0312229395,
+          "translation_drift_max": 9.22940671e-07,
+          "rotation_drift_max": 1.07233061e-07,
+          "linear_speed_max": 8.86544076e-06,
+          "angular_speed_max": 1.99924852e-06,
+          "cached_support_force_mean": 58.8599859,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00377482176,
+            0.00277930498,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189
+          ]
+        },
+        "after": {
+          "drop_max": 4.98949906,
+          "horizontal_motion_max": 2.10868874,
+          "rotation_excursion_max": 3.14157877,
+          "penetration_max": 0.0312229395,
+          "translation_drift_max": 9.22940671e-07,
+          "rotation_drift_max": 1.07233061e-07,
+          "linear_speed_max": 8.86544076e-06,
+          "angular_speed_max": 1.99924852e-06,
+          "cached_support_force_mean": 58.8599859,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00377482176,
+            0.00277930498,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 11580,
+        "constraint_evaluations": 34176,
+        "ordered_island_steps": 1236,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 48,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "pyramid",
+      "baseline_average_ms_runs": [
+        0.24762,
+        0.240311667,
+        0.244608333,
+        0.239366667,
+        0.242036667
+      ],
+      "candidate_average_ms_runs": [
+        0.248196667,
+        0.237876667,
+        0.236275,
+        0.239595,
+        0.238735
+      ],
+      "median_change_percent": -1.3641185201083594,
+      "baseline_spread_ms": [
+        0.239366667,
+        0.24762
+      ],
+      "candidate_spread_ms": [
+        0.236275,
+        0.248196667
+      ],
+      "arena_delta_bytes": 10272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00613641739,
+          "cached_penetration_max": 0.00613600155,
+          "translation_drift_max": 5.27035445e-06,
+          "rotation_drift_max": 3.68992914e-06,
+          "linear_speed_max": 1.96454675e-05,
+          "angular_speed_max": 1.78498558e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 2060.10013,
+          "supported_weight": 2060.10009
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00490957499,
+          "cached_penetration_max": 0.00490951538,
+          "translation_drift_max": 2.01736111e-06,
+          "rotation_drift_max": 2.45131378e-06,
+          "linear_speed_max": 1.69916984e-05,
+          "angular_speed_max": 1.77402526e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 2060.10007,
+          "supported_weight": 2060.10009
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 606240,
+        "graph_contact_visits": 1259704,
+        "constraint_evaluations": 3398400,
+        "ordered_island_steps": 711,
+        "extra_bytes": 10272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 9,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "rain",
+      "baseline_average_ms_runs": [
+        1.03239,
+        1.06135833,
+        1.03029333,
+        1.05392667,
+        1.03565667
+      ],
+      "candidate_average_ms_runs": [
+        1.13200333,
+        1.12923167,
+        1.14857333,
+        1.13140167,
+        1.13681167
+      ],
+      "median_change_percent": 9.302953651618928,
+      "baseline_spread_ms": [
+        1.03029333,
+        1.06135833
+      ],
+      "candidate_spread_ms": [
+        1.12923167,
+        1.14857333
+      ],
+      "arena_delta_bytes": 163264,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0538757145,
+          "cached_penetration_max": 0.0538755357,
+          "translation_drift_max": 0.000280871667,
+          "rotation_drift_max": 0.00179171562,
+          "linear_speed_max": 0.000251827878,
+          "angular_speed_max": 0.00239734096,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1953.56813,
+          "supported_weight": 1962.00011
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.0498261452,
+          "cached_penetration_max": 0.049826175,
+          "translation_drift_max": 8.47697956e-05,
+          "rotation_drift_max": 0.000584989786,
+          "linear_speed_max": 8.11652862e-05,
+          "angular_speed_max": 0.000577570929,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1972.54676,
+          "supported_weight": 1962.00011
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 5764320,
+        "graph_contact_visits": 9026535,
+        "constraint_evaluations": 24251024,
+        "ordered_island_steps": 656,
+        "extra_bytes": 163264,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 99517,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "piles",
+      "baseline_average_ms_runs": [
+        0.0728683333,
+        0.07507,
+        0.0735583333,
+        0.078785,
+        0.0757583333
+      ],
+      "candidate_average_ms_runs": [
+        0.079,
+        0.0837733333,
+        0.079075,
+        0.0816716667,
+        0.07933
+      ],
+      "median_change_percent": 5.674703609964027,
+      "baseline_spread_ms": [
+        0.0728683333,
+        0.078785
+      ],
+      "candidate_spread_ms": [
+        0.079,
+        0.0837733333
+      ],
+      "arena_delta_bytes": 19104,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00640678406,
+          "cached_penetration_max": 0.00642144773,
+          "translation_drift_max": 0.00140378298,
+          "rotation_drift_max": 0.000692961563,
+          "linear_speed_max": 0.0123843402,
+          "angular_speed_max": 0.00757564884,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1570.42709,
+          "supported_weight": 1569.60007
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00640678406,
+          "cached_penetration_max": 0.00642144773,
+          "translation_drift_max": 0.00140378298,
+          "rotation_drift_max": 0.000692961563,
+          "linear_speed_max": 0.0123843402,
+          "angular_speed_max": 0.00757564884,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1570.42709,
+          "supported_weight": 1569.60007
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 462240,
+        "graph_contact_visits": 334080,
+        "constraint_evaluations": 921600,
+        "ordered_island_steps": 11520,
+        "extra_bytes": 19104,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "chains",
+      "baseline_average_ms_runs": [
+        0.0171483333,
+        0.0174133333,
+        0.01741,
+        0.0173166667,
+        0.01802
+      ],
+      "candidate_average_ms_runs": [
+        0.0183,
+        0.0182566667,
+        0.0183966667,
+        0.0184616667,
+        0.018345
+      ],
+      "median_change_percent": 5.3704767375071905,
+      "baseline_spread_ms": [
+        0.0171483333,
+        0.01802
+      ],
+      "candidate_spread_ms": [
+        0.0182566667,
+        0.0184616667
+      ],
+      "arena_delta_bytes": 9984,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0.000154972076,
+          "rotation_drift_max": 0.000350601447,
+          "linear_speed_max": 0.00193793431,
+          "angular_speed_max": 0.00589785632,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0.000154972076,
+          "rotation_drift_max": 0.000350601447,
+          "linear_speed_max": 0.00193793431,
+          "angular_speed_max": 0.00589785632,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 288000,
+        "graph_contact_visits": 0,
+        "constraint_evaluations": 0,
+        "ordered_island_steps": 0,
+        "extra_bytes": 9984,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 5760,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 5760,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "churn",
+      "baseline_average_ms_runs": [
+        0.0153766667,
+        0.0153416667,
+        0.015785,
+        0.0156516667,
+        0.0156733333
+      ],
+      "candidate_average_ms_runs": [
+        0.0174066667,
+        0.0173133333,
+        0.0174816667,
+        0.01747,
+        0.0172433333
+      ],
+      "median_change_percent": 11.212863355951729,
+      "baseline_spread_ms": [
+        0.0153416667,
+        0.015785
+      ],
+      "candidate_spread_ms": [
+        0.0172433333,
+        0.0174816667
+      ],
+      "arena_delta_bytes": 18560,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 368640,
+        "graph_contact_visits": 17678,
+        "constraint_evaluations": 70712,
+        "ordered_island_steps": 0,
+        "extra_bytes": 18560,
+        "zero_gravity_fallbacks": 83321,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 5640,
+        "unrooted_fallbacks": 83321,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "table",
+      "baseline_average_ms_runs": [
+        0.00197333333,
+        0.001995,
+        0.00197666667,
+        0.00201666667,
+        0.002025
+      ],
+      "candidate_average_ms_runs": [
+        0.00209166667,
+        0.00209833333,
+        0.00216666667,
+        0.00217,
+        0.00210166667
+      ],
+      "median_change_percent": 5.346700250626557,
+      "baseline_spread_ms": [
+        0.00197333333,
+        0.002025
+      ],
+      "candidate_spread_ms": [
+        0.00209166667,
+        0.00217
+      ],
+      "arena_delta_bytes": 736,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00124847889,
+          "cached_penetration_max": 0.00124847889,
+          "translation_drift_max": 9.48799425e-07,
+          "rotation_drift_max": 1.54737791e-07,
+          "linear_speed_max": 5.19786181e-06,
+          "angular_speed_max": 1.72077569e-06,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 88.2900711,
+          "supported_weight": 88.2900038
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00124847889,
+          "cached_penetration_max": 0.00124847889,
+          "translation_drift_max": 9.48799425e-07,
+          "rotation_drift_max": 1.54737791e-07,
+          "linear_speed_max": 5.19786181e-06,
+          "angular_speed_max": 1.72077569e-06,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 88.2900711,
+          "supported_weight": 88.2900038
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 12960,
+        "graph_contact_visits": 9360,
+        "constraint_evaluations": 28800,
+        "ordered_island_steps": 720,
+        "extra_bytes": 736,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "inverted",
+      "baseline_average_ms_runs": [
+        0.002865,
+        0.00285166667,
+        0.00298666667,
+        0.00297166667,
+        0.00282333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00303833333,
+        0.00306666667,
+        0.00313,
+        0.00323,
+        0.00306833333
+      ],
+      "median_change_percent": 7.097149389179758,
+      "baseline_spread_ms": [
+        0.00282333333,
+        0.00298666667
+      ],
+      "candidate_spread_ms": [
+        0.00303833333,
+        0.00323
+      ],
+      "arena_delta_bytes": 1280,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0324983001,
+          "cached_penetration_max": 0.0324982628,
+          "translation_drift_max": 7.45980069e-05,
+          "rotation_drift_max": 1.72884902e-05,
+          "linear_speed_max": 0.000170503583,
+          "angular_speed_max": 3.95421994e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507494,
+          "supported_weight": 154.507507
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.0324983001,
+          "cached_penetration_max": 0.0324982628,
+          "translation_drift_max": 7.45980069e-05,
+          "rotation_drift_max": 1.72884902e-05,
+          "linear_speed_max": 0.000170503583,
+          "angular_speed_max": 3.95421994e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507494,
+          "supported_weight": 154.507507
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 18720,
+        "graph_contact_visits": 12240,
+        "constraint_evaluations": 34560,
+        "ordered_island_steps": 720,
+        "extra_bytes": 1280,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "study",
+      "scene": "bridge",
+      "baseline_average_ms_runs": [
+        0.000331666667,
+        0.000346666667,
+        0.000345,
+        0.00033,
+        0.00034
+      ],
+      "candidate_average_ms_runs": [
+        0.000431666667,
+        0.000426666667,
+        0.000423333333,
+        0.0004,
+        0.00039
+      ],
+      "median_change_percent": 24.50980382352941,
+      "baseline_spread_ms": [
+        0.00033,
+        0.000346666667
+      ],
+      "candidate_spread_ms": [
+        0.00039,
+        0.000431666667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.000724345446,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 68.6765769,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446
+          ]
+        },
+        "after": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.000724345446,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 68.6765769,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 5040,
+        "constraint_evaluations": 744,
+        "ordered_island_steps": 720,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "study",
+      "scene": "collapse",
+      "baseline_average_ms_runs": [
+        0.00151,
+        0.001535,
+        0.00154666667,
+        0.00157833333,
+        0.00158333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00184166667,
+        0.00183,
+        0.00172666667,
+        0.00177833333,
+        0.001755
+      ],
+      "median_change_percent": 14.978447812546447,
+      "baseline_spread_ms": [
+        0.00151,
+        0.00158333333
+      ],
+      "candidate_spread_ms": [
+        0.00172666667,
+        0.00184166667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 9.9949131,
+          "horizontal_motion_max": 2.94361537,
+          "rotation_excursion_max": 3.1415594,
+          "penetration_max": 0.181092739,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8600661,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.0315294266,
+            0.0153899193,
+            0.00298213959,
+            0.000913381577,
+            0.000250339508,
+            0.000678539276,
+            0.000680446625,
+            0.000680446625,
+            0.000680446625
+          ]
+        },
+        "after": {
+          "drop_max": 10.9895625,
+          "horizontal_motion_max": 5.75065416,
+          "rotation_excursion_max": 3.13834721,
+          "penetration_max": 0.175921679,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8604756,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.000282764435,
+            0.0038766861,
+            0.000851631165,
+            0.000836849213,
+            0.000830173492,
+            0.000830173492,
+            0.000830173492,
+            0.000830173492,
+            0.000830173492
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 10809,
+        "constraint_evaluations": 14928,
+        "ordered_island_steps": 1491,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 502,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "study",
+      "scene": "zero-gravity",
+      "baseline_average_ms_runs": [
+        0.000266666667,
+        0.000336666667,
+        0.00029,
+        0.000323333333,
+        0.000323333333
+      ],
+      "candidate_average_ms_runs": [
+        0.000356666667,
+        0.000371666667,
+        0.000356666667,
+        0.000358333333,
+        0.00036
+      ],
+      "median_change_percent": 10.82474227920076,
+      "baseline_spread_ms": [
+        0.000266666667,
+        0.000336666667
+      ],
+      "candidate_spread_ms": [
+        0.000356666667,
+        0.000371666667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "after": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 4,
+        "constraint_evaluations": 16,
+        "ordered_island_steps": 0,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 1438,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 2,
+        "unrooted_fallbacks": 1438,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "study",
+      "scene": "cycle",
+      "baseline_average_ms_runs": [
+        0.0006,
+        0.000505,
+        0.000505,
+        0.000485,
+        0.000281666667
+      ],
+      "candidate_average_ms_runs": [
+        0.000606666667,
+        0.000591666667,
+        0.000568333333,
+        0.000586666667,
+        0.000601666667
+      ],
+      "median_change_percent": 17.161716237623747,
+      "baseline_spread_ms": [
+        0.000281666667,
+        0.0006
+      ],
+      "candidate_spread_ms": [
+        0.000568333333,
+        0.000606666667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.00112211681,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 39.2418245,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681
+          ]
+        },
+        "after": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.00094267074,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 39.2417062,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074,
+            0.00094267074
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 27360,
+        "graph_contact_visits": 9359,
+        "constraint_evaluations": 1240,
+        "ordered_island_steps": 719,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "study",
+      "scene": "topple",
+      "baseline_average_ms_runs": [
+        0.00105333333,
+        0.001085,
+        0.00110333333,
+        0.00109,
+        0.00111833333
+      ],
+      "candidate_average_ms_runs": [
+        0.00130833333,
+        0.00137166667,
+        0.00128166667,
+        0.00129833333,
+        0.00131
+      ],
+      "median_change_percent": 20.030580733944948,
+      "baseline_spread_ms": [
+        0.00105333333,
+        0.00111833333
+      ],
+      "candidate_spread_ms": [
+        0.00128166667,
+        0.00137166667
+      ],
+      "arena_delta_bytes": 1408,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 4.99002409,
+          "horizontal_motion_max": 2.10843593,
+          "rotation_excursion_max": 3.14153215,
+          "penetration_max": 0.0321481228,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8613147,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00375980139,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514
+          ]
+        },
+        "after": {
+          "drop_max": 4.99002409,
+          "horizontal_motion_max": 2.10843593,
+          "rotation_excursion_max": 3.14153215,
+          "penetration_max": 0.0321481228,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8613147,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00375980139,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 11580,
+        "constraint_evaluations": 8560,
+        "ordered_island_steps": 1236,
+        "extra_bytes": 1408,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 48,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "pyramid",
+      "baseline_average_ms_runs": [
+        0.0552833333,
+        0.0562916667,
+        0.05492,
+        0.0543316667,
+        0.0546033333
+      ],
+      "candidate_average_ms_runs": [
+        0.0681416667,
+        0.0677983333,
+        0.0681766667,
+        0.0676933333,
+        0.068505
+      ],
+      "median_change_percent": 24.07441132556447,
+      "baseline_spread_ms": [
+        0.0543316667,
+        0.0562916667
+      ],
+      "candidate_spread_ms": [
+        0.0676933333,
+        0.068505
+      ],
+      "arena_delta_bytes": 10272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0060915947,
+          "cached_penetration_max": 0.00609165384,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 2049.41244,
+          "supported_weight": 2060.10009
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00490117073,
+          "cached_penetration_max": 0.00490117073,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 2068.31081,
+          "supported_weight": 2060.10009
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 606240,
+        "graph_contact_visits": 1259704,
+        "constraint_evaluations": 434240,
+        "ordered_island_steps": 711,
+        "extra_bytes": 10272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 9,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "rain",
+      "baseline_average_ms_runs": [
+        1.10932167,
+        1.105245,
+        1.10878833,
+        1.10347333,
+        1.10037333
+      ],
+      "candidate_average_ms_runs": [
+        1.20172167,
+        1.20872167,
+        1.19372667,
+        1.2221,
+        1.207155
+      ],
+      "median_change_percent": 9.220580052386573,
+      "baseline_spread_ms": [
+        1.10037333,
+        1.10932167
+      ],
+      "candidate_spread_ms": [
+        1.19372667,
+        1.2221
+      ],
+      "arena_delta_bytes": 163264,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0538757145,
+          "cached_penetration_max": 0.0538755357,
+          "translation_drift_max": 0.000280871667,
+          "rotation_drift_max": 0.00179171562,
+          "linear_speed_max": 0.000251827878,
+          "angular_speed_max": 0.00239734096,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1953.56813,
+          "supported_weight": 1962.00011
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.0498261452,
+          "cached_penetration_max": 0.049826175,
+          "translation_drift_max": 8.47697956e-05,
+          "rotation_drift_max": 0.000584989786,
+          "linear_speed_max": 8.11652862e-05,
+          "angular_speed_max": 0.000577570929,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1972.54676,
+          "supported_weight": 1962.00011
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 5764320,
+        "graph_contact_visits": 9026535,
+        "constraint_evaluations": 24249648,
+        "ordered_island_steps": 656,
+        "extra_bytes": 163264,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 99517,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "piles",
+      "baseline_average_ms_runs": [
+        0.018485,
+        0.0179466667,
+        0.0182033333,
+        0.0183716667,
+        0.01849
+      ],
+      "candidate_average_ms_runs": [
+        0.0220666667,
+        0.0221733333,
+        0.022095,
+        0.0223733333,
+        0.022415
+      ],
+      "median_change_percent": 20.69309585286565,
+      "baseline_spread_ms": [
+        0.0179466667,
+        0.01849
+      ],
+      "candidate_spread_ms": [
+        0.0220666667,
+        0.022415
+      ],
+      "arena_delta_bytes": 19104,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00640678406,
+          "cached_penetration_max": 0.00642144773,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1569.6603,
+          "supported_weight": 1569.60007
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00640678406,
+          "cached_penetration_max": 0.00642144773,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1569.6603,
+          "supported_weight": 1569.60007
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 462240,
+        "graph_contact_visits": 334080,
+        "constraint_evaluations": 152560,
+        "ordered_island_steps": 11520,
+        "extra_bytes": 19104,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "chains",
+      "baseline_average_ms_runs": [
+        0.006725,
+        0.00703166667,
+        0.00690666667,
+        0.00706666667,
+        0.00678333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00788666667,
+        0.00789333333,
+        0.00787833333,
+        0.007705,
+        0.00770666667
+      ],
+      "median_change_percent": 14.068532715217907,
+      "baseline_spread_ms": [
+        0.006725,
+        0.00706666667
+      ],
+      "candidate_spread_ms": [
+        0.007705,
+        0.00789333333
+      ],
+      "arena_delta_bytes": 9984,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 288000,
+        "graph_contact_visits": 0,
+        "constraint_evaluations": 0,
+        "ordered_island_steps": 0,
+        "extra_bytes": 9984,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 5760,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 5760,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "churn",
+      "baseline_average_ms_runs": [
+        0.0195766667,
+        0.0191316667,
+        0.019085,
+        0.0192033333,
+        0.0190966667
+      ],
+      "candidate_average_ms_runs": [
+        0.02094,
+        0.0208316667,
+        0.0207033333,
+        0.02074,
+        0.0207633333
+      ],
+      "median_change_percent": 8.528617112067916,
+      "baseline_spread_ms": [
+        0.019085,
+        0.0195766667
+      ],
+      "candidate_spread_ms": [
+        0.0207033333,
+        0.02094
+      ],
+      "arena_delta_bytes": 18560,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 368640,
+        "graph_contact_visits": 17678,
+        "constraint_evaluations": 70712,
+        "ordered_island_steps": 0,
+        "extra_bytes": 18560,
+        "zero_gravity_fallbacks": 83321,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 5640,
+        "unrooted_fallbacks": 83321,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "table",
+      "baseline_average_ms_runs": [
+        0.000526666667,
+        0.000495,
+        0.000498333333,
+        0.000538333333,
+        0.000501666667
+      ],
+      "candidate_average_ms_runs": [
+        0.000593333333,
+        0.000611666667,
+        0.000623333333,
+        0.000623333333,
+        0.000588333333
+      ],
+      "median_change_percent": 21.926910284433944,
+      "baseline_spread_ms": [
+        0.000495,
+        0.000538333333
+      ],
+      "candidate_spread_ms": [
+        0.000588333333,
+        0.000623333333
+      ],
+      "arena_delta_bytes": 736,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00118076801,
+          "cached_penetration_max": 0.0011806488,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 88.3106901,
+          "supported_weight": 88.2900038
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00118076801,
+          "cached_penetration_max": 0.0011806488,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 88.3106901,
+          "supported_weight": 88.2900038
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 12960,
+        "graph_contact_visits": 9360,
+        "constraint_evaluations": 1280,
+        "ordered_island_steps": 720,
+        "extra_bytes": 736,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "ordered",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "inverted",
+      "baseline_average_ms_runs": [
+        0.00321833333,
+        0.002935,
+        0.00306833333,
+        0.00280333333,
+        0.00307333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00325333333,
+        0.00324,
+        0.003245,
+        0.00331666667,
+        0.00334
+      ],
+      "median_change_percent": 6.029331891395273,
+      "baseline_spread_ms": [
+        0.00280333333,
+        0.00321833333
+      ],
+      "candidate_spread_ms": [
+        0.00324,
+        0.00334
+      ],
+      "arena_delta_bytes": 1280,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0324983001,
+          "cached_penetration_max": 0.0324982628,
+          "translation_drift_max": 7.45980069e-05,
+          "rotation_drift_max": 1.72884902e-05,
+          "linear_speed_max": 0.000170503583,
+          "angular_speed_max": 3.95421994e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507494,
+          "supported_weight": 154.507507
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.0324983001,
+          "cached_penetration_max": 0.0324982628,
+          "translation_drift_max": 7.45980069e-05,
+          "rotation_drift_max": 1.72884902e-05,
+          "linear_speed_max": 0.000170503583,
+          "angular_speed_max": 3.95421994e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507494,
+          "supported_weight": 154.507507
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 18720,
+        "graph_contact_visits": 12240,
+        "constraint_evaluations": 34560,
+        "ordered_island_steps": 720,
+        "extra_bytes": 1280,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "study",
+      "scene": "bridge",
+      "baseline_average_ms_runs": [
+        0.003555,
+        0.00224166667,
+        0.001925,
+        0.00165333333,
+        0.00156
+      ],
+      "candidate_average_ms_runs": [
+        0.00429,
+        0.00312166667,
+        0.00269666667,
+        0.00246666667,
+        0.00249333333
+      ],
+      "median_change_percent": 40.08658025974026,
+      "baseline_spread_ms": [
+        0.00156,
+        0.003555
+      ],
+      "candidate_spread_ms": [
+        0.00246666667,
+        0.00429
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 5.96046448e-08,
+          "horizontal_motion_max": 2.18933565e-08,
+          "rotation_excursion_max": 2.99541716e-08,
+          "penetration_max": 0.000731408596,
+          "translation_drift_max": 3.76712705e-09,
+          "rotation_drift_max": 4.18786872e-09,
+          "linear_speed_max": 2.05061627e-08,
+          "angular_speed_max": 1.31710092e-08,
+          "cached_support_force_mean": 68.6700035,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000731348991,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596,
+            0.000731408596
+          ]
+        },
+        "after": {
+          "drop_max": 0,
+          "horizontal_motion_max": 6.94593609e-08,
+          "rotation_excursion_max": 8.39335002e-09,
+          "penetration_max": 0.000345110893,
+          "translation_drift_max": 5.77654191e-09,
+          "rotation_drift_max": 3.63059982e-09,
+          "linear_speed_max": 8.52697322e-07,
+          "angular_speed_max": 1.08442407e-07,
+          "cached_support_force_mean": 68.6700034,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000345110893,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289,
+            0.000345051289
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 5040,
+        "constraint_evaluations": 25920,
+        "ordered_island_steps": 720,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "study",
+      "scene": "collapse",
+      "baseline_average_ms_runs": [
+        0.00538,
+        0.003985,
+        0.00326,
+        0.00296833333,
+        0.0028
+      ],
+      "candidate_average_ms_runs": [
+        0.00632166667,
+        0.00501666667,
+        0.00440166667,
+        0.00409333333,
+        0.004115
+      ],
+      "median_change_percent": 35.020450000000004,
+      "baseline_spread_ms": [
+        0.0028,
+        0.00538
+      ],
+      "candidate_spread_ms": [
+        0.00409333333,
+        0.00632166667
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 10.9893551,
+          "horizontal_motion_max": 5.29105959,
+          "rotation_excursion_max": 3.14154021,
+          "penetration_max": 0.204098225,
+          "translation_drift_max": 4.79215413e-06,
+          "rotation_drift_max": 2.11658725e-05,
+          "linear_speed_max": 1.41789535e-05,
+          "angular_speed_max": 3.6159814e-05,
+          "cached_support_force_mean": 58.860199,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.00731992722,
+            0.00465488434,
+            0.00128221512,
+            0.00139760971,
+            0.000346660614,
+            0.000346660614,
+            0.000347137451,
+            0.000347137451,
+            0.000346660614
+          ]
+        },
+        "after": {
+          "drop_max": 11.055119,
+          "horizontal_motion_max": 7.24292461,
+          "rotation_excursion_max": 3.14159095,
+          "penetration_max": 0.182188034,
+          "translation_drift_max": 6.85453415e-07,
+          "rotation_drift_max": 8.71878e-08,
+          "linear_speed_max": 1.07951504e-05,
+          "angular_speed_max": 7.06535184e-06,
+          "cached_support_force_mean": 58.8596727,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.000887870789,
+            0.0063829422,
+            0.000302791595,
+            0.000302791595,
+            0.000302314758,
+            0.000302314758,
+            0.000302314758,
+            0.000301837921,
+            0.000301837921
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 9524,
+        "constraint_evaluations": 46364,
+        "ordered_island_steps": 2386,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 350,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "study",
+      "scene": "zero-gravity",
+      "baseline_average_ms_runs": [
+        0.000233333333,
+        0.000366666667,
+        0.000313333333,
+        0.0003,
+        0.000271666667
+      ],
+      "candidate_average_ms_runs": [
+        0.000315,
+        0.000335,
+        0.0003,
+        0.00029,
+        0.000268333333
+      ],
+      "median_change_percent": 0.0,
+      "baseline_spread_ms": [
+        0.000233333333,
+        0.000366666667
+      ],
+      "candidate_spread_ms": [
+        0.000268333333,
+        0.000335
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "after": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 4,
+        "constraint_evaluations": 16,
+        "ordered_island_steps": 0,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 1438,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 2,
+        "unrooted_fallbacks": 1438,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "study",
+      "scene": "cycle",
+      "baseline_average_ms_runs": [
+        0.00402333333,
+        0.002695,
+        0.00255166667,
+        0.00232,
+        0.00212833333
+      ],
+      "candidate_average_ms_runs": [
+        0.00541166667,
+        0.00457,
+        0.00409666667,
+        0.0039,
+        0.00389833333
+      ],
+      "median_change_percent": 60.548660926781615,
+      "baseline_spread_ms": [
+        0.00212833333,
+        0.00402333333
+      ],
+      "candidate_spread_ms": [
+        0.00389833333,
+        0.00541166667
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 1.1920929e-07,
+          "horizontal_motion_max": 5.28259261e-06,
+          "rotation_excursion_max": 5.21471518e-07,
+          "penetration_max": 0.00112256419,
+          "translation_drift_max": 5.73349098e-07,
+          "rotation_drift_max": 2.9910467e-08,
+          "linear_speed_max": 1.5388789e-06,
+          "angular_speed_max": 1.08795768e-06,
+          "cached_support_force_mean": 39.2400299,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00112226617,
+            0.00112205767,
+            0.00112214708,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747,
+            0.00112208747
+          ]
+        },
+        "after": {
+          "drop_max": 8.34465027e-07,
+          "horizontal_motion_max": 7.17889634e-07,
+          "rotation_excursion_max": 2.93629773e-06,
+          "penetration_max": 0.000243127404,
+          "translation_drift_max": 1.09066605e-07,
+          "rotation_drift_max": 3.32145646e-07,
+          "linear_speed_max": 1.99622755e-06,
+          "angular_speed_max": 1.18979108e-06,
+          "cached_support_force_mean": 39.2399694,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000242888986,
+            0.000242650582,
+            0.000242352544,
+            0.000242173744,
+            0.000241905538,
+            0.000241637317,
+            0.000241309492,
+            0.000241071073,
+            0.000240773064,
+            0.00024059425
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 27360,
+        "graph_contact_visits": 9359,
+        "constraint_evaluations": 43180,
+        "ordered_island_steps": 719,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "study",
+      "scene": "topple",
+      "baseline_average_ms_runs": [
+        0.004815,
+        0.003855,
+        0.00330166667,
+        0.00316833333,
+        0.002825
+      ],
+      "candidate_average_ms_runs": [
+        0.006635,
+        0.00556,
+        0.00493666667,
+        0.00478,
+        0.00474333333
+      ],
+      "median_change_percent": 49.520444170095466,
+      "baseline_spread_ms": [
+        0.002825,
+        0.004815
+      ],
+      "candidate_spread_ms": [
+        0.00474333333,
+        0.006635
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "topple: penetration_max > 0.04"
+      ],
+      "quality": {
+        "before": {
+          "drop_max": 4.98949906,
+          "horizontal_motion_max": 2.10868874,
+          "rotation_excursion_max": 3.14157877,
+          "penetration_max": 0.0312229395,
+          "translation_drift_max": 9.22940671e-07,
+          "rotation_drift_max": 1.07233061e-07,
+          "linear_speed_max": 8.86544076e-06,
+          "angular_speed_max": 1.99924852e-06,
+          "cached_support_force_mean": 58.8599859,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00377482176,
+            0.00277930498,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189,
+            0.00278580189
+          ]
+        },
+        "after": {
+          "drop_max": 5.02930704,
+          "horizontal_motion_max": 2.05597583,
+          "rotation_excursion_max": 3.14159255,
+          "penetration_max": 0.117604554,
+          "translation_drift_max": 2.6030466e-07,
+          "rotation_drift_max": 2.99587554e-07,
+          "linear_speed_max": 7.35952057e-06,
+          "angular_speed_max": 1.02182812e-05,
+          "cached_support_force_mean": 58.8603258,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00140869617,
+            0.00138491392,
+            0.0013846755,
+            0.0013846159,
+            0.0013846755,
+            0.0013846755,
+            0.0013846755,
+            0.0013846755,
+            0.0013846755,
+            0.0013846755
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 11576,
+        "constraint_evaluations": 51252,
+        "ordered_island_steps": 1237,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 49,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "pyramid",
+      "baseline_average_ms_runs": [
+        0.24762,
+        0.240311667,
+        0.244608333,
+        0.239366667,
+        0.242036667
+      ],
+      "candidate_average_ms_runs": [
+        0.141491667,
+        0.129466667,
+        0.129708333,
+        0.13306,
+        0.132778333
+      ],
+      "median_change_percent": -45.14123225800329,
+      "baseline_spread_ms": [
+        0.239366667,
+        0.24762
+      ],
+      "candidate_spread_ms": [
+        0.129466667,
+        0.141491667
+      ],
+      "arena_delta_bytes": 136928,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "penetration_max: 0.169809818 > 0.01",
+        "translation_drift_max: 399.99234 > 0.005",
+        "rotation_drift_max: 3.14118814 > 0.005",
+        "linear_speed_max: 400.000031 > 0.001",
+        "angular_speed_max: 47.1238899 > 0.001",
+        "cached support ratio: 0.17256410828077776"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00613641739,
+          "cached_penetration_max": 0.00613600155,
+          "translation_drift_max": 5.27035445e-06,
+          "rotation_drift_max": 3.68992914e-06,
+          "linear_speed_max": 1.96454675e-05,
+          "angular_speed_max": 1.78498558e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 2060.10013,
+          "supported_weight": 2060.10009
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.169809818,
+          "cached_penetration_max": 0.169809431,
+          "translation_drift_max": 399.99234,
+          "rotation_drift_max": 3.14118814,
+          "linear_speed_max": 400.000031,
+          "angular_speed_max": 47.1238899,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 355.499335,
+          "supported_weight": 2060.10009
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 606240,
+        "graph_contact_visits": 160889,
+        "constraint_evaluations": 637536,
+        "ordered_island_steps": 3548,
+        "extra_bytes": 136928,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 8,
+        "unrooted_fallbacks": 116837,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "rain",
+      "baseline_average_ms_runs": [
+        1.03239,
+        1.06135833,
+        1.03029333,
+        1.05392667,
+        1.03565667
+      ],
+      "candidate_average_ms_runs": [
+        1.25555833,
+        1.243065,
+        1.23614833,
+        1.24608333,
+        1.24183833
+      ],
+      "median_change_percent": 20.026745929227687,
+      "baseline_spread_ms": [
+        1.03029333,
+        1.06135833
+      ],
+      "candidate_spread_ms": [
+        1.23614833,
+        1.25555833
+      ],
+      "arena_delta_bytes": 2570688,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0538757145,
+          "cached_penetration_max": 0.0538755357,
+          "translation_drift_max": 0.000280871667,
+          "rotation_drift_max": 0.00179171562,
+          "linear_speed_max": 0.000251827878,
+          "angular_speed_max": 0.00239734096,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1953.56813,
+          "supported_weight": 1962.00011
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.048962146,
+          "cached_penetration_max": 0.0489624999,
+          "translation_drift_max": 0.000293053687,
+          "rotation_drift_max": 0.00195360184,
+          "linear_speed_max": 0.000301933818,
+          "angular_speed_max": 0.00201289216,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1995.23175,
+          "supported_weight": 1962.00011
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 5764320,
+        "graph_contact_visits": 9041749,
+        "constraint_evaluations": 24303984,
+        "ordered_island_steps": 621,
+        "extra_bytes": 2570688,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 99172,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "piles",
+      "baseline_average_ms_runs": [
+        0.0728683333,
+        0.07507,
+        0.0735583333,
+        0.078785,
+        0.0757583333
+      ],
+      "candidate_average_ms_runs": [
+        0.128803333,
+        0.130565,
+        0.128343333,
+        0.130728333,
+        0.128136667
+      ],
+      "median_change_percent": 71.57763820434259,
+      "baseline_spread_ms": [
+        0.0728683333,
+        0.078785
+      ],
+      "candidate_spread_ms": [
+        0.128136667,
+        0.130728333
+      ],
+      "arena_delta_bytes": 317936,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "translation_drift_max: 0.00578518491 > 0.005",
+        "linear_speed_max: 0.0314938724 > 0.02",
+        "cached support ratio: 0.30427635939134484"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00640678406,
+          "cached_penetration_max": 0.00642144773,
+          "translation_drift_max": 0.00140378298,
+          "rotation_drift_max": 0.000692961563,
+          "linear_speed_max": 0.0123843402,
+          "angular_speed_max": 0.00757564884,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1570.42709,
+          "supported_weight": 1569.60007
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.0032954812,
+          "cached_penetration_max": 0.0032954812,
+          "translation_drift_max": 0.00578518491,
+          "rotation_drift_max": 0.00104854547,
+          "linear_speed_max": 0.0314938724,
+          "angular_speed_max": 0.0143154608,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 477.592195,
+          "supported_weight": 1569.60007
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 462240,
+        "graph_contact_visits": 334080,
+        "constraint_evaluations": 1382400,
+        "ordered_island_steps": 11520,
+        "extra_bytes": 317936,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "chains",
+      "baseline_average_ms_runs": [
+        0.0171483333,
+        0.0174133333,
+        0.01741,
+        0.0173166667,
+        0.01802
+      ],
+      "candidate_average_ms_runs": [
+        0.0184483333,
+        0.01857,
+        0.0184716667,
+        0.01957,
+        0.01836
+      ],
+      "median_change_percent": 6.098028144744405,
+      "baseline_spread_ms": [
+        0.0171483333,
+        0.01802
+      ],
+      "candidate_spread_ms": [
+        0.01836,
+        0.01957
+      ],
+      "arena_delta_bytes": 159984,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0.000154972076,
+          "rotation_drift_max": 0.000350601447,
+          "linear_speed_max": 0.00193793431,
+          "angular_speed_max": 0.00589785632,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0.000154972076,
+          "rotation_drift_max": 0.000350601447,
+          "linear_speed_max": 0.00193793431,
+          "angular_speed_max": 0.00589785632,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 288000,
+        "graph_contact_visits": 0,
+        "constraint_evaluations": 0,
+        "ordered_island_steps": 0,
+        "extra_bytes": 159984,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 5760,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 5760,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "churn",
+      "baseline_average_ms_runs": [
+        0.0153766667,
+        0.0153416667,
+        0.015785,
+        0.0156516667,
+        0.0156733333
+      ],
+      "candidate_average_ms_runs": [
+        0.0174766667,
+        0.0169916667,
+        0.0176733333,
+        0.0177183333,
+        0.0171983333
+      ],
+      "median_change_percent": 11.660100071003932,
+      "baseline_spread_ms": [
+        0.0153416667,
+        0.015785
+      ],
+      "candidate_spread_ms": [
+        0.0169916667,
+        0.0177183333
+      ],
+      "arena_delta_bytes": 316592,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 368640,
+        "graph_contact_visits": 17678,
+        "constraint_evaluations": 70712,
+        "ordered_island_steps": 0,
+        "extra_bytes": 316592,
+        "zero_gravity_fallbacks": 83321,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 5640,
+        "unrooted_fallbacks": 83321,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "table",
+      "baseline_average_ms_runs": [
+        0.00197333333,
+        0.001995,
+        0.00197666667,
+        0.00201666667,
+        0.002025
+      ],
+      "candidate_average_ms_runs": [
+        0.00405666667,
+        0.00405166667,
+        0.00416666667,
+        0.00412833333,
+        0.00401833333
+      ],
+      "median_change_percent": 103.3416877192983,
+      "baseline_spread_ms": [
+        0.00197333333,
+        0.002025
+      ],
+      "candidate_spread_ms": [
+        0.00401833333,
+        0.00416666667
+      ],
+      "arena_delta_bytes": 10128,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "translation_drift_max: 0.0415127352 > 0.005",
+        "linear_speed_max: 0.150743201 > 0.001",
+        "angular_speed_max: 0.147280455 > 0.001",
+        "cached support ratio: 1.1841814305143343"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00124847889,
+          "cached_penetration_max": 0.00124847889,
+          "translation_drift_max": 9.48799425e-07,
+          "rotation_drift_max": 1.54737791e-07,
+          "linear_speed_max": 5.19786181e-06,
+          "angular_speed_max": 1.72077569e-06,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 88.2900711,
+          "supported_weight": 88.2900038
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00374543667,
+          "cached_penetration_max": 0.00374555634,
+          "translation_drift_max": 0.0415127352,
+          "rotation_drift_max": 0.0021832732,
+          "linear_speed_max": 0.150743201,
+          "angular_speed_max": 0.147280455,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 104.551383,
+          "supported_weight": 88.2900038
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 12960,
+        "graph_contact_visits": 9360,
+        "constraint_evaluations": 43200,
+        "ordered_island_steps": 720,
+        "extra_bytes": 10128,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "off",
+      "family": "matrix",
+      "scene": "inverted",
+      "baseline_average_ms_runs": [
+        0.002865,
+        0.00285166667,
+        0.00298666667,
+        0.00297166667,
+        0.00282333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00510166667,
+        0.005055,
+        0.00505833333,
+        0.00509666667,
+        0.00485333333
+      ],
+      "median_change_percent": 76.5561371727749,
+      "baseline_spread_ms": [
+        0.00282333333,
+        0.00298666667
+      ],
+      "candidate_spread_ms": [
+        0.00485333333,
+        0.00510166667
+      ],
+      "arena_delta_bytes": 19936,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "penetration_max: 0.152649403 > 0.04"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0324983001,
+          "cached_penetration_max": 0.0324982628,
+          "translation_drift_max": 7.45980069e-05,
+          "rotation_drift_max": 1.72884902e-05,
+          "linear_speed_max": 0.000170503583,
+          "angular_speed_max": 3.95421994e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507494,
+          "supported_weight": 154.507507
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.152649403,
+          "cached_penetration_max": 0.152649403,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 1.25443904e-08,
+          "linear_speed_max": 2.43862274e-07,
+          "angular_speed_max": 4.84935242e-07,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507503,
+          "supported_weight": 154.507507
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 18720,
+        "graph_contact_visits": 10878,
+        "constraint_evaluations": 56696,
+        "ordered_island_steps": 2773,
+        "extra_bytes": 19936,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 150,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "study",
+      "scene": "bridge",
+      "baseline_average_ms_runs": [
+        0.000331666667,
+        0.000346666667,
+        0.000345,
+        0.00033,
+        0.00034
+      ],
+      "candidate_average_ms_runs": [
+        0.000453333333,
+        0.000415,
+        0.000406666667,
+        0.000415,
+        0.00044
+      ],
+      "median_change_percent": 22.058823529411754,
+      "baseline_spread_ms": [
+        0.00033,
+        0.000346666667
+      ],
+      "candidate_spread_ms": [
+        0.000406666667,
+        0.000453333333
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.000724345446,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 68.6765769,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446,
+            0.000724345446
+          ]
+        },
+        "after": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.000342190266,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 68.6714306,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266,
+            0.000342190266
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 5040,
+        "constraint_evaluations": 1080,
+        "ordered_island_steps": 720,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "study",
+      "scene": "collapse",
+      "baseline_average_ms_runs": [
+        0.00151,
+        0.001535,
+        0.00154666667,
+        0.00157833333,
+        0.00158333333
+      ],
+      "candidate_average_ms_runs": [
+        0.003775,
+        0.0039,
+        0.00373166667,
+        0.0038,
+        0.00369833333
+      ],
+      "median_change_percent": 144.07327533604897,
+      "baseline_spread_ms": [
+        0.00151,
+        0.00158333333
+      ],
+      "candidate_spread_ms": [
+        0.00369833333,
+        0.0039
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 9.9949131,
+          "horizontal_motion_max": 2.94361537,
+          "rotation_excursion_max": 3.1415594,
+          "penetration_max": 0.181092739,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8600661,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.0315294266,
+            0.0153899193,
+            0.00298213959,
+            0.000913381577,
+            0.000250339508,
+            0.000678539276,
+            0.000680446625,
+            0.000680446625,
+            0.000680446625
+          ]
+        },
+        "after": {
+          "drop_max": 11.0116591,
+          "horizontal_motion_max": 2.77717396,
+          "rotation_excursion_max": 3.14088296,
+          "penetration_max": 0.204343557,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8598766,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0,
+            0.0100280046,
+            0.0115089417,
+            0.0173428059,
+            0.00140428543,
+            0.00035572052,
+            0.000336170197,
+            0.000339031219,
+            0.000339031219,
+            0.000339031219
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 12933,
+        "constraint_evaluations": 31808,
+        "ordered_island_steps": 1344,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 326,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "study",
+      "scene": "zero-gravity",
+      "baseline_average_ms_runs": [
+        0.000266666667,
+        0.000336666667,
+        0.00029,
+        0.000323333333,
+        0.000323333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00035,
+        0.00037,
+        0.000376666667,
+        0.000343333333,
+        0.000351666667
+      ],
+      "median_change_percent": 8.7628868131576,
+      "baseline_spread_ms": [
+        0.000266666667,
+        0.000336666667
+      ],
+      "candidate_spread_ms": [
+        0.000343333333,
+        0.000376666667
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "after": {
+          "drop_max": 4.98207577e-07,
+          "horizontal_motion_max": 26.4001427,
+          "rotation_excursion_max": 3.13919762,
+          "penetration_max": 0,
+          "translation_drift_max": 2.64003754,
+          "rotation_drift_max": 0.71999725,
+          "linear_speed_max": 2.63999987,
+          "angular_speed_max": 0.719999313,
+          "cached_support_force_mean": 0,
+          "momentum_error_max": 1.1920929e-07,
+          "penetration_samples": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 25920,
+        "graph_contact_visits": 4,
+        "constraint_evaluations": 16,
+        "ordered_island_steps": 0,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 1438,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 2,
+        "unrooted_fallbacks": 1438,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "study",
+      "scene": "cycle",
+      "baseline_average_ms_runs": [
+        0.0006,
+        0.000505,
+        0.000505,
+        0.000485,
+        0.000281666667
+      ],
+      "candidate_average_ms_runs": [
+        0.000605,
+        0.000601666667,
+        0.000603333333,
+        0.000596666667,
+        0.000585
+      ],
+      "median_change_percent": 19.14191425742573,
+      "baseline_spread_ms": [
+        0.000281666667,
+        0.0006
+      ],
+      "candidate_spread_ms": [
+        0.000585,
+        0.000605
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.00112211681,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 39.2418245,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681,
+            0.00112211681
+          ]
+        },
+        "after": {
+          "drop_max": 0,
+          "horizontal_motion_max": 0,
+          "rotation_excursion_max": 0,
+          "penetration_max": 0.000243365823,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 39.2396644,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823,
+            0.000243365823
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 27360,
+        "graph_contact_visits": 9359,
+        "constraint_evaluations": 2200,
+        "ordered_island_steps": 719,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "study",
+      "scene": "topple",
+      "baseline_average_ms_runs": [
+        0.00105333333,
+        0.001085,
+        0.00110333333,
+        0.00109,
+        0.00111833333
+      ],
+      "candidate_average_ms_runs": [
+        0.004775,
+        0.00464666667,
+        0.004645,
+        0.004635,
+        0.00461833333
+      ],
+      "median_change_percent": 326.1467889908257,
+      "baseline_spread_ms": [
+        0.00105333333,
+        0.00111833333
+      ],
+      "candidate_spread_ms": [
+        0.00461833333,
+        0.004775
+      ],
+      "arena_delta_bytes": 20272,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "topple: penetration_max > 0.04",
+        "topple: linear_speed_max > 0.001",
+        "topple: angular_speed_max > 0.001"
+      ],
+      "quality": {
+        "before": {
+          "drop_max": 4.99002409,
+          "horizontal_motion_max": 2.10843593,
+          "rotation_excursion_max": 3.14153215,
+          "penetration_max": 0.0321481228,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "cached_support_force_mean": 58.8613147,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00375980139,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514,
+            0.00277626514
+          ]
+        },
+        "after": {
+          "drop_max": 5.0293172,
+          "horizontal_motion_max": 2.05715619,
+          "rotation_excursion_max": 3.14159165,
+          "penetration_max": 0.132876575,
+          "translation_drift_max": 6.94063328e-05,
+          "rotation_drift_max": 1.26422145e-05,
+          "linear_speed_max": 0.0134649753,
+          "angular_speed_max": 0.025307931,
+          "cached_support_force_mean": 59.2460505,
+          "momentum_error_max": 0,
+          "penetration_samples": [
+            0.00144547224,
+            0.00212654471,
+            0.00138318539,
+            0.00138360262,
+            0.00138348341,
+            0.00138354301,
+            0.00138378143,
+            0.00138348341,
+            0.0013833642,
+            0.00138366222
+          ]
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 31680,
+        "graph_contact_visits": 11576,
+        "constraint_evaluations": 40080,
+        "ordered_island_steps": 1237,
+        "extra_bytes": 20272,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 49,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "pyramid",
+      "baseline_average_ms_runs": [
+        0.0552833333,
+        0.0562916667,
+        0.05492,
+        0.0543316667,
+        0.0546033333
+      ],
+      "candidate_average_ms_runs": [
+        0.138548333,
+        0.136661667,
+        0.13759,
+        0.138445,
+        0.136871667
+      ],
+      "median_change_percent": 150.52804078659867,
+      "baseline_spread_ms": [
+        0.0543316667,
+        0.0562916667
+      ],
+      "candidate_spread_ms": [
+        0.136661667,
+        0.138548333
+      ],
+      "arena_delta_bytes": 136928,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "penetration_max: 0.169809818 > 0.01",
+        "translation_drift_max: 399.99234 > 0.005",
+        "rotation_drift_max: 3.14118814 > 0.005",
+        "linear_speed_max: 400.000031 > 0.001",
+        "angular_speed_max: 47.1238899 > 0.001",
+        "cached support ratio: 0.17256362675077597"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0060915947,
+          "cached_penetration_max": 0.00609165384,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 2049.41244,
+          "supported_weight": 2060.10009
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.169809818,
+          "cached_penetration_max": 0.169809431,
+          "translation_drift_max": 399.99234,
+          "rotation_drift_max": 3.14118814,
+          "linear_speed_max": 400.000031,
+          "angular_speed_max": 47.1238899,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 355.498343,
+          "supported_weight": 2060.10009
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 606240,
+        "graph_contact_visits": 160889,
+        "constraint_evaluations": 613068,
+        "ordered_island_steps": 3548,
+        "extra_bytes": 136928,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 8,
+        "unrooted_fallbacks": 116837,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "rain",
+      "baseline_average_ms_runs": [
+        1.10932167,
+        1.105245,
+        1.10878833,
+        1.10347333,
+        1.10037333
+      ],
+      "candidate_average_ms_runs": [
+        1.32601333,
+        1.30037167,
+        1.30185667,
+        1.297485,
+        1.30293333
+      ],
+      "median_change_percent": 17.788967152079405,
+      "baseline_spread_ms": [
+        1.10037333,
+        1.10932167
+      ],
+      "candidate_spread_ms": [
+        1.297485,
+        1.32601333
+      ],
+      "arena_delta_bytes": 2570688,
+      "same_physical_digest": false,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0538757145,
+          "cached_penetration_max": 0.0538755357,
+          "translation_drift_max": 0.000280871667,
+          "rotation_drift_max": 0.00179171562,
+          "linear_speed_max": 0.000251827878,
+          "angular_speed_max": 0.00239734096,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1953.56813,
+          "supported_weight": 1962.00011
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.048962146,
+          "cached_penetration_max": 0.0489624999,
+          "translation_drift_max": 3.28844835e-05,
+          "rotation_drift_max": 0.000312454998,
+          "linear_speed_max": 3.98221528e-05,
+          "angular_speed_max": 0.000321315863,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1995.23175,
+          "supported_weight": 1962.00011
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 5764320,
+        "graph_contact_visits": 9041749,
+        "constraint_evaluations": 24300720,
+        "ordered_island_steps": 621,
+        "extra_bytes": 2570688,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 1,
+        "unrooted_fallbacks": 99172,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "piles",
+      "baseline_average_ms_runs": [
+        0.018485,
+        0.0179466667,
+        0.0182033333,
+        0.0183716667,
+        0.01849
+      ],
+      "candidate_average_ms_runs": [
+        0.136645,
+        0.136268333,
+        0.13635,
+        0.136383333,
+        0.138225
+      ],
+      "median_change_percent": 642.3568869774891,
+      "baseline_spread_ms": [
+        0.0179466667,
+        0.01849
+      ],
+      "candidate_spread_ms": [
+        0.136268333,
+        0.138225
+      ],
+      "arena_delta_bytes": 317936,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "translation_drift_max: 0.00578518491 > 0.005",
+        "linear_speed_max: 0.0314938724 > 0.02",
+        "cached support ratio: 0.30427635939134484"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00640678406,
+          "cached_penetration_max": 0.00642144773,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 1569.6603,
+          "supported_weight": 1569.60007
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.0032954812,
+          "cached_penetration_max": 0.0032954812,
+          "translation_drift_max": 0.00578518491,
+          "rotation_drift_max": 0.00104854547,
+          "linear_speed_max": 0.0314938724,
+          "angular_speed_max": 0.0143154608,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 477.592195,
+          "supported_weight": 1569.60007
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 462240,
+        "graph_contact_visits": 334080,
+        "constraint_evaluations": 1382400,
+        "ordered_island_steps": 11520,
+        "extra_bytes": 317936,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "chains",
+      "baseline_average_ms_runs": [
+        0.006725,
+        0.00703166667,
+        0.00690666667,
+        0.00706666667,
+        0.00678333333
+      ],
+      "candidate_average_ms_runs": [
+        0.00766666667,
+        0.0079,
+        0.00801166667,
+        0.00784833333,
+        0.007765
+      ],
+      "median_change_percent": 13.634169781064598,
+      "baseline_spread_ms": [
+        0.006725,
+        0.00706666667
+      ],
+      "candidate_spread_ms": [
+        0.00766666667,
+        0.00801166667
+      ],
+      "arena_delta_bytes": 159984,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0,
+          "cached_penetration_max": 0,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0.00607299944,
+          "cached_support_force_mean": 0,
+          "supported_weight": 941.76004
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 288000,
+        "graph_contact_visits": 0,
+        "constraint_evaluations": 0,
+        "ordered_island_steps": 0,
+        "extra_bytes": 159984,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 5760,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 5760,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "churn",
+      "baseline_average_ms_runs": [
+        0.0195766667,
+        0.0191316667,
+        0.019085,
+        0.0192033333,
+        0.0190966667
+      ],
+      "candidate_average_ms_runs": [
+        0.0209833333,
+        0.02087,
+        0.0212633333,
+        0.0208133333,
+        0.0208983333
+      ],
+      "median_change_percent": 9.234253490314037,
+      "baseline_spread_ms": [
+        0.019085,
+        0.0195766667
+      ],
+      "candidate_spread_ms": [
+        0.0208133333,
+        0.0212633333
+      ],
+      "arena_delta_bytes": 316592,
+      "same_physical_digest": true,
+      "quality_violations": [],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.167013645,
+          "cached_penetration_max": 0.193077564,
+          "translation_drift_max": 0.0930585861,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0.28579241,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 0,
+          "supported_weight": 0
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 368640,
+        "graph_contact_visits": 17678,
+        "constraint_evaluations": 70712,
+        "ordered_island_steps": 0,
+        "extra_bytes": 316592,
+        "zero_gravity_fallbacks": 83321,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 5640,
+        "unrooted_fallbacks": 83321,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "table",
+      "baseline_average_ms_runs": [
+        0.000526666667,
+        0.000495,
+        0.000498333333,
+        0.000538333333,
+        0.000501666667
+      ],
+      "candidate_average_ms_runs": [
+        0.00432333333,
+        0.00425833333,
+        0.00430833333,
+        0.00429166667,
+        0.00435
+      ],
+      "median_change_percent": 758.8039854758777,
+      "baseline_spread_ms": [
+        0.000495,
+        0.000538333333
+      ],
+      "candidate_spread_ms": [
+        0.00425833333,
+        0.00435
+      ],
+      "arena_delta_bytes": 10128,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "translation_drift_max: 0.0415127352 > 0.005",
+        "linear_speed_max: 0.150743201 > 0.001",
+        "angular_speed_max: 0.147280455 > 0.001",
+        "cached support ratio: 1.1841814305143343"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.00118076801,
+          "cached_penetration_max": 0.0011806488,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 88.3106901,
+          "supported_weight": 88.2900038
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.00374543667,
+          "cached_penetration_max": 0.00374555634,
+          "translation_drift_max": 0.0415127352,
+          "rotation_drift_max": 0.0021832732,
+          "linear_speed_max": 0.150743201,
+          "angular_speed_max": 0.147280455,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 104.551383,
+          "supported_weight": 88.2900038
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 12960,
+        "graph_contact_visits": 9360,
+        "constraint_evaluations": 43200,
+        "ordered_island_steps": 720,
+        "extra_bytes": 10128,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 0,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    },
+    {
+      "variant": "two-pass",
+      "sleep": "on",
+      "family": "matrix",
+      "scene": "inverted",
+      "baseline_average_ms_runs": [
+        0.00321833333,
+        0.002935,
+        0.00306833333,
+        0.00280333333,
+        0.00307333333
+      ],
+      "candidate_average_ms_runs": [
+        0.002075,
+        0.00209166667,
+        0.00212833333,
+        0.0021,
+        0.002145
+      ],
+      "median_change_percent": -31.558935286864674,
+      "baseline_spread_ms": [
+        0.00280333333,
+        0.00321833333
+      ],
+      "candidate_spread_ms": [
+        0.002075,
+        0.002145
+      ],
+      "arena_delta_bytes": 19936,
+      "same_physical_digest": false,
+      "quality_violations": [
+        "penetration_max: 0.152649403 > 0.04"
+      ],
+      "quality": {
+        "before": {
+          "window_steps": 60,
+          "penetration_max": 0.0324983001,
+          "cached_penetration_max": 0.0324982628,
+          "translation_drift_max": 7.45980069e-05,
+          "rotation_drift_max": 1.72884902e-05,
+          "linear_speed_max": 0.000170503583,
+          "angular_speed_max": 3.95421994e-05,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507494,
+          "supported_weight": 154.507507
+        },
+        "after": {
+          "window_steps": 60,
+          "penetration_max": 0.152649403,
+          "cached_penetration_max": 0.152649403,
+          "translation_drift_max": 0,
+          "rotation_drift_max": 0,
+          "linear_speed_max": 0,
+          "angular_speed_max": 0,
+          "joint_error_max": 0,
+          "cached_support_force_mean": 154.507623,
+          "supported_weight": 154.507507
+        }
+      },
+      "experiment_work": {
+        "graph_body_visits": 18720,
+        "graph_contact_visits": 10878,
+        "constraint_evaluations": 21224,
+        "ordered_island_steps": 2773,
+        "extra_bytes": 19936,
+        "zero_gravity_fallbacks": 0,
+        "joint_fallbacks": 0,
+        "kinematic_fallbacks": 0,
+        "equal_height_fallbacks": 0,
+        "unrooted_fallbacks": 150,
+        "cycle_fallbacks": 0,
+        "rollbacks": 0
+      }
+    }
+  ]
+}

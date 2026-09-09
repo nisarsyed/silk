@@ -341,3 +341,53 @@ use one linear slop, while toppling retains the 0.04 stress-scene bound. Motion
 minimums require the removed-support stack to fall and the disturbed stack to
 topple; a frozen but apparently stable candidate cannot pass. Existing main
 matrix thresholds remain unchanged.
+
+The [measured decision](../bench/reports/solver-order/decision.json) retains Soft
+Step. Ordering alone passed quality, but added memory beyond the pinned budgets
+and increased most full-matrix timings (about 9% for rain on the recorded host).
+The bounded two-pass candidate reduced settled bridge penetration, but toppling
+penetration rose from 0.031 to 0.118 units. It also failed existing pyramid,
+piles, table, inverted-stack and ten-box drift checks. A faster failed pyramid
+run reflects a different, unstable trajectory and is not an accepted speedup.
+Both sleep modes were measured five times; raw reports retain timing spread,
+physical results and actual work. Tiny study scenes show substantial timing
+variation, so their medians are not precise microbenchmark claims.
+
+The [isolated patch](../bench/reports/solver-order/experiment.patch) contains
+both experiments and their private graph/rollback tests. It replaces the earlier
+ordering-only snapshot. It is evidence, not a supported runtime backend. Apply
+it to the harness revision in a disposable source directory:
+
+```sh
+mkdir -p build/solver-experiment
+git archive 894213f | tar -x -C build/solver-experiment
+git apply --directory=build/solver-experiment bench/reports/solver-order/experiment.patch
+cmake -S build/solver-experiment -B build/solver-ordered -DCMAKE_BUILD_TYPE=Release -DSL_BUILD_BENCH=ON -DCMAKE_C_FLAGS=-DSL_STUDY_TWO_PASS=0 -DSL_BENCH_REVISION=894213f-order-experiment
+cmake -S build/solver-experiment -B build/solver-two-pass -DCMAKE_BUILD_TYPE=Release -DSL_BUILD_BENCH=ON -DCMAKE_C_FLAGS=-DSL_STUDY_TWO_PASS=1 -DSL_BENCH_REVISION=894213f-two-pass-experiment
+cmake --build build/solver-ordered
+cmake --build build/solver-two-pass
+python3 bench/study.py build/solver-two-pass/bin/sl_bench_study --output build/two-pass-study
+python3 bench/report.py run build/solver-two-pass/bin/sl_bench --output build/two-pass-matrix
+```
+
+Repeat the last two commands with the ordering executable and with `--sleep on`.
+Do not enable `--quality` when collecting known failures; validate them against
+the unchanged limits afterward. The normal source retains no experiment API,
+scratch or selector. This bounded adaptation uses one sweep per layer per
+direction; it does not reproduce the reference implementation's much larger
+iteration budgets or fallback substeps.
+
+Experiment counters are written to stderr, once per scene, outside timing.
+Each `STUDY` line contains graph body visits, graph contact visits, actual biased
+and relaxation manifold evaluations, ordered island builds, extra arena bytes,
+six fallback counts (zero gravity, joints, kinematics, equal heights, unrooted,
+cycle), and rollbacks. The interval includes warm-up. Fallback reasons can
+overlap. Warm start and restitution are excluded from evaluation counts.
+Baseline reports have no such counters. `decision.json` names every field and
+records exact allocation deltas, including context and alignment.
+
+The experimental test suite deliberately retains failing production memory
+assertions, and two-pass also retains the failed ten-box drift assertion.
+Independent seeded layer reconstruction, fallback policies and finite failure
+rollback pass; debug, release and sanitizer logs are archived alongside the decision.
+No guardrail is relaxed to make the experiment appear acceptable.
