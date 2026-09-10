@@ -20,6 +20,11 @@ add_executable(sl_tests
     test_step.c
 )
 target_link_libraries(sl_tests PRIVATE silk silk_warnings)
+target_compile_definitions(sl_tests PRIVATE
+    SL_TEST_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    SL_TEST_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    SL_TEST_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+)
 target_include_directories(sl_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(sl_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 

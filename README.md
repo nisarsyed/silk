@@ -23,6 +23,15 @@ Silk provides:
 
 See [ROADMAP.md](ROADMAP.md) for the merged implementation trail and next phase.
 
+## Version 0.4.0
+
+Phase 4 completes replay regression coverage, private world ownership, spatial
+queries, work/memory diagnostics, deterministic islands, opt-in sleeping,
+sandbox inspection, and a relocatable static CMake package. The measured
+optimization skips empty joint stages; experimental query compaction, explicit
+SIMD, and alternative solver ordering were not adopted. See the
+[benchmark decisions](docs/benchmarks.md) for evidence and limitations.
+
 ## Requirements
 
 - CMake 3.28 or newer
@@ -176,7 +185,7 @@ In the consuming project:
 ```cmake
 cmake_minimum_required(VERSION 3.28)
 project(my_app LANGUAGES C)
-find_package(silk 0.3.0 CONFIG REQUIRED)
+find_package(silk 0.4.0 CONFIG REQUIRED)
 add_executable(my_app main.c)
 target_link_libraries(my_app PRIVATE silk::silk)
 ```
@@ -188,9 +197,9 @@ first-party warnings do not become consumer warnings. Install includes only
 the archive, public headers and CMake metadata. `SL_INSTALL` defaults on for a
 top-level build and off when embedded; `SL_BUILD_EXAMPLE` defaults off.
 
-The package uses exact version matching when a version is requested. The
-development tree remains version 0.3.0 until the planned release; this is not a
-stable binary ABI promise. Rebuild applications against matching headers and
+The package uses exact version matching when a version is requested.
+Version 0.4.0 does not promise a stable binary ABI. Rebuild applications
+against matching headers and
 archive. Public headers are independently compiled, with an additional C++
 linkage smoke check for the existing `extern "C"` guards; no C++ wrapper API is
 provided.
@@ -244,7 +253,7 @@ invalid input returns failure without partial mutation. Contact-pool exhaustion
 drops new pairs and is observable
 through `sl_world_contact_drop_count()`.
 
-For source migration from the original 0.3.0 tag toward the planned 0.4 release,
+For source migration from the original 0.3.0 release to 0.4.0,
 replace direct world-storage access with public accessors, scoped handles and
 copied statistics. Do not copy the owning world or depend on packed addresses.
 Query results contain handles, not retained body pointers. Shape pointers last
@@ -259,7 +268,9 @@ There are no compatibility aliases for the removed public storage layout.
   tunnel despite speculative contacts and free-integration speed caps.
 - No sensors or contact callbacks. Islands and opt-in sleeping are supported.
 - Distance and revolute joints have no limits, motors, or user-facing springs.
-- The CPU solver is scalar and single-threaded; SIMD and threading are deferred.
+- The CPU solver remains portable and single-threaded. Explicit SIMD and
+  solver-order experiments were evaluated and rejected; compiler vectorization
+  remains enabled. Threading feasibility was assessed; implementation is deferred.
 - Contacts are read-only snapshots. A pointer returned by
   `sl_world_contact_at()` is valid only until the next non-const world operation,
   as specified in [world.h](include/silk/world.h); consume or copy it before

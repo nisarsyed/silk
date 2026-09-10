@@ -4,6 +4,9 @@
 
 static void test_version_matches_macros(void)
 {
+    SL_EXPECT_INT_EQ(SL_VERSION_MAJOR, SL_TEST_VERSION_MAJOR);
+    SL_EXPECT_INT_EQ(SL_VERSION_MINOR, SL_TEST_VERSION_MINOR);
+    SL_EXPECT_INT_EQ(SL_VERSION_PATCH, SL_TEST_VERSION_PATCH);
     int expected =
         (SL_VERSION_MAJOR << 16) | (SL_VERSION_MINOR << 8) | SL_VERSION_PATCH;
     SL_EXPECT_INT_EQ(sl_version(), expected);

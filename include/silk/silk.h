@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #define SL_VERSION_MAJOR 0
-#define SL_VERSION_MINOR 3
+#define SL_VERSION_MINOR 4
 #define SL_VERSION_PATCH 0
 
 /* Encoded engine version: (major << 16) | (minor << 8) | patch. */

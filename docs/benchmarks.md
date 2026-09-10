@@ -359,6 +359,7 @@ ordering-only snapshot. It is evidence, not a supported runtime backend. Apply
 it to the harness revision in a disposable source directory:
 
 ```sh
+git fetch origin 894213f18f40790ad16e6a0b6a5d30f8806c6f0a
 mkdir -p build/solver-experiment
 git archive 894213f | tar -x -C build/solver-experiment
 git apply --directory=build/solver-experiment bench/reports/solver-order/experiment.patch
