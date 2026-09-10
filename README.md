@@ -1,9 +1,9 @@
 # silk
 
-A portable, data-oriented physics and simulation engine written in pure C17.
+A portable, data-oriented physics and simulation engine written in C.
 The core is renderer-independent and has no third-party dependencies.
 
-Silk 0.3.0 provides the Phase 3 2D rigid-body engine:
+Silk provides:
 
 - 2D vectors, matrices, rotations, transforms, and AABBs
 - circles and convex polygons with mass, bounds, point, and ray queries
@@ -17,6 +17,8 @@ Silk 0.3.0 provides the Phase 3 2D rigid-body engine:
 - Soft Step sequential impulses with warm starting, an unbiased relax pass,
   per-body Coulomb friction, and restitution
 - distance and revolute joints with optional connected-body collision suppression
+- deterministic constraint islands, opt-in whole-island sleeping and wake propagation
+- bounded world queries and copied work/memory diagnostics
 - a raylib collision sandbox and deterministic seven-fixture benchmark executable
 
 See [ROADMAP.md](ROADMAP.md) for the merged implementation trail and next phase.
@@ -64,6 +66,8 @@ Available CMake options:
 | `SL_BUILD_TESTS` | On at the top level; off as a subproject | Build and register `sl_tests` |
 | `SL_SANITIZERS` | `OFF` | Enable AddressSanitizer and UndefinedBehaviorSanitizer |
 | `SL_SANDBOX` | `OFF` | Fetch raylib and build the interactive sandbox |
+| `SL_BUILD_EXAMPLE` | `OFF` | Build the public headless example |
+| `SL_INSTALL` | top-level only | Install the static library, headers and CMake package |
 | `SL_BUILD_BENCH` | `OFF` | Build `sl_bench`, separate from CTest |
 
 ## Interactive sandbox
@@ -121,19 +125,78 @@ Digests check determinism within the same platform and build; physical-quality
 limits assess cross-build results. See [benchmark documentation](docs/benchmarks.md)
 for the schema, fixtures, quality limits and profiling commands.
 
-## Use as a CMake subproject
+## Use from C
 
-Silk currently exports its target from the source tree:
+Build the public headless example, which checks initialization and pool failure,
+creates bodies and a joint, steps, inspects contacts, queries sleeping bodies,
+wakes a component, resets and cleans up:
+
+```sh
+cmake --preset debug -DSL_BUILD_EXAMPLE=ON
+cmake --build --preset debug
+./build/debug/bin/silk_headless
+```
+
+An existing CMake project can embed Silk without enabling its tests, examples
+or installation rules:
 
 ```cmake
 add_subdirectory(path/to/silk)
 target_link_libraries(my_app PRIVATE silk::silk)
 ```
 
+For an installed static package:
+
+```sh
+cmake --preset release -DSL_INSTALL=ON
+cmake --build --preset release
+cmake --install build/release --prefix "$PWD/build/silk-prefix"
+```
+
+In the consuming project:
+
+```cmake
+cmake_minimum_required(VERSION 3.28)
+project(my_app LANGUAGES C)
+find_package(silk 0.3.0 CONFIG REQUIRED)
+add_executable(my_app main.c)
+target_link_libraries(my_app PRIVATE silk::silk)
+```
+
+Configure that project with `-DCMAKE_PREFIX_PATH=/path/to/silk-prefix`. The
+prefix can be moved before configuring a fresh consumer. The target supplies
+public include paths, the required C standard and platform math linkage; Silk's
+first-party warnings do not become consumer warnings. Install includes only
+the archive, public headers and CMake metadata. `SL_INSTALL` defaults on for a
+top-level build and off when embedded; `SL_BUILD_EXAMPLE` defaults off.
+
+The package uses exact version matching when a version is requested. The
+development tree remains version 0.3.0 until the planned release; this is not a
+stable binary ABI promise. Rebuild applications against matching headers and
+archive. Public headers are independently compiled, with an additional C++
+linkage smoke check for the existing `extern "C"` guards; no C++ wrapper API is
+provided.
+
+Run the same external checks used in compiler CI with:
+
+```sh
+python3 tools/check_consumer.py --output build/consumer-checks --config Debug
+python3 tools/check_consumer.py --output build/consumer-release --config Release
+```
+
+The check copies a clean source tree and consumer, builds both integration
+paths, moves the installation and removes the original source/build paths from
+reach before rebuilding the installed consumer. It checks every public header,
+linkage, version rejection and downstream compile options without fetching
+any dependencies.
+
 A world is a zero-initialized owning shell: call `sl_world_init` and
 `sl_world_destroy`, and never copy it while initialized. Storage is private;
 inspect bodies, joints and diagnostics through the public accessors. Handles
-belong to the world lifetime that created them.
+belong to the world lifetime that created them. Reset invalidates old handles;
+numerical handle collisions across worlds or after destroy/reinitialize are
+possible. Walk packed rows with `sl_world_body_at()` when removing bodies during
+traversal, as documented in the header.
 
 Include the subsystem headers you use, such as `<silk/math.h>`,
 `<silk/shape.h>`, `<silk/contact.h>`, `<silk/joint.h>`, `<silk/world.h>`,
@@ -151,16 +214,32 @@ preserve snapshots and simulation state but share scratch, so same-world
 operations must not run concurrently. See the header for type masks and ray bounds.
 
 `sl_world_config.substep_count` defaults to four and accepts one through eight.
+Gravity and drag default to zero; sleeping defaults off. Enabling sleep selects
+0.02 units/s, 0.01 radians/s and 0.5 seconds when its thresholds are zero.
+Choose consistent length/mass/time units; angles and angular speeds use radians.
 Body friction and restitution default to zero; joint storage is opt-in through
 a nonzero `joint_capacity`. Size body, contact, and joint pools at initialization
-for the workload. Contact-pool exhaustion drops new pairs and is observable
+for the workload. Zero contact capacity selects up to four times body capacity,
+bounded by `SL_CONTACT_COUNT_MAX`. Initialization validates before allocating;
+body/joint creation returns a null handle on capacity failure. Recoverable
+invalid input returns failure without partial mutation. Contact-pool exhaustion
+drops new pairs and is observable
 through `sl_world_contact_drop_count()`.
+
+For source migration from the original 0.3.0 tag toward the planned 0.4 release,
+replace direct world-storage access with public accessors, scoped handles and
+copied statistics. Do not copy the owning world or depend on packed addresses.
+Query results contain handles, not retained body pointers. Shape pointers last
+until the next create/destroy/reset/shape replacement; contact pointers last
+until the next non-const world operation. Consume or copy snapshots before those
+operations. Queries reuse scratch, so serialize all operations on the same world.
+There are no compatibility aliases for the removed public storage layout.
 
 ## Current limits
 
 - No continuous collision detection (CCD) or bullet bodies; fast objects can
   tunnel despite speculative contacts and free-integration speed caps.
-- No sleeping or islands, sensors, or contact callbacks.
+- No sensors or contact callbacks. Islands and opt-in sleeping are supported.
 - Distance and revolute joints have no limits, motors, or user-facing springs.
 - The CPU solver is scalar and single-threaded; SIMD and threading are deferred.
 - Contacts are read-only snapshots. A pointer returned by

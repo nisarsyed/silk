@@ -29,6 +29,7 @@ jobs:
         cc: [gcc, clang]
     env:
       CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cc == 'gcc' && 'g++' || 'clang++' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -37,6 +38,7 @@ jobs:
       - run: cmake --preset debug -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset debug
       - run: ctest --preset debug
+      - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
       - run: build/debug/bin/sl_bench_check
       - run: python bench/test_report.py --executable build/debug/bin/sl_bench
       - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
@@ -44,8 +46,11 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: bench-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
-          path: build/bench-reports/
+          name: developer-tools-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
+          path: |
+            build/bench-reports/
+            build/consumer-reports/checks.log
+            build/consumer-reports/summary.json
           retention-days: 14
           if-no-files-found: warn
 
@@ -58,6 +63,7 @@ jobs:
         cc: [gcc, clang]
     env:
       CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cc == 'gcc' && 'g++' || 'clang++' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -68,6 +74,7 @@ jobs:
       - run: cmake --preset release -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset release
       - run: ctest --preset release
+      - run: python tools/check_consumer.py --output build/consumer-reports --config Release
       - run: build/release/bin/sl_bench_check
       - run: python bench/test_report.py --executable build/release/bin/sl_bench
       - run: python bench/report.py run build/release/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
@@ -75,8 +82,11 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: bench-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
-          path: build/bench-reports/
+          name: developer-tools-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
+          path: |
+            build/bench-reports/
+            build/consumer-reports/checks.log
+            build/consumer-reports/summary.json
           retention-days: 14
           if-no-files-found: warn
 
@@ -91,6 +101,7 @@ jobs:
       - run: cmake --preset debug -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset debug
       - run: ctest --preset debug
+      - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
       - run: build/debug/bin/sl_bench_check
       - run: python bench/test_report.py --executable build/debug/bin/sl_bench
       - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
@@ -98,8 +109,11 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: bench-${{ github.job }}-${{ github.sha }}
-          path: build/bench-reports/
+          name: developer-tools-${{ github.job }}-${{ github.sha }}
+          path: |
+            build/bench-reports/
+            build/consumer-reports/checks.log
+            build/consumer-reports/summary.json
           retention-days: 14
           if-no-files-found: warn
 
@@ -114,6 +128,7 @@ jobs:
       - run: cmake --preset windows -DSL_BUILD_BENCH=ON
       - run: cmake --build --preset windows
       - run: ctest --preset windows
+      - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
       - run: build/windows/bin/Debug/sl_bench_check.exe
       - run: python bench/test_report.py --executable build/windows/bin/Debug/sl_bench.exe
       - run: python bench/report.py run build/windows/bin/Debug/sl_bench.exe --output build/bench-reports --repeat 2 --warmup 2 --steps 8
@@ -121,8 +136,11 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: bench-${{ github.job }}-${{ github.sha }}
-          path: build/bench-reports/
+          name: developer-tools-${{ github.job }}-${{ github.sha }}
+          path: |
+            build/bench-reports/
+            build/consumer-reports/checks.log
+            build/consumer-reports/summary.json
           retention-days: 14
           if-no-files-found: warn
 
