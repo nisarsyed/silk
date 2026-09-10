@@ -17,9 +17,15 @@
  *   space                      pause / resume
  *   period                     execute one fixed step (while paused)
  *   c                          toggle contact points and normals
- *   a                          toggle fat proxy AABBs
+ *   a                          toggle tight/fat AABBs
+ *   1-4                        select deterministic scene
+ *   s                          toggle sleep policy and rebuild scene
+ *   i                          toggle last-build island colors
+ *   m                          start/stop the moving support
+ *   q                          cycle point/ray/AABB query
+ *   right-drag                 define query; release selects first hit
  *   j                          spawn a six-link revolute chain at cursor
- *   r                          reset to the default scene
+ *   r                          rebuild the selected scene
  *
  * Shaped bodies collide with the static ground and one another.
  * The off-screen cull remains a safety net for objects that tunnel at high
@@ -37,6 +43,7 @@
  * scene. */
 
 #include <float.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,6 +51,7 @@
 #include <raylib.h>
 
 #include <silk/math.h>
+#include <silk/query.h>
 #include <silk/shape.h>
 #include <silk/step.h>
 #include <silk/world.h>
@@ -110,11 +118,6 @@ static const float k_sb_tether_gain = 15.0f; /* N per metre of offset */
 static const float k_sb_launch_gain = 6.0f;       /* (m/s) per metre */
 static const float k_sb_launch_speed_max = 15.0f; /* metres / second */
 
-/* Grab radius around the body origin, for probes the shape test cannot
- * catch: shapeless point particles, and pointer slop on a body smaller
- * than the cursor is precise. */
-static const float k_sb_pick_slack_pixels = 12.0f;
-
 /* One-metre cells expose the simulation scale directly. */
 static const float k_sb_grid_spacing = 1.0f; /* metres */
 
@@ -122,6 +125,25 @@ typedef enum sb_spawn_kind { SB_SPAWN_CIRCLE = 0, SB_SPAWN_BOX } sb_spawn_kind;
 
 typedef struct sb_app {
     sl_world world;
+    sl_world_memory_breakdown memory;
+    bool failed;
+    bool sleep_enabled;
+    bool show_islands;
+    uint32_t scene;
+    uint32_t scene_step;
+    sl_body_handle support;
+    bool support_moving;
+    sl_body_handle selected;
+    sl_body_handle pick_buffer[SB_BODY_CAPACITY];
+    uint32_t query_mode; /* 0 point, 1 ray, 2 AABB */
+    sl_vec2 query_start;
+    sl_vec2 query_end;
+    bool query_dragging;
+    bool query_defined;
+    bool query_valid;
+    sl_query_result query_result;
+    sl_query_ray_result ray_result;
+    sl_body_handle query_bodies[8];
     /* Unstepped frame time, seconds. The sandbox owns its accumulator
      * outright rather than carrying an sl_stepper it only half uses --
      * see sb_advance_frame. */
@@ -144,8 +166,6 @@ typedef struct sb_app {
     bool paused;
     bool show_contacts;
     bool show_aabbs;
-    uint32_t last_steps; /* steps executed by the most recent frame or
-                          * manual single-step */
 } sb_app;
 
 static uint32_t sb_rng_state = SB_RNG_SEED;
@@ -315,54 +335,102 @@ static void sb_spawn_ground(sl_world *world)
     (void)body;
 }
 
-/* Reset is the only thing that invalidates handles in this app, so it
- * owns clearing interaction state to the null handle; the PRNG reseeds
- * so the rebuilt scene matches launch exactly. */
+static void sb_spawn_joint_chain(sb_app *app, float link_angle);
+
+static sl_body_handle sb_box(sb_app *app, sl_body_type type, float x, float y,
+                             float hx, float hy)
+{
+    sl_shape shape = sl_shape_none();
+    const bool made = sl_shape_make_box(hx, hy, &shape);
+    SL_ASSERT(made);
+    (void)made;
+    const sl_body_desc desc = { .type = type,
+                                .position = { x, y },
+                                .mass = type == SL_BODY_DYNAMIC ? 1.0f : 0.0f,
+                                .shape = &shape,
+                                .friction = k_sb_friction };
+    const sl_body_handle body = sl_world_body_create(&app->world, &desc);
+    SL_ASSERT(!sl_body_handle_is_null(body));
+    return body;
+}
+
+/* Rebuild with the selected initialization-only sleep policy. Clear all
+ * handles before allocating: numerical handle collisions across lifetimes
+ * are possible. Each fixture starts from the committed seed and fixed poses. */
 static void sb_reset(sb_app *app)
 {
-    sl_world_reset(&app->world);
+    sl_world_destroy(&app->world);
     app->tether_body = sl_body_handle_null();
+    app->selected = sl_body_handle_null();
+    app->support = sl_body_handle_null();
     app->grab_local = sl_vec2_make(0.0f, 0.0f);
     app->sling_armed = false;
     app->tether_force = sl_vec2_make(0.0f, 0.0f);
     app->bank = 0.0f;
-    app->last_steps = 0u;
+    app->scene_step = 0u;
+    app->support_moving = false;
+    app->query_defined = false;
+    app->query_dragging = false;
+    const sl_world_config config = {
+        .body_capacity = SB_BODY_CAPACITY,
+        .contact_capacity = SB_CONTACT_CAPACITY,
+        .joint_capacity = SB_JOINT_CAPACITY,
+        .gravity = k_sb_gravity,
+        .linear_drag = k_sb_linear_drag,
+        .angular_drag = k_sb_angular_drag,
+        .substep_count = SB_SUBSTEP_COUNT,
+        .sleep_enabled = app->sleep_enabled,
+    };
+    if (!sl_world_init(&app->world, &config) ||
+        !sl_world_memory_breakdown_get(&config, &app->memory)) {
+        fprintf(stderr, "sandbox: world initialization failed\n");
+        app->failed = true;
+        return;
+    }
     sb_rng_state = SB_RNG_SEED;
     sb_spawn_ground(&app->world);
-    sb_spawn_pyramid(&app->world);
-    sb_spawn_rain(&app->world);
+    if (app->scene == 0u) {
+        sb_spawn_pyramid(&app->world);
+        sb_spawn_rain(&app->world);
+    } else if (app->scene == 1u) {
+        for (uint32_t pile = 0u; pile < 4u; ++pile) {
+            for (uint32_t row = 0u; row < 3u; ++row) {
+                (void)sb_box(app, SL_BODY_DYNAMIC, 2.0f + 2.8f * (float)pile,
+                             6.55f - 0.5f * (float)row, 0.25f, 0.25f);
+            }
+        }
+    } else if (app->scene == 2u) {
+        app->support = sb_box(app, SL_BODY_KINEMATIC, 6.4f, 5.8f, 2.2f, 0.15f);
+        for (uint32_t column = 0u; column < 5u; ++column) {
+            (void)sb_box(app, SL_BODY_DYNAMIC, 5.2f + 0.6f * (float)column,
+                         5.4f, 0.25f, 0.25f);
+        }
+    } else {
+        const sl_vec2 cursor = app->cursor;
+        app->cursor = sl_vec2_make(6.4f, 2.0f);
+        sb_spawn_joint_chain(app, 0.0f);
+        app->cursor = cursor;
+    }
 }
 
-/* Nearest dynamic body whose shape covers the point (or whose reach
- * plus slop does); null handle when nothing qualifies. Static and
- * kinematic bodies are untetherable by contract -- they reject forces,
- * and grabbing one would fight its own movement rules. */
-static sl_body_handle sb_pick_body(const sb_app *app, sl_vec2 point)
+/* Exact public containment, including sleeping bodies. Query results are
+ * slot-ordered, so strict distance improvement retains the lowest-slot tie. */
+static sl_body_handle sb_pick_body(sb_app *app, sl_vec2 point)
 {
+    sl_query_result result = { 0 };
     sl_body_handle best = sl_body_handle_null();
-    float best_dist = FLT_MAX;
-    const float pick_slack_metres =
-        sb_length_from_pixels(k_sb_pick_slack_pixels);
-
-    for (sl_body_handle it = sl_world_body_first(&app->world);
-         !sl_body_handle_is_null(it);
-         it = sl_world_body_next(&app->world, it)) {
-        if (sl_world_body_get_type(&app->world, it) != SL_BODY_DYNAMIC) {
-            continue;
-        }
-        const sl_transform tf = sl_world_body_get_transform(&app->world, it);
-        const sl_shape *shape = sl_world_body_get_shape(&app->world, it);
-        const float dist = sl_vec2_distance(point, tf.position);
-        /* The engine's shape test is what decides; the slop disc only
-         * covers what it cannot. Comparing against the shape's reach
-         * instead would make the test dead weight -- containment
-         * already implies dist <= reach for a centroid-centered convex
-         * shape, so OR-ing the two could never change the answer. */
-        const bool covered = dist <= pick_slack_metres ||
-                             sl_shape_contains_point(shape, tf, point);
-        if (covered && dist < best_dist) {
-            best_dist = dist;
-            best = it;
+    float best_distance = FLT_MAX;
+    if (!sl_world_query_point(&app->world, point, SL_QUERY_DYNAMIC,
+                              app->pick_buffer, SB_BODY_CAPACITY, &result)) {
+        return best;
+    }
+    for (uint32_t i = 0u; i < result.count; ++i) {
+        const sl_body_handle body = app->pick_buffer[i];
+        const sl_vec2 position = sl_world_body_get_position(&app->world, body);
+        const float distance = sl_vec2_length_sq(sl_vec2_sub(point, position));
+        if (distance < best_distance) {
+            best_distance = distance;
+            best = body;
         }
     }
     return best;
@@ -398,7 +466,7 @@ static void sb_launch_slingshot(sb_app *app)
     sl_world_body_create(&app->world, &desc);
 }
 
-static void sb_spawn_joint_chain(sb_app *app)
+static void sb_spawn_joint_chain(sb_app *app, float link_angle)
 {
     const uint32_t body_remaining =
         sl_world_body_capacity(&app->world) - sl_world_body_count(&app->world);
@@ -419,7 +487,6 @@ static void sb_spawn_joint_chain(sb_app *app)
     const float half_width = 0.1f;
     const float half_height = 0.225f;
     const float link_height = 2.0f * half_height;
-    const float link_angle = 0.35f;
     const sl_vec2 link_step = sl_rotation_apply(
         sl_rotation_make(link_angle), sl_vec2_make(0.0f, link_height));
     sl_shape link_shape = sl_shape_none();
@@ -429,8 +496,7 @@ static void sb_spawn_joint_chain(sb_app *app)
 
     for (uint32_t i = 0u; i < SB_CHAIN_LINK_COUNT; ++i) {
         const sl_body_desc link_desc = {
-            /* Start 0.35 rad off vertical so gravity produces an immediately
-             * visible swing while adjacent anchors still coincide exactly. */
+            /* Adjacent anchors coincide at the supplied initial angle. */
             .position = sl_vec2_add(app->cursor,
                                     sl_vec2_scale(link_step, (float)i + 0.5f)),
             .mass = 0.75f,
@@ -461,45 +527,111 @@ static void sb_spawn_joint_chain(sb_app *app)
 }
 
 static void sb_apply_tether_for_step(sb_app *app);
+static void sb_step(sb_app *app)
+{
+    if (sl_world_body_is_valid(&app->world, app->support)) {
+        const float speed =
+            !app->support_moving
+                ? 0.0f
+                : (app->scene_step % 480u < 240u ? 0.4f : -0.4f);
+        const bool accepted = sl_world_body_set_velocity(
+            &app->world, app->support, sl_vec2_make(speed, 0.0f));
+        SL_ASSERT(accepted);
+        (void)accepted;
+    }
+    sb_apply_tether_for_step(app);
+    sl_world_step(&app->world, k_sb_timestep);
+    app->scene_step = (app->scene_step + 1u) % 480u;
+}
 
 static void sb_handle_input(sb_app *app)
 {
     const Vector2 mouse = GetMousePosition();
     app->cursor = sb_from_raylib(mouse);
 
-    if (IsKeyPressed(KEY_SPACE)) {
+    /* Consume press events so a quick down/up within one render frame is not
+     * lost by polling only the final held state. These controls are ASCII;
+     * other keys are ignored. Bound input work independently of rendering. */
+    bool pressed[128] = { false };
+    for (uint32_t event = 0u; event < 32u; ++event) {
+        const int key = GetKeyPressed();
+        if (key == 0) {
+            break;
+        }
+        if (key > 0 && key < 128) {
+            pressed[key] = true;
+        }
+    }
+
+    if (pressed[KEY_SPACE]) {
         app->paused = !app->paused;
     }
-    if (IsKeyPressed(KEY_R)) {
+    if (pressed[KEY_R]) {
         sb_reset(app);
         return;
     }
-    if (IsKeyPressed(KEY_B)) {
+    for (uint32_t scene = 0u; scene < 4u; ++scene) {
+        if (pressed[KEY_ONE + (int)scene]) {
+            app->scene = scene;
+            sb_reset(app);
+            return;
+        }
+    }
+    if (pressed[KEY_S]) {
+        app->sleep_enabled = !app->sleep_enabled;
+        sb_reset(app);
+        return;
+    }
+    if (pressed[KEY_I]) {
+        app->show_islands = !app->show_islands;
+    }
+    if (pressed[KEY_M]) {
+        app->support_moving = !app->support_moving;
+    }
+    if (pressed[KEY_Q]) {
+        app->query_mode = (app->query_mode + 1u) % 3u;
+        app->query_defined = false;
+        app->query_dragging = false;
+    }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+        app->query_start = app->cursor;
+        app->query_defined = true;
+        app->query_dragging = true;
+    }
+    if (app->query_dragging) {
+        app->query_end = app->cursor;
+    }
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+        app->query_dragging = false;
+    }
+    if (pressed[KEY_B]) {
         app->spawn_kind = (app->spawn_kind == SB_SPAWN_CIRCLE)
                               ? SB_SPAWN_BOX
                               : SB_SPAWN_CIRCLE;
     }
-    if (IsKeyPressed(KEY_C)) {
+    if (pressed[KEY_C]) {
         app->show_contacts = !app->show_contacts;
     }
-    if (IsKeyPressed(KEY_A)) {
+    if (pressed[KEY_A]) {
         app->show_aabbs = !app->show_aabbs;
     }
-    if (IsKeyPressed(KEY_J)) {
-        sb_spawn_joint_chain(app);
+    if (pressed[KEY_J]) {
+        sb_spawn_joint_chain(app, 0.35f);
     }
-    if (IsKeyPressed(KEY_PERIOD) && app->paused) {
+    if (pressed[KEY_PERIOD] && app->paused) {
         /* Manual step shows the tether acting: one application, one
          * consumed step, nothing left banked behind. */
-        sb_apply_tether_for_step(app);
-        sl_world_step(&app->world, k_sb_timestep);
-        app->last_steps = 1u;
+        sb_step(app);
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         app->press_point = app->cursor;
         app->tether_body = sb_pick_body(app, app->cursor);
+        app->selected = app->tether_body;
         if (!sl_body_handle_is_null(app->tether_body)) {
+            const bool woke = sl_world_body_wake(&app->world, app->tether_body);
+            SL_ASSERT(woke);
+            (void)woke;
             const sl_transform tf =
                 sl_world_body_get_transform(&app->world, app->tether_body);
             app->grab_local = sl_transform_apply_inverse(tf, app->cursor);
@@ -565,8 +697,7 @@ static void sb_advance_frame(sb_app *app)
 
     uint32_t steps = 0u;
     while (available >= k_sb_timestep && steps < SL_STEP_COUNT_MAX) {
-        sb_apply_tether_for_step(app);
-        sl_world_step(&app->world, k_sb_timestep);
+        sb_step(app);
         available -= k_sb_timestep;
         steps++;
     }
@@ -574,7 +705,6 @@ static void sb_advance_frame(sb_app *app)
     /* At the cap, drop the rest: a slow frame sheds debt instead of
      * stepping forever on the next one. */
     app->bank = (steps == SL_STEP_COUNT_MAX) ? 0.0f : available;
-    app->last_steps = steps;
 }
 
 /* Despawn unattended bodies that fell out of view after a fast tunnel or
@@ -666,6 +796,19 @@ static void sb_draw_bodies(const sb_app *app)
             fill = SKYBLUE;
         } else if (sl_world_body_get_type(world, it) == SL_BODY_STATIC) {
             fill = DARKGRAY;
+        } else if (sl_world_body_get_type(world, it) == SL_BODY_KINEMATIC) {
+            fill = PURPLE;
+        } else {
+            sl_island_stats island;
+            if (app->show_islands &&
+                sl_world_body_get_island_stats(world, it, &island)) {
+                const Color colors[] = { ORANGE, GOLD,    PINK,
+                                         LIME,   SKYBLUE, VIOLET };
+                fill = colors[island.id % 6u];
+            }
+            if (!sl_world_body_is_awake(world, it)) {
+                fill = Fade(fill, 0.35f);
+            }
         }
 
         if (shape->kind == SL_SHAPE_CIRCLE) {
@@ -692,6 +835,17 @@ static void sb_draw_bodies(const sb_app *app)
     }
 }
 
+static void sb_draw_bounds(sl_aabb bounds, Color color, float width)
+{
+    const Rectangle rectangle = {
+        sb_length_to_pixels(bounds.lower.x),
+        sb_length_to_pixels(bounds.lower.y),
+        sb_length_to_pixels(bounds.upper.x - bounds.lower.x),
+        sb_length_to_pixels(bounds.upper.y - bounds.lower.y),
+    };
+    DrawRectangleLinesEx(rectangle, width, color);
+}
+
 static void sb_draw_aabbs(const sb_app *app)
 {
     if (!app->show_aabbs) {
@@ -700,17 +854,84 @@ static void sb_draw_aabbs(const sb_app *app)
     for (sl_body_handle body = sl_world_body_first(&app->world);
          !sl_body_handle_is_null(body);
          body = sl_world_body_next(&app->world, body)) {
-        sl_aabb aabb;
-        if (!sl_world_body_get_proxy_aabb(&app->world, body, &aabb)) {
+        sl_aabb fat;
+        if (!sl_world_body_get_proxy_aabb(&app->world, body, &fat)) {
             continue;
         }
-        const Rectangle rectangle = {
-            sb_length_to_pixels(aabb.lower.x),
-            sb_length_to_pixels(aabb.lower.y),
-            sb_length_to_pixels(aabb.upper.x - aabb.lower.x),
-            sb_length_to_pixels(aabb.upper.y - aabb.lower.y),
-        };
-        DrawRectangleLinesEx(rectangle, 1.0f, Fade(SKYBLUE, 0.75f));
+        sb_draw_bounds(fat, Fade(SKYBLUE, 0.75f), 1.0f);
+        const sl_shape *shape = sl_world_body_get_shape(&app->world, body);
+        const sl_transform tf = sl_world_body_get_transform(&app->world, body);
+        sb_draw_bounds(sl_shape_aabb(shape, tf), Fade(YELLOW, 0.8f), 1.0f);
+    }
+}
+
+static sl_aabb sb_query_bounds(const sb_app *app)
+{
+    return (sl_aabb){
+        .lower = { sl_min(app->query_start.x, app->query_end.x),
+                   sl_min(app->query_start.y, app->query_end.y) },
+        .upper = { sl_max(app->query_start.x, app->query_end.x),
+                   sl_max(app->query_start.y, app->query_end.y) },
+    };
+}
+
+/* Query scratch is used after all mutations and before consuming snapshots.
+ * Store copied handles only; recompute every frame so destruction cannot leave
+ * a displayed query result pointing at a replacement body. */
+static void sb_update_query(sb_app *app)
+{
+    app->query_result = (sl_query_result){ 0 };
+    app->ray_result = (sl_query_ray_result){ 0 };
+    app->query_valid = false;
+    if (app->query_mode == 0u) {
+        app->query_valid =
+            sl_world_query_point(&app->world, app->cursor, SL_QUERY_ALL,
+                                 app->query_bodies, 8u, &app->query_result);
+    } else if (app->query_defined && app->query_mode == 1u) {
+        const sl_ray ray = { app->query_start,
+                             sl_vec2_sub(app->query_end, app->query_start) };
+        app->query_valid = sl_world_query_ray(&app->world, ray, SL_QUERY_ALL,
+                                              &app->ray_result);
+        if (app->query_valid && app->ray_result.hit) {
+            app->query_result.count = 1u;
+            app->query_bodies[0] = app->ray_result.body;
+        }
+    } else if (app->query_defined) {
+        app->query_valid =
+            sl_world_query_aabb(&app->world, sb_query_bounds(app), SL_QUERY_ALL,
+                                app->query_bodies, 8u, &app->query_result);
+    }
+    if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+        app->selected = app->query_result.count > 0u ? app->query_bodies[0]
+                                                     : sl_body_handle_null();
+    }
+}
+
+static void sb_draw_query(const sb_app *app)
+{
+    if (app->query_mode == 0u) {
+        DrawCircleLinesV(sb_to_raylib(app->cursor), 5.0f, WHITE);
+    } else if (app->query_defined && app->query_mode == 1u) {
+        DrawLineEx(sb_to_raylib(app->query_start), sb_to_raylib(app->query_end),
+                   2.0f, WHITE);
+        if (app->ray_result.hit) {
+            const sl_ray_hit hit = app->ray_result.geometry;
+            DrawCircleV(sb_to_raylib(hit.point), 5.0f, RED);
+            DrawLineEx(sb_to_raylib(hit.point),
+                       sb_to_raylib(sl_vec2_add(
+                           hit.point, sl_vec2_scale(hit.normal, 0.3f))),
+                       2.0f, RED);
+        }
+    } else if (app->query_defined) {
+        sb_draw_bounds(sb_query_bounds(app), WHITE, 2.0f);
+    }
+    const uint32_t shown =
+        app->query_result.count < 8u ? app->query_result.count : 8u;
+    for (uint32_t i = 0u; i < shown; ++i) {
+        const sl_body_handle body = app->query_bodies[i];
+        const sl_shape *shape = sl_world_body_get_shape(&app->world, body);
+        const sl_transform tf = sl_world_body_get_transform(&app->world, body);
+        sb_draw_bounds(sl_shape_aabb(shape, tf), WHITE, 2.0f);
     }
 }
 
@@ -810,43 +1031,106 @@ static void sb_draw_interactions(const sb_app *app)
 
 static void sb_draw_hud(const sb_app *app)
 {
-    DrawText(TextFormat("bodies %u/%u", sl_world_body_count(&app->world),
-                        sl_world_body_capacity(&app->world)),
-             12, 10, 20, LIME);
-    DrawText(TextFormat("contacts %u/%u  dropped %u",
-                        sl_world_contact_count(&app->world),
-                        sl_world_contact_capacity(&app->world),
-                        sl_world_contact_drop_count(&app->world)),
-             12, 34, 20, LIME);
-    DrawText(TextFormat("joints %u/%u", sl_world_joint_count(&app->world),
-                        sl_world_joint_capacity(&app->world)),
-             12, 58, 20, LIME);
-    DrawText(TextFormat("steps %u  bank %.1f ms  %d fps", app->last_steps,
-                        (double)app->bank * 1000.0, GetFPS()),
-             12, 82, 20, LIME);
-    DrawText(TextFormat("spawn: %s",
+    const char *scenes[] = { "playground", "settled piles", "moving support",
+                             "joint chain" };
+    const char *queries[] = { "point", "closest ray", "AABB" };
+    const sl_world_stats stats = sl_world_get_stats(&app->world);
+    DrawRectangle(4, 4, 630, 222, Fade(BLACK, 0.86f));
+    DrawText(TextFormat("%u: %s | sleep %s | %s | %s", app->scene + 1u,
+                        scenes[app->scene], app->sleep_enabled ? "on" : "off",
+                        app->paused ? "PAUSED" : "running",
                         app->spawn_kind == SB_SPAWN_CIRCLE ? "circle" : "box"),
-             12, 106, 20, LIME);
-    DrawText(TextFormat("debug: contacts %s  AABBs %s",
-                        app->show_contacts ? "on" : "off",
-                        app->show_aabbs ? "on" : "off"),
-             12, 130, 20, LIME);
-
-    if (!sl_body_handle_is_null(app->tether_body)) {
-        const float degrees =
-            sl_world_body_get_angle(&app->world, app->tether_body) *
-            (180.0f / SL_PI);
-        DrawText(TextFormat("angle %.0f deg", (double)degrees),
-                 SB_SCREEN_WIDTH - 170, 10, 20, SKYBLUE);
+             12, 10, 20, WHITE);
+    DrawText(
+        TextFormat("Current: bodies %u/%u  awake %u  asleep %u  joints %u/%u",
+                   stats.body_count, stats.body_capacity,
+                   stats.awake_dynamic_count, stats.sleeping_dynamic_count,
+                   stats.joint_count, stats.joint_capacity),
+        12, 38, 16, LIME);
+    DrawText(TextFormat("Contacts %u/%u  pairs %u/%u  drops %" PRIu64,
+                        stats.contact_count, stats.contact_capacity,
+                        stats.pair_count, stats.pair_capacity,
+                        stats.cumulative.contact_drops),
+             12, 60, 16, LIME);
+    DrawText(
+        TextFormat("Last step: islands %u  executed %u  skipped %u  largest %u",
+                   stats.step.island_count, stats.step.island_executed_count,
+                   stats.step.island_skipped_count,
+                   stats.step.island_body_count_max),
+        12, 82, 16, SKYBLUE);
+    DrawText(TextFormat("Prepared contacts/joints %u/%u  tree visits %" PRIu64
+                        "  probes %" PRIu64,
+                        stats.step.contact_constraint_count,
+                        stats.step.joint_constraint_count,
+                        stats.step.work.tree_node_visits,
+                        stats.step.work.pair_probes),
+             12, 104, 16, SKYBLUE);
+    DrawText(TextFormat("Cumulative: graph bodies %" PRIu64
+                        "  wake visits %" PRIu64 "  wakes %" PRIu64,
+                        stats.cumulative.graph_body_visits,
+                        stats.cumulative.wake_visits,
+                        stats.cumulative.body_wakes),
+             12, 126, 16, GRAY);
+    DrawText(TextFormat(
+                 "Memory %zu B (arena %zu + shell %zu)  island %zu  sleep %zu",
+                 app->memory.arena_bytes + app->memory.world_bytes,
+                 app->memory.arena_bytes, app->memory.world_bytes,
+                 app->memory.island_bytes, app->memory.sleep_bytes),
+             12, 148, 16, GRAY);
+    DrawText(
+        TextFormat("Query %s: %s  matches %u  shown %u%s",
+                   queries[app->query_mode],
+                   app->query_valid
+                       ? (app->query_result.count > 0u ? "HIT" : "MISS")
+                       : (app->query_defined ? "INVALID" : "drag to define"),
+                   app->query_result.count,
+                   app->query_result.count < 8u ? app->query_result.count : 8u,
+                   app->query_result.truncated ? "  TRUNCATED" : ""),
+        12, 170, 18, WHITE);
+    DrawText(TextFormat("%s colors | asleep = dim | bounds: tight yellow / fat "
+                        "blue | %d fps",
+                        app->show_islands ? "Last-build island" : "Activation",
+                        GetFPS()),
+             12, 196, 16, GRAY);
+    if (sl_world_body_is_valid(&app->world, app->selected)) {
+        const sl_body_handle body = app->selected;
+        const sl_vec2 position = sl_world_body_get_position(&app->world, body);
+        const sl_vec2 velocity = sl_world_body_get_velocity(&app->world, body);
+        DrawRectangle(930, 4, 346, 144, Fade(BLACK, 0.86f));
+        DrawText(TextFormat("Selected %u:%u  %s", body.index, body.generation,
+                            sl_world_body_is_awake(&app->world, body)
+                                ? "awake"
+                                : "static/asleep"),
+                 940, 12, 18, WHITE);
+        DrawText(TextFormat("position %.3f, %.3f m", (double)position.x,
+                            (double)position.y),
+                 940, 38, 16, GRAY);
+        DrawText(TextFormat("velocity %.3f, %.3f m/s", (double)velocity.x,
+                            (double)velocity.y),
+                 940, 60, 16, GRAY);
+        DrawText(TextFormat("angle %.3f rad  spin %.3f rad/s",
+                            (double)sl_world_body_get_angle(&app->world, body),
+                            (double)sl_world_body_get_angular_velocity(
+                                &app->world, body)),
+                 940, 82, 16, GRAY);
+        sl_island_stats island;
+        if (sl_world_body_get_island_stats(&app->world, body, &island)) {
+            DrawText(TextFormat("Last build: island %u, bodies %u", island.id,
+                                island.dynamic_body_count),
+                     940, 104, 16, SKYBLUE);
+            DrawText(TextFormat("contacts %u, joints %u", island.contact_count,
+                                island.joint_count),
+                     940, 126, 16, SKYBLUE);
+        }
     }
-
-    if (app->paused) {
-        DrawText("PAUSED", SB_SCREEN_WIDTH - 130, 40, 20, RED);
-    }
-
-    DrawText("drag: spawn   b: shape   hold: tether   c: contacts   "
-             "a: AABBs   j: chain   space: pause   .: step   r: reset",
-             12, SB_SCREEN_HEIGHT - 28, 16, GRAY);
+    DrawRectangle(0, SB_SCREEN_HEIGHT - 52, SB_SCREEN_WIDTH, 52,
+                  Fade(BLACK, 0.9f));
+    DrawText("1-4: scene | S: sleep + rebuild | R: reset | space: pause | .: "
+             "step | M: move support | I: island colors",
+             12, SB_SCREEN_HEIGHT - 48, 16, WHITE);
+    DrawText("left hold: wake/tether | empty drag: spawn | B: shape | J: chain "
+             "| Q: query mode | right drag: query | A: bounds | C: contacts",
+             12, SB_SCREEN_HEIGHT - 24, 16, GRAY);
 }
 
 static void sb_draw(const sb_app *app)
@@ -860,6 +1144,7 @@ static void sb_draw(const sb_app *app)
     sb_draw_contacts(app);
     sb_draw_joints(app);
     sb_draw_forces(app);
+    sb_draw_query(app);
     sb_draw_hud(app);
     EndDrawing();
 }
@@ -868,37 +1153,32 @@ int main(void)
 {
     SetConfigFlags(FLAG_VSYNC_HINT);
     InitWindow(SB_SCREEN_WIDTH, SB_SCREEN_HEIGHT, "silk sandbox");
+    if (!IsWindowReady()) {
+        fprintf(stderr, "sandbox: display initialization failed\n");
+        return 1;
+    }
     SetTargetFPS(60);
 
     sb_app app = { 0 };
 
-    const sl_world_config config = {
-        .body_capacity = SB_BODY_CAPACITY,
-        .contact_capacity = SB_CONTACT_CAPACITY,
-        .joint_capacity = SB_JOINT_CAPACITY,
-        .gravity = k_sb_gravity,
-        .linear_drag = k_sb_linear_drag,
-        .angular_drag = k_sb_angular_drag,
-        .substep_count = SB_SUBSTEP_COUNT,
-    };
-    if (!sl_world_init(&app.world, &config)) {
-        fprintf(stderr, "sandbox: world init failed\n");
-        CloseWindow();
-        return 1;
-    }
-
+    app.sleep_enabled = true;
+    app.show_contacts = true;
     sb_reset(&app);
 
-    while (!WindowShouldClose()) {
+    while (!app.failed && !WindowShouldClose()) {
         sb_handle_input(&app);
+        if (app.failed) {
+            break;
+        }
         if (!app.paused) {
             sb_advance_frame(&app);
         }
         sb_cull_fallen(&app);
+        sb_update_query(&app);
         sb_draw(&app);
     }
 
     sl_world_destroy(&app.world);
     CloseWindow();
-    return 0;
+    return app.failed ? 1 : 0;
 }

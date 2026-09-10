@@ -5,6 +5,7 @@
 
 int sl_sleep_suite(void);
 int sl_island_suite(void);
+int sl_diagnostics_suite(void);
 int sl_stats_suite(void);
 int sl_replay_suite(void);
 int sl_core_suite(void);

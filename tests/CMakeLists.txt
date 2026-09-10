@@ -5,6 +5,7 @@ add_executable(sl_tests
     test_query.c
     test_sleep.c
     test_island.c
+    test_diagnostics.c
     test_stats.c
     test_core.c
     test_math.c
