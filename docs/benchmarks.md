@@ -112,6 +112,46 @@ Linux) around a release invocation; inspect step, pair maintenance and solver
 stacks. Keep profiling code/timers out of the library. Record the exact machine,
 compiler flags, revision, scene and invocation with any optimization decision.
 
+## 0.4.0 release verification
+
+[Matched release evidence](../bench/reports/phase4-release/comparison.json)
+compares merged main `feb220c` with clean release candidate `cba1ebf`. Five
+alternating repetitions per revision and sleep mode cover all seven matrix
+scenes and five solver-study scenes; queries have five matched batches.
+Every non-timing result matches, including physical digests, quality, work,
+activation and exact memory. All quality gates pass and drops remain zero.
+The eleven simulation object files are byte-identical; only the version
+implementation object differs. This wrap introduces no physics optimization.
+
+On the recorded Apple M4 Pro/AppleClang 21 host, pyramid/rain/piles medians
+vary by less than 1% between revisions in both modes. Tiny fixtures have larger
+relative spread, including roughly 6–7% higher inverted-stack medians at about
+0.003 ms per step. These are whole-step measurements, not evidence of a new
+engine cost or a promised performance improvement. Raw runs preserve the full
+ranges rather than selecting favorable samples.
+
+[Historical comparisons](../bench/reports/phase4-release/historical-comparison.json)
+also retain exact non-timing equality with the accepted workset measurements.
+Their timing comes from different sessions and is contextual evidence only.
+The original reports and rejected experiment records remain unchanged.
+[Verification details](../bench/reports/phase4-release/verification.json) record
+provenance, prerequisite merges and local checks; hosted CI is recorded on the
+release PR. Schema 4 remains the only current matrix format.
+
+To repeat the matched collection, archive each recorded revision into a separate
+source directory and configure each with `-DCMAKE_BUILD_TYPE=Release`,
+`-DSL_BUILD_BENCH=ON`, `-DSL_BUILD_TESTS=OFF`, and
+`-DSL_BENCH_REVISION=<full recorded revision>`. Build both, then run:
+
+```sh
+python3 bench/reports/phase4-release/collect.py /path/to/parent/build/bin /path/to/candidate/build/bin --output build/release-evidence
+```
+
+Keep the same compiler/flags and otherwise-idle host. The collector alternates
+revision order, preserves raw reports, applies the current validators and quality
+limits, and rejects any non-timing difference. It is a release comparison tool;
+intentional future physics changes require separate acceptance criteria.
+
 ## Recorded evidence
 
 The [five-run summary](../bench/reports/matrix/summary.json) and sibling raw

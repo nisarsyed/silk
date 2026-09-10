@@ -1,0 +1,100 @@
+{
+  "candidate_revision": "cba1ebf62d26f636016e7d42baeb982e4b3b505e",
+  "baseline_revision": "feb220cbe7de6b01b136b2c40a448f879302d8fd",
+  "host_cpu": "Apple M4 Pro",
+  "host_memory_bytes": 25769803776,
+  "prerequisites": [
+    {
+      "issue": 57,
+      "pr": 72,
+      "merge_commit": "51c574413cf956d38fb3b013a2376d38689569bf",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 58,
+      "pr": 73,
+      "merge_commit": "92c6be5e3a36ace61c95783dc9ce132f20243ca8",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 59,
+      "pr": 74,
+      "merge_commit": "c0bb79744736eafd8cd9a0992ff529cbd31522b7",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 60,
+      "pr": 75,
+      "merge_commit": "cb05a39966fc0180f1a90c8793ec9c31f29125a5",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 61,
+      "pr": 77,
+      "merge_commit": "88ef7477b431e315c8fe1e3affddb1740eb560c2",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 62,
+      "pr": 78,
+      "merge_commit": "c4bcd9e6617dc291976574661b68155702569113",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 63,
+      "pr": 80,
+      "merge_commit": "efc687a96f8bc4b85f7e82c087762713546e4704",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 64,
+      "pr": 81,
+      "merge_commit": "0b22cb600d99fbf733c9c6703d6bdd452f256c89",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 65,
+      "pr": 83,
+      "merge_commit": "dfdb657fd358f0a835116eb2dfad68f36074ca2b",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 66,
+      "pr": 84,
+      "merge_commit": "9140587a2b20678ec5f95500ec2685fcb2de26e9",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 67,
+      "pr": 85,
+      "merge_commit": "feb220cbe7de6b01b136b2c40a448f879302d8fd",
+      "reachable_from_baseline": true
+    },
+    {
+      "issue": 68,
+      "pr": 86,
+      "merge_commit": "cf094a79fd934e59e2dc8a13e47463477a5bc689",
+      "reachable_from_baseline": true
+    }
+  ],
+  "local_checks": [
+    "debug configure/build/CTest",
+    "release configure/build/CTest",
+    "sanitize configure/build/CTest",
+    "sandbox build",
+    "sandbox-release build",
+    "external consumer Debug",
+    "external consumer Release",
+    "independent benchmark geometry",
+    "headless example",
+    "report parser/live CLI tests",
+    "six solver-study tests",
+    "clang-format 22.1.3",
+    "git diff --check"
+  ],
+  "manual_sandbox": "Nisar confirmed complete Wave 4 gesture checklist on 2026-09-10; no sandbox behavior changes in this wrap.",
+  "reproduction": "Fetched 894213f18f40790ad16e6a0b6a5d30f8806c6f0a into a fresh bare repository; archived experiment patch applies cleanly.",
+  "attribution": "No third-party implementation code added; existing MIT license and method citations retained. DOI publisher returned 403; DOI registration and title verified through Crossref.",
+  "measurement": "Clean archived source revisions built with -DCMAKE_BUILD_TYPE=Release -DSL_BUILD_BENCH=ON -DSL_BUILD_TESTS=OFF and explicit SL_BENCH_REVISION, then collect.py ran five alternating repetitions. Only silk.c.o differs; all eleven simulation object files are byte-identical.",
+  "post_measurement_changes": "Evidence and documentation only."
+}
