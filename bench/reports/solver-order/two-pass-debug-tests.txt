@@ -1,0 +1,243 @@
+[replay] mixed operations                 ok
+[replay] coupled long run                 ok
+[replay] rejection and first divergence   ok
+[replay] capacity and retry recovery      ok
+[sleep] seeded activation mutation replay ok
+[sleep] support changes, contacts and moving kinematics ok
+[sleep] settling guards and new joint propagation ok
+[sleep] settled piles/chains, replay and exact holds ok
+[sleep] mutation wake propagation        ok
+[sleep] rejection, no-ops and timestep changes ok
+[island] capacity, cycles and immediate reuse ok
+[island] seeded connectivity and range oracle ok
+[island] shared boundaries and speculative edges ok
+[stats] tiny work and snapshot lifetime  ok
+[stats] exact memory categories          ok
+[stats] counter saturation and empty step ok
+[consumer] public_lifecycle                 ok
+[query] seeded mutation oracle and replay ok
+[query] boundaries ordering and snapshots ok
+[query] rejection and empty world        ok
+[core] version_matches_macros           ok
+[math] scalar_min_max                   ok
+[math] scalar_clamp                     ok
+[math] scalar_feq                       ok
+[math] vec2_make_and_components         ok
+[math] vec2_add_sub_neg_scale           ok
+[math] vec2_dot                         ok
+[math] vec2_cross_sign                  ok
+[math] vec2_length_normalize            ok
+[math] vec2_perp_is_orthogonal_ccw      ok
+[math] vec2_right_perp_and_scalar_cross_order ok
+[math] vec2_lerp_endpoints              ok
+[math] vec2_distance                    ok
+[math] vec2_min_max_componentwise       ok
+[math] vec2_distance_sq_matches_distance ok
+[math] rotation_identity_is_exact       ok
+[math] rotation_make_matches_mat2_rotation ok
+[math] rotation_apply_inverse_roundtrip ok
+[math] rotation_mul_composes_and_reports_angle ok
+[math] rotation_normalize_is_scale_safe ok
+[math] rotation_integrate_small_and_extreme_deltas ok
+[math] transform_apply_rotates_then_translates ok
+[math] transform_apply_inverse_roundtrip ok
+[math] aabb_contains_point_boundary_inclusive ok
+[math] aabb_is_valid_rejects_inverted_or_non_finite ok
+[math] aabb_set_operations_are_boundary_inclusive ok
+[math] segment_distance_crossing_and_parallel ok
+[math] segment_distance_handles_degenerate_and_invalid ok
+[math] angle_wrap_identity_inside_range ok
+[math] angle_wrap_single_turn           ok
+[math] angle_wrap_many_turns            ok
+[math] mat2_identity                    ok
+[math] mat2_multiply_operand_order      ok
+[math] mat2_rotation_90deg              ok
+[math] mat2_rotation_composition        ok
+[math] mat2_transpose_inverse_for_rotation ok
+[math] mat2_solve_known_system          ok
+[math] mat2_solve_rejects_without_partial_output ok
+[shape] long circle rays preserve radius ok
+[shape] none_shape_is_zeroed_and_inert   ok
+[shape] constructors_zero_unused_payload ok
+[shape] circle_make_rejects_bad_radius   ok
+[shape] shape_extent_limit_bounds_derived_data ok
+[shape] far_origin_polygon_is_canonical_and_valid ok
+[shape] circle_mass_data_matches_closed_form ok
+[shape] circle_aabb_ignores_rotation     ok
+[shape] box_make_matches_closed_form     ok
+[shape] box_mass_data_matches_closed_form ok
+[shape] right_triangle_mass_data_matches_closed_form ok
+[shape] polygon_make_recenters_offset_input ok
+[shape] polygon_accepts_octagon_at_vertex_count_max ok
+[shape] polygon_make_rejects_bad_count   ok
+[shape] polygon_make_rejects_non_finite_vertex ok
+[shape] polygon_make_rejects_clockwise_winding ok
+[shape] polygon_make_rejects_collinear_vertex ok
+[shape] polygon_make_rejects_near_duplicate_vertices ok
+[shape] polygon_make_rejects_reflex_vertex ok
+[shape] polygon_make_rejects_self_intersecting_star ok
+[shape] polygon_make_rejects_overflowing_geometry ok
+[shape] shape_is_valid_accepts_made_rejects_tampered ok
+[shape] polygon_aabb_bounds_rotated_box  ok
+[shape] contains_point_circle_boundary_inclusive ok
+[shape] contains_point_polygon_uses_inverse_transform ok
+[shape] ray_cast_circle_hits_front_face_with_outward_normal ok
+[shape] ray_cast_circle_from_inside_or_boundary_misses ok
+[shape] ray_cast_polygon_hits_edge_with_outward_normal ok
+[shape] ray_cast_polygon_from_inside_or_parallel_misses ok
+[shape] ray_cast_rejects_malformed_ray   ok
+[shape] random_convex_polygons_satisfy_invariants ok
+[collide] circles overlap analytically     ok
+[collide] circle boundary cases            ok
+[collide] polygon circle regions           ok
+[collide] circle polygon flip              ok
+[collide] resting box contacts             ok
+[collide] polygon speculative gap          ok
+[collide] rotated and large contacts       ok
+[collide] seeded circle properties         ok
+[collide] none is inert                    ok
+[contact] pair lifecycle and speculative   ok
+[contact] type and shape filters           ok
+[contact] proxy lifecycle and reset        ok
+[contact] stale contact and slot reuse     ok
+[contact] materials and persistence        ok
+[contact] saturation retry                 ok
+[contact] saturation retry order and uniqueness ok
+[contact] capacity and determinism         ok
+[contact] pair hash churn                  ok
+[study graph] seeded independent layer oracle  ok
+[study graph] fallback policies                ok
+[study graph] finite failed stage rollback     ok
+[solver] resting ball                     ok
+[solver] two point normal block           ok
+[solver] ten box stack                    
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_solver.c:131: drift_max < 0.01f
+FAILED
+[solver] restitution                      ok
+[solver] friction incline                 ok
+[solver] kinematic paddle                 ok
+[solver] material refresh                 ok
+[solver] static softness                  ok
+[solver] tuning and extreme mass          ok
+[solver] seeded pile determinism          ok
+[joint] config and descriptor atomicity  ok
+[joint] handles, reset, body destroy     ok
+[joint] collision suppression requery    ok
+[joint] revolute free rotation           ok
+[joint] revolute mass-independent correction ok
+[joint] rotating distance energy         ok
+[joint] coincident distance axis         ok
+[joint] distance load and step impulse   ok
+[joint] pendulum period                  ok
+[joint] eight-link top load              ok
+[joint] extreme mass ratio               ok
+[joint] joint determinism                ok
+[tree] memory and init validation       ok
+[tree] root isolation and boundaries    ok
+[tree] capacity and query overflow      ok
+[tree] seeded mutations vs brute force  ok
+[tree] deterministic traversal order    ok
+[tree] tied insertion balance           ok
+[body] desc_defaults_are_dynamic_point_particle ok
+[body] materials_validate_pack_and_reset ok
+[body] create_static_stores_infinite_mass_as_zero ok
+[body] create_rejects_static_or_kinematic_with_mass ok
+[body] create_rejects_static_with_velocity ok
+[body] create_rejects_unknown_type      ok
+[body] create_rejects_non_finite_angle_or_spin ok
+[body] create_wraps_angle               ok
+[body] create_with_shape_derives_inertia ok
+[body] create_rejects_tampered_shape_before_measuring_it ok
+[body] create_normalizes_circle_payload ok
+[body] create_normalizes_polygon_vertex_tail ok
+[body] set_shape_normalizes_none_payload ok
+[body] set_mass_rejects_when_banked_force_would_overflow ok
+[body] set_shape_rejects_when_banked_torque_would_overflow ok
+[body] set_shape_on_dynamic_body_sets_inertia ok
+[body] set_shape_null_detaches_and_zeroes_inertia ok
+[body] set_shape_rejects_invalid_shape  ok
+[body] set_shape_on_static_keeps_zero_inertia ok
+[body] set_mass_rescales_inertia        ok
+[body] set_mass_rejected_on_non_dynamic ok
+[body] set_mass_rejects_inertia_inverse_overflow ok
+[body] set_angular_velocity_only_zero_on_static ok
+[body] apply_torque_accumulates_on_dynamic ok
+[body] apply_torque_rejected_on_non_dynamic ok
+[body] apply_torque_rejects_non_finite_and_overflow ok
+[body] apply_force_at_point_adds_cross_product_torque ok
+[body] apply_force_at_point_rejects_atomically ok
+[body] apply_force_rejected_on_non_dynamic ok
+[body] get_transform_matches_position_and_angle ok
+[body] get_shape_reflects_set_shape     ok
+[body] destroy_swap_moves_angular_and_shape_rows ok
+[world] init_destroy_roundtrip           ok
+[world] init_zeroes_contact_storage      ok
+[world] init_rejects_bad_capacity        ok
+[world] create_roundtrips_state          ok
+[world] memory_bytes_at_capacity_max_within_budget 
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:133: worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX + state_bytes)
+
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:134: worst <= (size_t)97u << 20
+
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:143: joint_worst == ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX + (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes)
+
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:144: joint_worst <= (size_t)108u << 20
+
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:158: small == ((size_t)6208u + state_bytes)
+
+    FAIL /Users/nisar/personal/projects/engine/build/solver-study/experiment/tests/test_world.c:164: sl_world_memory_bytes(&small_joints) == ((size_t)6616u + state_bytes)
+FAILED
+[world] create_rejects_non_finite_state  ok
+[world] position_domain_is_enforced      ok
+[world] create_rejects_non_positive_mass ok
+[world] create_rejects_inverse_overflow  ok
+[world] fill_to_capacity                 ok
+[world] destroy_invalidates_handle       ok
+[world] destroy_tolerates_bad_handles    ok
+[world] slot_reuse_bumps_generation      ok
+[world] arrays_stay_packed_on_middle_destroy ok
+[world] traversal_visits_each_body_once  ok
+[world] destroy_during_traversal_visits_each_once ok
+[world] partial_cull_during_traversal    ok
+[world] at_matches_handle_traversal      ok
+[world] reset_invalidates_and_refills    ok
+[world] set_mass_updates_inv_mass        ok
+[world] setters_roundtrip                ok
+[world] setters_report_rejected_values   ok
+[world] churn_stress_matches_model       ok
+[step] stepper_init_rejects_bad_timestep ok
+[step] step_moves_body_under_gravity    ok
+[step] default_substeps_pin_gravity_trajectory ok
+[step] substep_drag_and_force_equations ok
+[step] moving_body_speed_caps           ok
+[step] mid_substep_domain_hold_by_body_type ok
+[step] invalid_step_is_release_safe_and_atomic ok
+[step] step_applies_force_via_inv_mass  ok
+[step] force_clears_after_step          ok
+[step] apply_force_rejects_non_finite   ok
+[step] apply_force_rejects_overflowing_sum ok
+[step] apply_force_rejects_acceleration_overflow ok
+[step] step_holds_last_finite_state_on_overflow ok
+[step] step_holds_velocity_when_candidate_overflows ok
+[step] position_domain_boundary_matches_setters ok
+[step] position_domain_holds_pose_and_allows_recovery ok
+[step] position_domain_rejects_axes_independently ok
+[step] drag_halves_velocity_per_step    ok
+[step] drag_extreme_coefficient_stable  ok
+[step] advance_runs_steps_and_carries_remainder ok
+[step] advance_drops_debt_at_cap        ok
+[step] advance_ignores_garbage_frame_time ok
+[step] determinism_identical_sequences_bitwise ok
+[step] results_independent_of_packed_layout ok
+[step] config_validation_and_defaults   ok
+[step] torque_integrates_angular_velocity_by_inv_inertia ok
+[step] torque_clears_after_step         ok
+[step] angular_drag_halves_spin_per_step ok
+[step] angle_stays_principal_after_many_rotations ok
+[step] large_rotation_is_capped_per_full_step ok
+[step] static_body_ignores_gravity_and_force ok
+[step] kinematic_moves_without_drag_or_gravity ok
+[step] shapeless_dynamic_spins_kinematically ok
+[step] churn_step_stress_matches_model  ok
+[step] churn_mixed_types_stress_matches_model ok
+7 failure(s)

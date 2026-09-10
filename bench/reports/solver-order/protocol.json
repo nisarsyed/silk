@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "status": "complete; both candidates rejected, see decision.json",
+  "baseline_revision": "0b22cb600d99fbf733c9c6703d6bdd452f256c89",
+  "sources": [
+    {
+      "title": "Two-Pass Shock Propagation for Stable Stacking with Gauss-Seidel",
+      "url": "https://doi.org/10.1145/3747867",
+      "year": 2025
+    },
+    {
+      "title": "Author project",
+      "url": "https://ziyanxiong.github.io/2PSP/"
+    },
+    {
+      "title": "Author reference implementation",
+      "url": "https://github.com/ZiyanXiong/2PSP",
+      "revision": "84ce5e23c3874e6d6700cf082b3318ca9b73ab78",
+      "note": "Read for algorithm interpretation only. No repository license file was present in the inspected tree; do not copy its code. Derive the experiment independently from Silk primitives and attribute the method."
+    }
+  ],
+  "hypothesis": "Test stable gravity-directed ordering separately from a bounded withheld-impulse adaptation. Do not infer that either reproduces the reference implementation or its published speedups.",
+  "variants": [
+    "unchanged Soft Step",
+    "ordering only",
+    "two-pass with one sweep per layer per direction"
+  ],
+  "stage_mapping": {
+    "substeps": 4,
+    "graph": "Build once after contact refresh and normal constraint preparation; preserve the original prepared-row mapping and cache storage.",
+    "warm_start": "Unchanged two-body warm start.",
+    "biased": "Ordering-only visits ascending graph layers. Two-pass solves ascending layers with lower-body response withheld, then visits descending layers, releasing accumulated responses to each layer before resolving its support constraints. Preserve source order inside each layer.",
+    "relaxation_and_restitution": "Unchanged scalar unbiased relaxation and final restitution; friction remains active inside each manifold solve.",
+    "budget": "Baseline and ordering-only use one biased manifold evaluation per substep; two-pass uses two. Report actual evaluations including failed attempts/fallback, rather than presenting equal substeps as equal work."
+  },
+  "graph": {
+    "vertices": "Dynamic bodies in each existing island. Static bodies are support boundaries.",
+    "edges": "Orient contacts by body position projected against gravity, using double arithmetic. Equal projected heights are ambiguous and select the cycle/equal-height fallback.",
+    "algorithm": "Bounded adjacency arrays, indegrees and a lowest-slot-first heap for topological traversal; longest support distance defines a layer. Sort contact indices by layer then original row using nonrecursive heapsort.",
+    "fallbacks": [
+      "zero gravity",
+      "joint-coupled island",
+      "kinematic boundary",
+      "cycle or equal-height dynamic edge",
+      "unrooted dynamic body without a static-support path",
+      "non-finite arithmetic"
+    ],
+    "dynamic_policy": "Unsupported free-flight components keep Soft Step. Supported toppling components are exercised rather than excluded by an unmeasured velocity cutoff."
+  },
+  "scratch_budget": {
+    "body_bytes_per_capacity": 40,
+    "contact_bytes_per_capacity": 152,
+    "body_components": "Four uint32 arrays (heads, indegrees, layers, queue) plus saved linear/angular velocities and deferred linear/angular responses (two groups of three floats).",
+    "contact_components": "Adjacency next and ordered-index arrays (8 bytes), plus a snapshot of the existing 144-byte prepared constraint for transactional fallback.",
+    "ownership": "Carve scratch and fixed context from the existing initialization-owned solver arena. No step allocation, recursion, public production selector, or permanent alternative backend."
+  },
+  "finite_transaction": "Snapshot the island velocities and prepared constraints before the two-pass attempt. Evaluate top-body responses and withheld lower-body responses in finite local state. If release or any complete candidate state is invalid, restore the snapshots and execute the original biased stage. Never retain a half-applied non-finite impulse.",
+  "fixtures": {
+    "existing": [
+      "pyramid",
+      "rain",
+      "table",
+      "inverted",
+      "chains"
+    ],
+    "additional": [
+      "bridge with multiple supports",
+      "support-removal collapse",
+      "zero-gravity momentum exchange",
+      "equal-height contact cycle",
+      "supported toppling"
+    ],
+    "quality": "Keep existing matrix thresholds. Pin new geometry and quality windows on the unoptimized baseline before comparing variants. Measure penetration, movement, residual speed, support/load transfer, momentum where external forces permit comparison, and failure/fallback coverage."
+  },
+  "evidence": "Five matched release runs, repeated same-binary determinism, actual graph/constraint work and exact memory. Validate sleep-disabled behavior and sleep-enabled compatibility separately. Run original physical/replay tests on experiments and record failures without loosening them.",
+  "decision_rule": "Adopt only if physical and runtime evidence justify the change at the intended bounded budget. Otherwise retain Soft Step and archive only the reproducible experiment patch, harness and decision data; leave no runtime dispatch."
+}

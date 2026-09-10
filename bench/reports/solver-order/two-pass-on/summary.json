@@ -1,0 +1,89 @@
+{
+  "command": [
+    "/Users/nisar/personal/projects/engine/build/solver-study/two-pass/bin/sl_bench_study",
+    "--sleep",
+    "on"
+  ],
+  "repetitions": 5,
+  "metadata": {
+    "revision": "894213f-two-pass-experiment",
+    "compiler": "21.0.0.21000101",
+    "compiler_id": "AppleClang",
+    "host": "Darwin",
+    "host_version": "25.6.0",
+    "processor": "arm64",
+    "flags": "-DSL_STUDY_TWO_PASS=1 -O3 -DNDEBUG"
+  },
+  "violations": [
+    "topple: penetration_max > 0.04",
+    "topple: linear_speed_max > 0.001",
+    "topple: angular_speed_max > 0.001"
+  ],
+  "scenes": [
+    {
+      "scene": "bridge",
+      "average_ms_runs": [
+        0.000453333333,
+        0.000415,
+        0.000406666667,
+        0.000415,
+        0.00044
+      ],
+      "median_ms": 0.000415,
+      "minimum_ms": 0.000406666667,
+      "maximum_ms": 0.000453333333
+    },
+    {
+      "scene": "collapse",
+      "average_ms_runs": [
+        0.003775,
+        0.0039,
+        0.00373166667,
+        0.0038,
+        0.00369833333
+      ],
+      "median_ms": 0.003775,
+      "minimum_ms": 0.00369833333,
+      "maximum_ms": 0.0039
+    },
+    {
+      "scene": "zero-gravity",
+      "average_ms_runs": [
+        0.00035,
+        0.00037,
+        0.000376666667,
+        0.000343333333,
+        0.000351666667
+      ],
+      "median_ms": 0.000351666667,
+      "minimum_ms": 0.000343333333,
+      "maximum_ms": 0.000376666667
+    },
+    {
+      "scene": "cycle",
+      "average_ms_runs": [
+        0.000605,
+        0.000601666667,
+        0.000603333333,
+        0.000596666667,
+        0.000585
+      ],
+      "median_ms": 0.000601666667,
+      "minimum_ms": 0.000585,
+      "maximum_ms": 0.000605
+    },
+    {
+      "scene": "topple",
+      "average_ms_runs": [
+        0.004775,
+        0.00464666667,
+        0.004645,
+        0.004635,
+        0.00461833333
+      ],
+      "median_ms": 0.004645,
+      "minimum_ms": 0.00461833333,
+      "maximum_ms": 0.004775
+    }
+  ]
+}

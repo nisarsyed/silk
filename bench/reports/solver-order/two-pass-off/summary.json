@@ -1,0 +1,87 @@
+{
+  "command": [
+    "/Users/nisar/personal/projects/engine/build/solver-study/two-pass/bin/sl_bench_study",
+    "--sleep",
+    "off"
+  ],
+  "repetitions": 5,
+  "metadata": {
+    "revision": "894213f-two-pass-experiment",
+    "compiler": "21.0.0.21000101",
+    "compiler_id": "AppleClang",
+    "host": "Darwin",
+    "host_version": "25.6.0",
+    "processor": "arm64",
+    "flags": "-DSL_STUDY_TWO_PASS=1 -O3 -DNDEBUG"
+  },
+  "violations": [
+    "topple: penetration_max > 0.04"
+  ],
+  "scenes": [
+    {
+      "scene": "bridge",
+      "average_ms_runs": [
+        0.00429,
+        0.00312166667,
+        0.00269666667,
+        0.00246666667,
+        0.00249333333
+      ],
+      "median_ms": 0.00269666667,
+      "minimum_ms": 0.00246666667,
+      "maximum_ms": 0.00429
+    },
+    {
+      "scene": "collapse",
+      "average_ms_runs": [
+        0.00632166667,
+        0.00501666667,
+        0.00440166667,
+        0.00409333333,
+        0.004115
+      ],
+      "median_ms": 0.00440166667,
+      "minimum_ms": 0.00409333333,
+      "maximum_ms": 0.00632166667
+    },
+    {
+      "scene": "zero-gravity",
+      "average_ms_runs": [
+        0.000315,
+        0.000335,
+        0.0003,
+        0.00029,
+        0.000268333333
+      ],
+      "median_ms": 0.0003,
+      "minimum_ms": 0.000268333333,
+      "maximum_ms": 0.000335
+    },
+    {
+      "scene": "cycle",
+      "average_ms_runs": [
+        0.00541166667,
+        0.00457,
+        0.00409666667,
+        0.0039,
+        0.00389833333
+      ],
+      "median_ms": 0.00409666667,
+      "minimum_ms": 0.00389833333,
+      "maximum_ms": 0.00541166667
+    },
+    {
+      "scene": "topple",
+      "average_ms_runs": [
+        0.006635,
+        0.00556,
+        0.00493666667,
+        0.00478,
+        0.00474333333
+      ],
+      "median_ms": 0.00493666667,
+      "minimum_ms": 0.00474333333,
+      "maximum_ms": 0.006635
+    }
+  ]
+}
