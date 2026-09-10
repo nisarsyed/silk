@@ -1,0 +1,118 @@
+{
+  "command": [
+    "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+    "--scene",
+    "all",
+    "--warmup",
+    "120",
+    "--steps",
+    "600",
+    "--sleep",
+    "on"
+  ],
+  "repetitions": 5,
+  "metadata": {
+    "compiler": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "build": "Release",
+    "flags": " -O3 -DNDEBUG",
+    "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+    "host": "Darwin",
+    "host_version": "25.6.0",
+    "processor": "arm64",
+    "revision": "0b22cb600d99fbf733c9c6703d6bdd452f256c89-dirty"
+  },
+  "scenes": [
+    {
+      "scene": "pyramid",
+      "average_ms_runs": [
+        0.0546516667,
+        0.0548466667,
+        0.0544516667,
+        0.0547716667,
+        0.0553183333
+      ],
+      "median_average_ms": 0.0547716667,
+      "minimum_average_ms": 0.0544516667,
+      "maximum_average_ms": 0.0553183333
+    },
+    {
+      "scene": "rain",
+      "average_ms_runs": [
+        1.11727833,
+        1.14909167,
+        1.13048333,
+        1.13325667,
+        1.12306833
+      ],
+      "median_average_ms": 1.13048333,
+      "minimum_average_ms": 1.11727833,
+      "maximum_average_ms": 1.14909167
+    },
+    {
+      "scene": "piles",
+      "average_ms_runs": [
+        0.018395,
+        0.0183733333,
+        0.0184283333,
+        0.0183233333,
+        0.0183066667
+      ],
+      "median_average_ms": 0.0183733333,
+      "minimum_average_ms": 0.0183066667,
+      "maximum_average_ms": 0.0184283333
+    },
+    {
+      "scene": "chains",
+      "average_ms_runs": [
+        0.00691666667,
+        0.00699,
+        0.00696833333,
+        0.00694333333,
+        0.00700333333
+      ],
+      "median_average_ms": 0.00696833333,
+      "minimum_average_ms": 0.00691666667,
+      "maximum_average_ms": 0.00700333333
+    },
+    {
+      "scene": "churn",
+      "average_ms_runs": [
+        0.01755,
+        0.0175566667,
+        0.0175383333,
+        0.0177666667,
+        0.0176033333
+      ],
+      "median_average_ms": 0.0175566667,
+      "minimum_average_ms": 0.0175383333,
+      "maximum_average_ms": 0.0177666667
+    },
+    {
+      "scene": "table",
+      "average_ms_runs": [
+        0.000475,
+        0.000478333333,
+        0.000488333333,
+        0.000486666667,
+        0.000485
+      ],
+      "median_average_ms": 0.000485,
+      "minimum_average_ms": 0.000475,
+      "maximum_average_ms": 0.000488333333
+    },
+    {
+      "scene": "inverted",
+      "average_ms_runs": [
+        0.00305,
+        0.00309,
+        0.00311833333,
+        0.00312333333,
+        0.00311
+      ],
+      "median_average_ms": 0.00311,
+      "minimum_average_ms": 0.00305,
+      "maximum_average_ms": 0.00312333333
+    }
+  ]
+}

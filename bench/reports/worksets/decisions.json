@@ -1,0 +1,109 @@
+{
+  "baseline_revision": "0b22cb600d99fbf733c9c6703d6bdd452f256c89",
+  "joint_implementation_revision": "0d5699f",
+  "candidate_metadata_note": "Joint runs were collected before committing, and correctly report the parent revision with a dirty suffix. The only engine change is the joint.c diff in 0d5699f.",
+  "host": {
+    "cpu": "Apple M4 Pro",
+    "memory_bytes": 25769803776,
+    "compiler": "AppleClang 21.0.0.21000101",
+    "flags": "-O3 -DNDEBUG",
+    "platform": "macOS arm64"
+  },
+  "joint": {
+    "decision": "adopt",
+    "cost_before": "At four substeps, warm start, biased/relaxed solve and store visit each island 13 times even with zero joints. Each visit reads range metadata and calls the sleep predicate. Preparation also scans islands with reserved but unused capacity.",
+    "cost_after": "A single prepared-count load/branch per stage skips all island reads when no joint constraints execute. Nonempty stages retain exactly the same traversal. No new allocations, arrays or public APIs.",
+    "memory_delta_bytes": 0,
+    "deterministic_result_fields_equal": true,
+    "confirming_repetitions": 5,
+    "confirmation_order": "Alternating parent/candidate order on successive repetitions, both sleep modes, all seven fixtures, 120 warmup and 600 measured steps.",
+    "median_churn_change_percent": {
+      "off": -9.721631938543073,
+      "on": -10.078500886300324
+    }
+  },
+  "query": {
+    "decision": "reject",
+    "cost_before": "C candidates: C exact tests plus O(C log C) bounded heapsort; caller writes bounded by capacity.",
+    "cost_candidate": "C exact tests plus compaction writes and O(M log M) sorting of M exact matches. Same scratch capacity. Avoids sorting count-only queries.",
+    "reason": "Point misses improved 10.7%, but all-body broad queries regressed 1.7% in the confirming batch. No demonstrated application workload justifies that tradeoff.",
+    "patch": "query-compaction.patch",
+    "fixture": "bench/query.c",
+    "repetitions": 5,
+    "queries_per_batch": 65536,
+    "warmup_batches": 1,
+    "memory_delta_bytes": 0,
+    "digest_equal": true
+  },
+  "vectorization": {
+    "status": "complete; retain compiler defaults",
+    "flags_disabled": "-fno-vectorize -fno-slp-vectorize",
+    "physical_digests_equal": true
+  },
+  "profiling": {
+    "command": "sample <benchmark-pid> 1 1 -file <output>",
+    "benchmark_arguments": "--scene churn|rain --sleep off|on --warmup 10000 --steps 10000",
+    "build_flags": "-O3 -DNDEBUG -g",
+    "limitation": "CLI sampling includes setup, warmup and quality work and supplies statistical stacks, not hardware counters or isolated function timings. Full Xcode/Instruments is unavailable."
+  },
+  "simd": {
+    "decision": "reject",
+    "patch": "simd-aabb.patch",
+    "target": "Four AABB interval comparisons in broad-phase/query overlap tests, preserving the existing finite-input validation.",
+    "cost_before": "After validation, four scalar comparisons and boolean combination. AABB payload is four floats (16 bytes); tree traversal is a dependent node walk.",
+    "cost_candidate": "Same inputs and allocation, but construct two four-lane vectors, compare and reduce. Wrapper assembly contains six lane moves plus comparison/reduction; vectorization does not remove node lookup or validation.",
+    "reason": "Five alternating full matrix runs show no repeatable whole-step gain beyond timing spread. No production architecture path is justified; the core remains portable C.",
+    "testing": "Apple M4 Pro/AppleClang only; release complete replay/physical tests and full quality gates passed; every non-timing matrix field matches parent across five runs in each sleep mode. Query digests match.",
+    "memory_delta_bytes": 0,
+    "query_results": [
+      {
+        "scene": "query-point",
+        "parent_ms": [
+          25.194,
+          21.553,
+          21.865,
+          22.433,
+          22.661
+        ],
+        "simd_ms": [
+          24.959,
+          21.706,
+          20.962,
+          21.873,
+          21.188
+        ],
+        "median_change_percent": -3.240761378326573
+      },
+      {
+        "scene": "query-broad",
+        "parent_ms": [
+          999.734,
+          992.852,
+          994.239,
+          988.896,
+          991.855
+        ],
+        "simd_ms": [
+          965.049,
+          965.812,
+          983.718,
+          969.661,
+          981.186
+        ],
+        "median_change_percent": -2.3357962717504788
+      }
+    ]
+  },
+  "threading": {
+    "decision": "defer",
+    "assessment": "docs/benchmarks.md: Threading feasibility",
+    "independent_work": "Disjoint dynamic island ranges with static/kinematic boundary reads. Preserve sequential constraint ordering within each island.",
+    "shared_state": "Tree/query scratch, wake/union scratch, contact and pair mutations, pools and diagnostic publication require serialization or bounded worker-local storage and deterministic merging.",
+    "cost": "Awake piles whole-step time gives an upper bound near 5 microseconds/component; chains near 2 microseconds/component. Sleeping removes most solver work; rain finishes as one 2000-body island. Scheduling/barrier overhead was not measured; no parallel speedup is claimed.",
+    "future_scope": "Separate measured coarse-island worker-contract experiment with fixed initialization-owned task/scratch storage, explicit kinematic barriers and deterministic completion; no scheduler or threading dependency is added."
+  },
+  "other_candidates": {
+    "pair_maintenance": "Defer: churn has 75276 cumulative pair probes versus 860526 graph constraint visits across the full run. Profiling identified empty joint-range traversal as a simpler supported change. Counts are not interchangeable cycle costs and do not prove hashing is free.",
+    "body_scans_and_wake_scratch": "Defer: avoid new persistent workset arrays or wake-generation metadata without a measured advantage after the count guard. Existing memory, wake semantics and full replay remain unchanged."
+  }
+}

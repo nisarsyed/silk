@@ -1,0 +1,492 @@
+{
+  "commands": [
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-simd/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ]
+  ],
+  "results": [
+    {
+      "scene": "pyramid",
+      "sleep": "off",
+      "parent_ms": [
+        0.245985,
+        0.242435,
+        0.243226667,
+        0.243401667,
+        0.24321
+      ],
+      "simd_ms": [
+        0.249855,
+        0.241391667,
+        0.245633333,
+        0.243873333,
+        0.24373
+      ],
+      "median_change_percent": 0.26586969594086796
+    },
+    {
+      "scene": "rain",
+      "sleep": "off",
+      "parent_ms": [
+        1.03863833,
+        1.03885833,
+        1.03982667,
+        1.06319667,
+        1.05285667
+      ],
+      "simd_ms": [
+        1.04680833,
+        1.04596667,
+        1.03968167,
+        1.05485833,
+        1.04339833
+      ],
+      "median_change_percent": 0.5904830273299355
+    },
+    {
+      "scene": "piles",
+      "sleep": "off",
+      "parent_ms": [
+        0.07568,
+        0.0745383333,
+        0.0766183333,
+        0.07852,
+        0.0749133333
+      ],
+      "simd_ms": [
+        0.0783366667,
+        0.0774166667,
+        0.0736116667,
+        0.07733,
+        0.0771266667
+      ],
+      "median_change_percent": 2.1802325581395277
+    },
+    {
+      "scene": "chains",
+      "sleep": "off",
+      "parent_ms": [
+        0.0167233333,
+        0.0175883333,
+        0.0174633333,
+        0.018075,
+        0.0174916667
+      ],
+      "simd_ms": [
+        0.0176183333,
+        0.0170216667,
+        0.0175466667,
+        0.0173983333,
+        0.0171366667
+      ],
+      "median_change_percent": -0.5335878026992091
+    },
+    {
+      "scene": "churn",
+      "sleep": "off",
+      "parent_ms": [
+        0.0152883333,
+        0.0148483333,
+        0.0156033333,
+        0.0159333333,
+        0.015535
+      ],
+      "simd_ms": [
+        0.0161933333,
+        0.0153483333,
+        0.015705,
+        0.015705,
+        0.0152266667
+      ],
+      "median_change_percent": 1.0943031863533959
+    },
+    {
+      "scene": "table",
+      "sleep": "off",
+      "parent_ms": [
+        0.00198166667,
+        0.002015,
+        0.00201,
+        0.00198166667,
+        0.00201
+      ],
+      "simd_ms": [
+        0.00203,
+        0.00196666667,
+        0.00189666667,
+        0.00201333333,
+        0.00197333333
+      ],
+      "median_change_percent": -1.824212437810957
+    },
+    {
+      "scene": "inverted",
+      "sleep": "off",
+      "parent_ms": [
+        0.002645,
+        0.00263166667,
+        0.00282666667,
+        0.00282333333,
+        0.00287333333
+      ],
+      "simd_ms": [
+        0.00273,
+        0.002875,
+        0.00277666667,
+        0.00299166667,
+        0.002805
+      ],
+      "median_change_percent": -0.6493505320535276
+    },
+    {
+      "scene": "pyramid",
+      "sleep": "on",
+      "parent_ms": [
+        0.054355,
+        0.0547633333,
+        0.05503,
+        0.054975,
+        0.0542333333
+      ],
+      "simd_ms": [
+        0.055055,
+        0.0548933333,
+        0.0557166667,
+        0.0568666667,
+        0.0547683333
+      ],
+      "median_change_percent": 0.5325948630668931
+    },
+    {
+      "scene": "rain",
+      "sleep": "on",
+      "parent_ms": [
+        1.10686333,
+        1.11447167,
+        1.11413167,
+        1.11580333,
+        1.11175167
+      ],
+      "simd_ms": [
+        1.105395,
+        1.11188833,
+        1.11356833,
+        1.12343,
+        1.11247167
+      ],
+      "median_change_percent": -0.14899495676304886
+    },
+    {
+      "scene": "piles",
+      "sleep": "on",
+      "parent_ms": [
+        0.0205933333,
+        0.0184183333,
+        0.0186816667,
+        0.01813,
+        0.0183966667
+      ],
+      "simd_ms": [
+        0.01849,
+        0.018715,
+        0.01886,
+        0.0186233333,
+        0.0190116667
+      ],
+      "median_change_percent": 1.61071414643148
+    },
+    {
+      "scene": "chains",
+      "sleep": "on",
+      "parent_ms": [
+        0.00720666667,
+        0.00707833333,
+        0.00719333333,
+        0.00678166667,
+        0.00695333333
+      ],
+      "simd_ms": [
+        0.00723333333,
+        0.00705333333,
+        0.00766166667,
+        0.00686833333,
+        0.00715
+      ],
+      "median_change_percent": 1.0124794447904373
+    },
+    {
+      "scene": "churn",
+      "sleep": "on",
+      "parent_ms": [
+        0.0193933333,
+        0.01995,
+        0.01945,
+        0.0190766667,
+        0.0190333333
+      ],
+      "simd_ms": [
+        0.0189116667,
+        0.0192816667,
+        0.0192666667,
+        0.0191783333,
+        0.0198533333
+      ],
+      "median_change_percent": -0.6531450681559692
+    },
+    {
+      "scene": "table",
+      "sleep": "on",
+      "parent_ms": [
+        0.000516666667,
+        0.000578333333,
+        0.000463333333,
+        0.000496666667,
+        0.000491666667
+      ],
+      "simd_ms": [
+        0.000483333333,
+        0.000496666667,
+        0.000508333333,
+        0.00051,
+        0.000516666667
+      ],
+      "median_change_percent": 2.3489931527858943
+    },
+    {
+      "scene": "inverted",
+      "sleep": "on",
+      "parent_ms": [
+        0.003185,
+        0.00320833333,
+        0.00302666667,
+        0.00311333333,
+        0.00305333333
+      ],
+      "simd_ms": [
+        0.00313833333,
+        0.00309166667,
+        0.003095,
+        0.00313666667,
+        0.00320833333
+      ],
+      "median_change_percent": 0.749464883029427
+    }
+  ]
+}

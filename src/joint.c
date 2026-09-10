@@ -745,7 +745,7 @@ static sl_mat2 effective_matrix_make(const sl_world_state *world,
 void sl_joint_prepare(sl_world_state *world, float h, float inverse_h)
 {
     SL_ASSERT(world != NULL);
-    if (world->joint_capacity == 0u) {
+    if (world->joint_count == 0u) {
         world->joint_constraint_count = 0u;
         return;
     }
@@ -824,6 +824,9 @@ void sl_joint_prepare(sl_world_state *world, float h, float inverse_h)
 void sl_joint_warm_start(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
+    if (world->joint_constraint_count == 0u) {
+        return;
+    }
     sl_joint_constraint *constraints = world->joint_constraints;
     for (uint32_t island_id = 0u; island_id < world->island_count;
          ++island_id) {
@@ -973,6 +976,9 @@ static void revolute_solve(const sl_world_state *world,
 void sl_joint_solve(sl_world_state *world, bool use_bias)
 {
     SL_ASSERT(world != NULL);
+    if (world->joint_constraint_count == 0u) {
+        return;
+    }
     sl_joint_constraint *constraints = world->joint_constraints;
     for (uint32_t island_id = 0u; island_id < world->island_count;
          ++island_id) {
@@ -1001,6 +1007,9 @@ void sl_joint_solve(sl_world_state *world, bool use_bias)
 void sl_joint_store(sl_world_state *world)
 {
     SL_ASSERT(world != NULL);
+    if (world->joint_constraint_count == 0u) {
+        return;
+    }
     sl_joint_constraint *constraints = world->joint_constraints;
     for (uint32_t island_id = 0u; island_id < world->island_count;
          ++island_id) {

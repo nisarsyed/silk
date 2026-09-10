@@ -78,3 +78,6 @@ target_include_directories(sl_bench PRIVATE "${SL_BENCH_CONFIG_DIR}")
 
 add_executable(sl_bench_check check.c quality.c)
 target_link_libraries(sl_bench_check PRIVATE silk silk_warnings)
+
+add_executable(sl_bench_query query.c)
+target_link_libraries(sl_bench_query PRIVATE silk silk_warnings)

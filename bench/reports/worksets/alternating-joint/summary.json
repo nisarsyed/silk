@@ -1,0 +1,482 @@
+{
+  "commands_in_execution_order": [
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-parent/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/worksets-candidate/bin/sl_bench",
+      "--scene",
+      "all",
+      "--warmup",
+      "120",
+      "--steps",
+      "600",
+      "--sleep",
+      "on"
+    ]
+  ],
+  "modes": {
+    "off": [
+      {
+        "scene": "pyramid",
+        "parent_ms": [
+          0.252708333,
+          0.250935,
+          0.254623333,
+          0.251955,
+          0.251056667
+        ],
+        "candidate_ms": [
+          0.251346667,
+          0.25109,
+          0.252705,
+          0.251783333,
+          0.252116667
+        ],
+        "median_change_percent": -0.0681339921811408
+      },
+      {
+        "scene": "rain",
+        "parent_ms": [
+          1.05055833,
+          1.06123833,
+          1.06346333,
+          1.10442167,
+          1.05463333
+        ],
+        "candidate_ms": [
+          1.07420833,
+          1.09571333,
+          1.05604333,
+          1.06608333,
+          1.07420333
+        ],
+        "median_change_percent": 1.221685990177157
+      },
+      {
+        "scene": "piles",
+        "parent_ms": [
+          0.0794166667,
+          0.07874,
+          0.0791816667,
+          0.07874,
+          0.078985
+        ],
+        "candidate_ms": [
+          0.0798833333,
+          0.0784216667,
+          0.0784866667,
+          0.0780466667,
+          0.078735
+        ],
+        "median_change_percent": -0.6309214407798969
+      },
+      {
+        "scene": "chains",
+        "parent_ms": [
+          0.0175416667,
+          0.0177716667,
+          0.0179316667,
+          0.0177583333,
+          0.0177366667
+        ],
+        "candidate_ms": [
+          0.018285,
+          0.0179666667,
+          0.01767,
+          0.0177633333,
+          0.017865
+        ],
+        "median_change_percent": 0.6006571573921038
+      },
+      {
+        "scene": "churn",
+        "parent_ms": [
+          0.0158016667,
+          0.01557,
+          0.01598,
+          0.0156866667,
+          0.0156
+        ],
+        "candidate_ms": [
+          0.0147216667,
+          0.0142083333,
+          0.0141616667,
+          0.0141516667,
+          0.0140333333
+        ],
+        "median_change_percent": -9.721631938543073
+      },
+      {
+        "scene": "table",
+        "parent_ms": [
+          0.00203666667,
+          0.00206166667,
+          0.0021,
+          0.00203833333,
+          0.002075
+        ],
+        "candidate_ms": [
+          0.00211666667,
+          0.00201166667,
+          0.00201166667,
+          0.00200333333,
+          0.00200666667
+        ],
+        "median_change_percent": -2.425222308124142
+      },
+      {
+        "scene": "inverted",
+        "parent_ms": [
+          0.00297666667,
+          0.00299,
+          0.00298833333,
+          0.00297333333,
+          0.00295166667
+        ],
+        "candidate_ms": [
+          0.00305,
+          0.00296666667,
+          0.00289166667,
+          0.00295,
+          0.00297
+        ],
+        "median_change_percent": -0.3359462482240283
+      }
+    ],
+    "on": [
+      {
+        "scene": "pyramid",
+        "parent_ms": [
+          0.056655,
+          0.0557583333,
+          0.0561816667,
+          0.056395,
+          0.0559183333
+        ],
+        "candidate_ms": [
+          0.0556866667,
+          0.0564716667,
+          0.0548466667,
+          0.0551616667,
+          0.055375
+        ],
+        "median_change_percent": -1.4358183859290885
+      },
+      {
+        "scene": "rain",
+        "parent_ms": [
+          1.15918333,
+          1.14493,
+          1.12615333,
+          1.13483167,
+          1.11914333
+        ],
+        "candidate_ms": [
+          1.12777333,
+          1.12922167,
+          1.12032,
+          1.12374167,
+          1.12789333
+        ],
+        "median_change_percent": -0.6219724199272747
+      },
+      {
+        "scene": "piles",
+        "parent_ms": [
+          0.0188333333,
+          0.0191916667,
+          0.0187333333,
+          0.0187933333,
+          0.0193983333
+        ],
+        "candidate_ms": [
+          0.0183633333,
+          0.0185583333,
+          0.0185133333,
+          0.0188316667,
+          0.0185633333
+        ],
+        "median_change_percent": -1.4601769937348297
+      },
+      {
+        "scene": "chains",
+        "parent_ms": [
+          0.00724833333,
+          0.00717666667,
+          0.00681666667,
+          0.00710833333,
+          0.007265
+        ],
+        "candidate_ms": [
+          0.00696166667,
+          0.00692833333,
+          0.00726333333,
+          0.00719666667,
+          0.00697666667
+        ],
+        "median_change_percent": -2.7868091022820174
+      },
+      {
+        "scene": "churn",
+        "parent_ms": [
+          0.0197983333,
+          0.0199683333,
+          0.01901,
+          0.0193883333,
+          0.019745
+        ],
+        "candidate_ms": [
+          0.0175616667,
+          0.0178383333,
+          0.017755,
+          0.0181666667,
+          0.017595
+        ],
+        "median_change_percent": -10.078500886300324
+      },
+      {
+        "scene": "table",
+        "parent_ms": [
+          0.000538333333,
+          0.000511666667,
+          0.000491666667,
+          0.000503333333,
+          0.000523333333
+        ],
+        "candidate_ms": [
+          0.00049,
+          0.000498333333,
+          0.000488333333,
+          0.000503333333,
+          0.000475
+        ],
+        "median_change_percent": -4.2345277496843465
+      },
+      {
+        "scene": "inverted",
+        "parent_ms": [
+          0.00322833333,
+          0.00317833333,
+          0.00312833333,
+          0.00309666667,
+          0.00324833333
+        ],
+        "candidate_ms": [
+          0.00311666667,
+          0.00317666667,
+          0.00323666667,
+          0.00322333333,
+          0.00305333333
+        ],
+        "median_change_percent": -0.05243817519920979
+      }
+    ]
+  }
+}
