@@ -100,9 +100,9 @@ def main():
             # Consumers now have only copied app sources and installed headers.
             options = ['-DCMAKE_PREFIX_PATH=' + str(relocated),
                        '-DSILK_PUBLIC_HEADERS=' + str(relocated / 'include/silk-sdk')]
-            configure(work / 'installed', project, *options, '-DSILK_REQUESTED_VERSION=0.3.0')
+            configure(work / 'installed', project, *options, '-DSILK_REQUESTED_VERSION=0.4.0')
             build_consumer(work / 'installed')
-            for version in ('0.2.0', '0.3.1', '0.4.0'):
+            for version in ('0.3.0', '0.4.1', '0.5.0'):
                 configure(work / ('reject-' + version), project, *options,
                           '-DSILK_REQUESTED_VERSION=' + version, expected=1)
             summary.update({'passed': True, 'headers': headers, 'installed_files': installed,

@@ -4,8 +4,8 @@ Living document, updated as milestones land. It records direction, not dates or
 commitments. Engineering principles and contribution policy live in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Status:** Phase 3 · 2D rigid-body physics complete (0.3.0).
-Phase 4 · 2D engine maturity is next.
+**Status:** Phase 4 · 2D engine maturity complete (0.4.0).
+Phase 5 · WebAssembly is next.
 
 ## Baseline
 
@@ -65,34 +65,41 @@ below.
 
 ## Milestone 4 — 2D engine maturity
 
-Phase 4 targets 0.4.0. Correctness, API cleanup, diagnostics, and performance
+Phase 4 delivers 0.4.0. Correctness, API cleanup, diagnostics, and performance
 are complementary workstreams; performance is one part of engine maturity.
 The [Phase 4 milestone](https://github.com/nisarsyed/silk/milestone/2) and
 [execution tracker #56](https://github.com/nisarsyed/silk/issues/56) track the
 work, dependencies, and short gh-stack PR chains. Merges remain with the
 maintainer; items are checked only after their implementation reaches `main`.
 
-- [ ] Correctness: deterministic replay and mutation regression coverage ([#57](https://github.com/nisarsyed/silk/issues/57))
-- [ ] Measurement: deterministic work counters, exact memory diagnostics, expanded benchmark workloads, and developer-tool CI ([#58](https://github.com/nisarsyed/silk/issues/58), [#59](https://github.com/nisarsyed/silk/issues/59), [#60](https://github.com/nisarsyed/silk/issues/60))
-- [ ] Public API: separate world ownership from private storage and add bounded spatial queries ([#61](https://github.com/nisarsyed/silk/issues/61), [#62](https://github.com/nisarsyed/silk/issues/62))
-- [ ] Activation: deterministic constraint islands, opt-in sleeping, and complete wake propagation ([#63](https://github.com/nisarsyed/silk/issues/63), [#64](https://github.com/nisarsyed/silk/issues/64))
-- [ ] Measured optimization round: investigate algorithmic cost, memory access, compiler vectorization, targeted SIMD, and solver ordering; assess threading feasibility ([#65](https://github.com/nisarsyed/silk/issues/65), [#66](https://github.com/nisarsyed/silk/issues/66))
-- [ ] Diagnostics and consumption: public-API sandbox diagnostics and a tested, documented C17 consumer contract ([#67](https://github.com/nisarsyed/silk/issues/67), [#68](https://github.com/nisarsyed/silk/issues/68))
-- [ ] Wrap: version 0.4.0, documentation, migration notes, and release verification ([#69](https://github.com/nisarsyed/silk/issues/69))
+- [x] Correctness: deterministic replay and mutation regression coverage ([#57](https://github.com/nisarsyed/silk/issues/57))
+- [x] Measurement: deterministic work counters, exact memory diagnostics, expanded benchmark workloads, and developer-tool CI ([#58](https://github.com/nisarsyed/silk/issues/58), [#59](https://github.com/nisarsyed/silk/issues/59), [#60](https://github.com/nisarsyed/silk/issues/60))
+- [x] Public API: separate world ownership from private storage and add bounded spatial queries ([#61](https://github.com/nisarsyed/silk/issues/61), [#62](https://github.com/nisarsyed/silk/issues/62))
+- [x] Activation: deterministic constraint islands, opt-in sleeping, and complete wake propagation ([#63](https://github.com/nisarsyed/silk/issues/63), [#64](https://github.com/nisarsyed/silk/issues/64))
+- [x] Measured optimization round: investigate algorithmic cost, memory access, compiler vectorization, targeted SIMD, and solver ordering; assess threading feasibility ([#65](https://github.com/nisarsyed/silk/issues/65), [#66](https://github.com/nisarsyed/silk/issues/66))
+- [x] Diagnostics and consumption: public-API sandbox diagnostics and a tested, documented C consumer contract ([#67](https://github.com/nisarsyed/silk/issues/67), [#68](https://github.com/nisarsyed/silk/issues/68))
+- [x] Wrap: version 0.4.0, documentation, migration notes, and release verification ([#69](https://github.com/nisarsyed/silk/issues/69))
 
-The measured optimization round follows the expanded benchmarks and
-islands/sleeping work, and precedes the 0.4.0 release. Adopt changes only with
-repeatable performance evidence while preserving correctness, determinism,
-and physical quality. SIMD investigation is in scope; shipping SIMD is not
-mandatory. Assess threading feasibility here and scope substantial threading
-implementation separately. A documented decision to retain the current
-implementation is a valid investigation outcome.
+Merged delivery trail: [replay #72](https://github.com/nisarsyed/silk/pull/72),
+[stats #73](https://github.com/nisarsyed/silk/pull/73),
+[benchmarks #74](https://github.com/nisarsyed/silk/pull/74),
+[CI #75](https://github.com/nisarsyed/silk/pull/75),
+[ownership #77](https://github.com/nisarsyed/silk/pull/77),
+[queries #78](https://github.com/nisarsyed/silk/pull/78),
+[islands #80](https://github.com/nisarsyed/silk/pull/80),
+[sleep #81](https://github.com/nisarsyed/silk/pull/81),
+[worksets #83](https://github.com/nisarsyed/silk/pull/83),
+[solver study #84](https://github.com/nisarsyed/silk/pull/84),
+[sandbox #85](https://github.com/nisarsyed/silk/pull/85), and
+[consumer #86](https://github.com/nisarsyed/silk/pull/86).
 
-Preserve the portable C17 scalar implementation. Any platform-specific
-acceleration requires an explicit design decision consistent with the
-repository's portability, dependency, and bounded-work constraints; this plan
-does not authorize nonportable core code or speculative backend/dispatch
-layers.
+The measured round adopted empty joint-stage skipping without changing physics
+or memory. Query compaction and explicit SIMD were rejected after matched
+measurements; compiler vectorization defaults remain. Graph ordering and the
+bounded two-pass solver adaptation were rejected on cost or physical-quality
+evidence. Threading feasibility was assessed and implementation deferred.
+The [benchmark guide](docs/benchmarks.md) links reproducible positive and
+negative decisions. The core remains portable C and single-threaded.
 
 CCD/bullets, sensors/contact events, joint limits/motors/user-facing springs,
 serialization, and WASM implementation remain outside Phase 4's committed
@@ -108,8 +115,8 @@ Condensed from the technical specification. Near-term phases stay itemized; late
 | 1 | Foundation | Milestone 1 above |
 | 2 | Basic simulation *(complete)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
 | 3 | 2D rigid-body physics *(complete)* | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
-| 4 | 2D engine maturity *(next)* | Correctness & determinism; public API cleanup & queries; islands/sleeping; diagnostics; benchmarks followed by a measured optimization round |
-| 5 | WebAssembly | WASM build target; C ↔ JavaScript API boundary; browser demos & debug visualization; measure and optimize the actual WASM/browser build |
+| 4 | 2D engine maturity *(complete)* | Correctness & determinism; public API cleanup & queries; islands/sleeping; diagnostics; benchmarks followed by a measured optimization round |
+| 5 | WebAssembly *(next)* | WASM build target; C ↔ JavaScript API boundary; browser demos & debug visualization; measure and optimize the actual WASM/browser build |
 | 6 | GPU foundation | Select a concrete particle-based simulation workload; build and optimize GPU memory/compute infrastructure for its demonstrated requirements |
 | 7 | WebGPU | WebGPU execution and browser demonstrations of the selected workload; optimize suitable GPU workloads; broad-phase/constraint experiments stay outside the portable core |
 | 8 | 3D foundation | 3D math & quaternions; rigid bodies, orientation & angular dynamics; shapes, collision & CCD; joints; spatial acceleration |

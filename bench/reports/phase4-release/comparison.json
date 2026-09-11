@@ -1,0 +1,1139 @@
+{
+  "repetitions": 5,
+  "order": "Alternating before/after by repetition; off then on.",
+  "commands": [
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "off"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_study",
+      "--sleep",
+      "on"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/before/build/bin/sl_bench_query"
+    ],
+    [
+      "/Users/nisar/personal/projects/engine/build/phase4-matched/after/build/bin/sl_bench_query"
+    ]
+  ],
+  "comparison": [
+    {
+      "sleep": "off",
+      "kind": "matrix",
+      "all_non_timing_results_equal": true,
+      "timing": [
+        {
+          "scene": "pyramid",
+          "before_average_ms": {
+            "median": 0.235588333,
+            "min": 0.231378333,
+            "max": 0.2405
+          },
+          "after_average_ms": {
+            "median": 0.235155,
+            "min": 0.234386667,
+            "max": 0.241868333
+          }
+        },
+        {
+          "scene": "rain",
+          "before_average_ms": {
+            "median": 1.01224,
+            "min": 0.998578333,
+            "max": 1.02328
+          },
+          "after_average_ms": {
+            "median": 1.00676333,
+            "min": 1.00183,
+            "max": 1.01199333
+          }
+        },
+        {
+          "scene": "piles",
+          "before_average_ms": {
+            "median": 0.0720783333,
+            "min": 0.071825,
+            "max": 0.07465
+          },
+          "after_average_ms": {
+            "median": 0.07216,
+            "min": 0.0719516667,
+            "max": 0.0729716667
+          }
+        },
+        {
+          "scene": "chains",
+          "before_average_ms": {
+            "median": 0.0165816667,
+            "min": 0.0163916667,
+            "max": 0.01697
+          },
+          "after_average_ms": {
+            "median": 0.017055,
+            "min": 0.0162583333,
+            "max": 0.0173083333
+          }
+        },
+        {
+          "scene": "churn",
+          "before_average_ms": {
+            "median": 0.013705,
+            "min": 0.01354,
+            "max": 0.0139616667
+          },
+          "after_average_ms": {
+            "median": 0.0135966667,
+            "min": 0.0135233333,
+            "max": 0.0138816667
+          }
+        },
+        {
+          "scene": "table",
+          "before_average_ms": {
+            "median": 0.00198166667,
+            "min": 0.00177833333,
+            "max": 0.00221166667
+          },
+          "after_average_ms": {
+            "median": 0.00189166667,
+            "min": 0.00183833333,
+            "max": 0.00195666667
+          }
+        },
+        {
+          "scene": "inverted",
+          "before_average_ms": {
+            "median": 0.00266666667,
+            "min": 0.00253333333,
+            "max": 0.00279
+          },
+          "after_average_ms": {
+            "median": 0.00283166667,
+            "min": 0.00268333333,
+            "max": 0.002895
+          }
+        }
+      ],
+      "metadata": {
+        "before": {
+          "compiler": "AppleClang",
+          "compiler_version": "21.0.0.21000101",
+          "build": "Release",
+          "flags": " -O3 -DNDEBUG",
+          "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+          "host": "Darwin",
+          "host_version": "25.6.0",
+          "processor": "arm64",
+          "revision": "feb220cbe7de6b01b136b2c40a448f879302d8fd"
+        },
+        "after": {
+          "compiler": "AppleClang",
+          "compiler_version": "21.0.0.21000101",
+          "build": "Release",
+          "flags": " -O3 -DNDEBUG",
+          "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+          "host": "Darwin",
+          "host_version": "25.6.0",
+          "processor": "arm64",
+          "revision": "cba1ebf62d26f636016e7d42baeb982e4b3b505e"
+        }
+      },
+      "deltas": [
+        {
+          "scene": "pyramid",
+          "average_ms_before": 0.2405,
+          "average_ms_after": 0.241868333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "rain",
+          "average_ms_before": 0.998578333,
+          "average_ms_after": 1.00183,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "piles",
+          "average_ms_before": 0.0730616667,
+          "average_ms_after": 0.07216,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "chains",
+          "average_ms_before": 0.0163916667,
+          "average_ms_after": 0.0162583333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0,
+            "cached_penetration_max": 0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0.0,
+            "cached_support_force_mean": 0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "churn",
+          "average_ms_before": 0.01354,
+          "average_ms_after": 0.0135233333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0,
+            "supported_weight": 0
+          }
+        },
+        {
+          "scene": "table",
+          "average_ms_before": 0.00177833333,
+          "average_ms_after": 0.00183833333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "inverted",
+          "average_ms_before": 0.00253333333,
+          "average_ms_after": 0.00268333333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "sleep": "off",
+      "kind": "study",
+      "all_non_timing_results_equal": true,
+      "timing": [
+        {
+          "scene": "bridge",
+          "before_average_ms": {
+            "median": 0.00131833333,
+            "min": 0.001315,
+            "max": 0.00372166667
+          },
+          "after_average_ms": {
+            "median": 0.00142333333,
+            "min": 0.00129666667,
+            "max": 0.00368666667
+          }
+        },
+        {
+          "scene": "collapse",
+          "before_average_ms": {
+            "median": 0.00241833333,
+            "min": 0.00234166667,
+            "max": 0.00593833333
+          },
+          "after_average_ms": {
+            "median": 0.00250833333,
+            "min": 0.00234166667,
+            "max": 0.00595
+          }
+        },
+        {
+          "scene": "zero-gravity",
+          "before_average_ms": {
+            "median": 0.000193333333,
+            "min": 0.000188333333,
+            "max": 0.000495
+          },
+          "after_average_ms": {
+            "median": 0.000213333333,
+            "min": 0.000205,
+            "max": 0.000488333333
+          }
+        },
+        {
+          "scene": "cycle",
+          "before_average_ms": {
+            "median": 0.00190666667,
+            "min": 0.00182166667,
+            "max": 0.00397333333
+          },
+          "after_average_ms": {
+            "median": 0.002,
+            "min": 0.00191666667,
+            "max": 0.00393
+          }
+        },
+        {
+          "scene": "topple",
+          "before_average_ms": {
+            "median": 0.00262333333,
+            "min": 0.00251166667,
+            "max": 0.00497666667
+          },
+          "after_average_ms": {
+            "median": 0.00268666667,
+            "min": 0.00261166667,
+            "max": 0.00517833333
+          }
+        }
+      ]
+    },
+    {
+      "sleep": "on",
+      "kind": "matrix",
+      "all_non_timing_results_equal": true,
+      "timing": [
+        {
+          "scene": "pyramid",
+          "before_average_ms": {
+            "median": 0.0533466667,
+            "min": 0.0528183333,
+            "max": 0.0536366667
+          },
+          "after_average_ms": {
+            "median": 0.0529266667,
+            "min": 0.05259,
+            "max": 0.0538166667
+          }
+        },
+        {
+          "scene": "rain",
+          "before_average_ms": {
+            "median": 1.080805,
+            "min": 1.07099167,
+            "max": 1.08822
+          },
+          "after_average_ms": {
+            "median": 1.08047833,
+            "min": 1.07591667,
+            "max": 1.084625
+          }
+        },
+        {
+          "scene": "piles",
+          "before_average_ms": {
+            "median": 0.0178333333,
+            "min": 0.0176633333,
+            "max": 0.018075
+          },
+          "after_average_ms": {
+            "median": 0.01785,
+            "min": 0.017755,
+            "max": 0.0179
+          }
+        },
+        {
+          "scene": "chains",
+          "before_average_ms": {
+            "median": 0.00683333333,
+            "min": 0.00659166667,
+            "max": 0.00689166667
+          },
+          "after_average_ms": {
+            "median": 0.00661333333,
+            "min": 0.00656166667,
+            "max": 0.00664166667
+          }
+        },
+        {
+          "scene": "churn",
+          "before_average_ms": {
+            "median": 0.01742,
+            "min": 0.0170883333,
+            "max": 0.0178733333
+          },
+          "after_average_ms": {
+            "median": 0.0175416667,
+            "min": 0.0171466667,
+            "max": 0.0175416667
+          }
+        },
+        {
+          "scene": "table",
+          "before_average_ms": {
+            "median": 0.000478333333,
+            "min": 0.000465,
+            "max": 0.000603333333
+          },
+          "after_average_ms": {
+            "median": 0.000468333333,
+            "min": 0.000456666667,
+            "max": 0.000481666667
+          }
+        },
+        {
+          "scene": "inverted",
+          "before_average_ms": {
+            "median": 0.00287,
+            "min": 0.002775,
+            "max": 0.00308166667
+          },
+          "after_average_ms": {
+            "median": 0.00307833333,
+            "min": 0.003015,
+            "max": 0.00335333333
+          }
+        }
+      ],
+      "metadata": {
+        "before": {
+          "compiler": "AppleClang",
+          "compiler_version": "21.0.0.21000101",
+          "build": "Release",
+          "flags": " -O3 -DNDEBUG",
+          "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+          "host": "Darwin",
+          "host_version": "25.6.0",
+          "processor": "arm64",
+          "revision": "feb220cbe7de6b01b136b2c40a448f879302d8fd"
+        },
+        "after": {
+          "compiler": "AppleClang",
+          "compiler_version": "21.0.0.21000101",
+          "build": "Release",
+          "flags": " -O3 -DNDEBUG",
+          "warnings": "-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Wdouble-promotion -Wformat=2 -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wvla -Werror",
+          "host": "Darwin",
+          "host_version": "25.6.0",
+          "processor": "arm64",
+          "revision": "cba1ebf62d26f636016e7d42baeb982e4b3b505e"
+        }
+      },
+      "deltas": [
+        {
+          "scene": "pyramid",
+          "average_ms_before": 0.0528183333,
+          "average_ms_after": 0.05259,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0,
+            "rotation_drift_max": 0,
+            "linear_speed_max": 0,
+            "angular_speed_max": 0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "rain",
+          "average_ms_before": 1.07099167,
+          "average_ms_after": 1.07591667,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "piles",
+          "average_ms_before": 0.017775,
+          "average_ms_after": 0.01786,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0,
+            "rotation_drift_max": 0,
+            "linear_speed_max": 0,
+            "angular_speed_max": 0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "chains",
+          "average_ms_before": 0.00689166667,
+          "average_ms_after": 0.00661333333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0,
+            "cached_penetration_max": 0,
+            "translation_drift_max": 0,
+            "rotation_drift_max": 0,
+            "linear_speed_max": 0,
+            "angular_speed_max": 0,
+            "joint_error_max": 0.0,
+            "cached_support_force_mean": 0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "churn",
+          "average_ms_before": 0.0170883333,
+          "average_ms_after": 0.0171466667,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0,
+            "supported_weight": 0
+          }
+        },
+        {
+          "scene": "table",
+          "average_ms_before": 0.000603333333,
+          "average_ms_after": 0.000456666667,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0,
+            "rotation_drift_max": 0,
+            "linear_speed_max": 0,
+            "angular_speed_max": 0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        },
+        {
+          "scene": "inverted",
+          "average_ms_before": 0.002775,
+          "average_ms_after": 0.00335333333,
+          "arena_delta_bytes": 0,
+          "world_delta_bytes": 0,
+          "digest_equal": true,
+          "work_delta": {
+            "tree_node_visits": 0,
+            "pair_candidates": 0,
+            "pair_probes": 0,
+            "proxy_creates": 0,
+            "proxy_destroys": 0,
+            "proxy_moves": 0,
+            "contact_drops": 0,
+            "graph_body_visits": 0,
+            "graph_constraint_visits": 0,
+            "graph_parent_probes": 0,
+            "wake_visits": 0,
+            "body_wakes": 0,
+            "body_sleeps": 0
+          },
+          "quality_delta": {
+            "penetration_max": 0.0,
+            "cached_penetration_max": 0.0,
+            "translation_drift_max": 0.0,
+            "rotation_drift_max": 0.0,
+            "linear_speed_max": 0.0,
+            "angular_speed_max": 0.0,
+            "joint_error_max": 0,
+            "cached_support_force_mean": 0.0,
+            "supported_weight": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "sleep": "on",
+      "kind": "study",
+      "all_non_timing_results_equal": true,
+      "timing": [
+        {
+          "scene": "bridge",
+          "before_average_ms": {
+            "median": 0.000323333333,
+            "min": 0.000316666667,
+            "max": 0.00037
+          },
+          "after_average_ms": {
+            "median": 0.000331666667,
+            "min": 0.000311666667,
+            "max": 0.000378333333
+          }
+        },
+        {
+          "scene": "collapse",
+          "before_average_ms": {
+            "median": 0.00160833333,
+            "min": 0.001565,
+            "max": 0.00166833333
+          },
+          "after_average_ms": {
+            "median": 0.00155666667,
+            "min": 0.00153,
+            "max": 0.00158666667
+          }
+        },
+        {
+          "scene": "zero-gravity",
+          "before_average_ms": {
+            "median": 0.000275,
+            "min": 0.000261666667,
+            "max": 0.000298333333
+          },
+          "after_average_ms": {
+            "median": 0.000276666667,
+            "min": 0.000271666667,
+            "max": 0.000283333333
+          }
+        },
+        {
+          "scene": "cycle",
+          "before_average_ms": {
+            "median": 0.000485,
+            "min": 0.000456666667,
+            "max": 0.000508333333
+          },
+          "after_average_ms": {
+            "median": 0.0005,
+            "min": 0.000491666667,
+            "max": 0.00052
+          }
+        },
+        {
+          "scene": "topple",
+          "before_average_ms": {
+            "median": 0.00111166667,
+            "min": 0.001055,
+            "max": 0.00115166667
+          },
+          "after_average_ms": {
+            "median": 0.00110333333,
+            "min": 0.00105,
+            "max": 0.00113
+          }
+        }
+      ]
+    }
+  ],
+  "query": [
+    {
+      "scene": "query-point",
+      "digest": "e0f3c1273ab42325",
+      "queries": 65536,
+      "before_batch_ms": {
+        "median": 22.092,
+        "min": 21.559,
+        "max": 25.927
+      },
+      "after_batch_ms": {
+        "median": 22.061,
+        "min": 21.091,
+        "max": 26.224
+      }
+    },
+    {
+      "scene": "query-broad",
+      "digest": "1250ad5d4aaa2325",
+      "queries": 65536,
+      "before_batch_ms": {
+        "median": 962.554,
+        "min": 956.302,
+        "max": 966.11
+      },
+      "after_batch_ms": {
+        "median": 962.357,
+        "min": 956.497,
+        "max": 980.701
+      }
+    }
+  ],
+  "timing_note": "Whole-step or whole-query-batch time, same host; no speed acceptance threshold."
+}
