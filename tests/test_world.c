@@ -132,7 +132,9 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     /* Only the owning headers contain pointers. sl_tree has three pointers
      * and eight uint32 words: 56 bytes on 64-bit, 44 on wasm32, rounded to
      * 48 by the arena. Keep the pointer-free payload totals exact below. */
-    SL_EXPECT(sizeof(sl_tree) == 3u * sizeof(void *) + 8u * sizeof(uint32_t));
+    _Static_assert(
+        sizeof(sl_tree) == 3u * sizeof(void *) + 8u * sizeof(uint32_t),
+        "tree header must contain only three pointers and eight words");
     const size_t tree_bytes = (sizeof(sl_tree) + 7u) & ~(size_t)7u;
     const size_t worst = sl_world_memory_bytes(&worst_config);
     SL_EXPECT(worst == ((size_t)95813632u + (size_t)73u * SL_BODY_COUNT_MAX +
