@@ -40,6 +40,13 @@ if(EMSCRIPTEN)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/provision_memory.py"
             "${CMAKE_BINARY_DIR}/package/silk.wasm"
         VERBATIM)
+    configure_file(package.json.in "${CMAKE_BINARY_DIR}/package/package.json" @ONLY)
+    configure_file(index.d.ts "${CMAKE_BINARY_DIR}/package/index.d.ts" COPYONLY)
+    configure_file(README.md "${CMAKE_BINARY_DIR}/package/README.md" COPYONLY)
+    configure_file("${PROJECT_SOURCE_DIR}/LICENSE" "${CMAKE_BINARY_DIR}/package/LICENSE" COPYONLY)
+    foreach(SL_NOTICE README.md emscripten.txt musl.txt compiler-rt.txt)
+        configure_file("licenses/${SL_NOTICE}" "${CMAKE_BINARY_DIR}/package/licenses/${SL_NOTICE}" COPYONLY)
+    endforeach()
     configure_file(views.mjs "${CMAKE_BINARY_DIR}/package/views.mjs" COPYONLY)
     configure_file(index.mjs "${CMAKE_BINARY_DIR}/package/index.mjs" COPYONLY)
 endif()
