@@ -62,7 +62,8 @@
             "toolchainFile": "${sourceDir}/cmake/wasm-toolchain.cmake",
             "cacheVariables": {
                 "SL_INSTALL": "OFF",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "SL_BUILD_WASM_ADAPTER": "ON"
             }
         },
         {
@@ -73,7 +74,8 @@
             "toolchainFile": "${sourceDir}/cmake/wasm-toolchain.cmake",
             "cacheVariables": {
                 "SL_INSTALL": "OFF",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "SL_BUILD_WASM_ADAPTER": "ON"
             }
         }
     ],
