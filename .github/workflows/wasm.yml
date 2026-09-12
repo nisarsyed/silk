@@ -1,0 +1,50 @@
+name: WebAssembly
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: wasm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Emscripten 6.0.9 / ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [debug, release]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned SDK
+        shell: bash
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          git -C "$RUNNER_TEMP/emsdk" checkout 5eb0bde7585670252e8ba05e9d361627bffd08b5
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.9
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.9
+      - name: Configure, build, and run complete C suite
+        shell: bash
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --preset wasm-${{ matrix.mode }}
+          emcc --version > build/wasm-${{ matrix.mode }}/toolchain.txt
+          "$EMSDK_NODE" --version >> build/wasm-${{ matrix.mode }}/toolchain.txt
+          git -C "$EMSDK" rev-parse HEAD >> build/wasm-${{ matrix.mode }}/toolchain.txt
+          git rev-parse HEAD >> build/wasm-${{ matrix.mode }}/toolchain.txt
+          cmake --build --preset wasm-${{ matrix.mode }} --parallel 2
+          ctest --preset wasm-${{ matrix.mode }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: wasm-core-${{ matrix.mode }}-${{ github.sha }}
+          path: |
+            build/wasm-${{ matrix.mode }}/toolchain.txt
+            build/wasm-${{ matrix.mode }}/compile_commands.json
+            build/wasm-${{ matrix.mode }}/tests/CMakeFiles/sl_tests.dir/link.txt
+            build/wasm-${{ matrix.mode }}/Testing/Temporary/
+          retention-days: 14
+          if-no-files-found: warn

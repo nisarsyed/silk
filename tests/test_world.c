@@ -1,5 +1,6 @@
 #include "silk_test.h"
 #include "suites.h"
+#include "tree.h"
 #include "world_internal.h"
 
 #include <math.h>
@@ -128,9 +129,16 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
         .body_capacity = SL_BODY_COUNT_MAX,
     };
     const size_t state_bytes = (sizeof(sl_world_state) + 7u) & ~(size_t)7u;
+    /* Only the owning headers contain pointers. sl_tree has three pointers
+     * and eight uint32 words: 56 bytes on 64-bit, 44 on wasm32, rounded to
+     * 48 by the arena. Keep the pointer-free payload totals exact below. */
+    _Static_assert(
+        sizeof(sl_tree) == 3u * sizeof(void *) + 8u * sizeof(uint32_t),
+        "tree header must contain only three pointers and eight words");
+    const size_t tree_bytes = (sizeof(sl_tree) + 7u) & ~(size_t)7u;
     const size_t worst = sl_world_memory_bytes(&worst_config);
-    SL_EXPECT(worst == ((size_t)95813688u + (size_t)73u * SL_BODY_COUNT_MAX +
-                        state_bytes));
+    SL_EXPECT(worst == ((size_t)95813632u + (size_t)73u * SL_BODY_COUNT_MAX +
+                        state_bytes + tree_bytes));
     SL_EXPECT(worst <= (size_t)97u << 20);
 
     const sl_world_config with_joints = {
@@ -139,8 +147,8 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
     };
     const size_t joint_worst = sl_world_memory_bytes(&with_joints);
     SL_EXPECT(joint_worst ==
-              ((size_t)108003384u + (size_t)73u * SL_BODY_COUNT_MAX +
-               (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes));
+              ((size_t)108003328u + (size_t)73u * SL_BODY_COUNT_MAX +
+               (size_t)4u * SL_JOINT_COUNT_MAX + state_bytes + tree_bytes));
     SL_EXPECT(joint_worst <= (size_t)108u << 20);
 
     const sl_world_config zero = { 0 };
@@ -155,13 +163,13 @@ static void test_memory_bytes_at_capacity_max_within_budget(void)
      * SL_BODY_COUNT_MAX * sizeof(uint32_t) bytes at maximum capacity. */
     const sl_world_config small_config = { .body_capacity = 4u };
     const size_t small = sl_world_memory_bytes(&small_config);
-    SL_EXPECT(small == ((size_t)6208u + state_bytes));
+    SL_EXPECT(small == ((size_t)6152u + state_bytes + tree_bytes));
     const sl_world_config small_joints = {
         .body_capacity = 4u,
         .joint_capacity = 2u,
     };
     SL_EXPECT(sl_world_memory_bytes(&small_joints) ==
-              ((size_t)6616u + state_bytes));
+              ((size_t)6560u + state_bytes + tree_bytes));
 }
 
 static void test_create_rejects_non_finite_state(void)

@@ -53,6 +53,28 @@
             "cacheVariables": {
                 "SL_SANDBOX": "ON"
             }
+        },
+        {
+            "name": "wasm-debug",
+            "displayName": "WebAssembly (Debug)",
+            "inherits": "debug",
+            "binaryDir": "${sourceDir}/build/wasm-debug",
+            "toolchainFile": "${sourceDir}/cmake/wasm-toolchain.cmake",
+            "cacheVariables": {
+                "SL_INSTALL": "OFF",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "wasm-release",
+            "displayName": "WebAssembly (Release)",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/build/wasm-release",
+            "toolchainFile": "${sourceDir}/cmake/wasm-toolchain.cmake",
+            "cacheVariables": {
+                "SL_INSTALL": "OFF",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -80,6 +102,14 @@
         {
             "name": "sandbox-release",
             "configurePreset": "sandbox-release"
+        },
+        {
+            "name": "wasm-debug",
+            "configurePreset": "wasm-debug"
+        },
+        {
+            "name": "wasm-release",
+            "configurePreset": "wasm-release"
         }
     ],
     "testPresets": [
@@ -122,6 +152,20 @@
         {
             "name": "sandbox-release",
             "configurePreset": "sandbox-release",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "wasm-debug",
+            "configurePreset": "wasm-debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "wasm-release",
+            "configurePreset": "wasm-release",
             "output": {
                 "outputOnFailure": true
             }
