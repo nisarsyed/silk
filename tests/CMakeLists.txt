@@ -19,7 +19,11 @@ add_executable(sl_tests
     test_world.c
     test_step.c
 )
-target_link_libraries(sl_tests PRIVATE silk silk_warnings)
+if(SL_BUILD_WASM_ADAPTER)
+    target_link_libraries(sl_tests PRIVATE silk_wasm_adapter silk_warnings)
+else()
+    target_link_libraries(sl_tests PRIVATE silk silk_warnings)
+endif()
 target_compile_definitions(sl_tests PRIVATE
     SL_TEST_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     SL_TEST_VERSION_MINOR=${PROJECT_VERSION_MINOR}
@@ -39,4 +43,9 @@ target_sources(sl_tests PRIVATE $<TARGET_OBJECTS:sl_consumer>)
 
 if(EMSCRIPTEN)
     sl_wasm_executable(sl_tests)
+endif()
+
+if(SL_BUILD_WASM_ADAPTER)
+    target_sources(sl_tests PRIVATE test_wasm.c)
+    target_compile_definitions(sl_tests PRIVATE SL_TEST_WASM_ADAPTER=1)
 endif()
