@@ -5,6 +5,10 @@ set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+if(EMSCRIPTEN)
+    include(cmake/wasm.cmake)
+endif()
+
 option(SL_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(SL_BUILD_TESTS "Build the silk test suite" ${PROJECT_IS_TOP_LEVEL})
 if(SL_SANITIZERS)
