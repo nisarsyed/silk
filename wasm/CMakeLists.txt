@@ -1,4 +1,4 @@
-add_library(silk_wasm_adapter STATIC adapter.c)
+add_library(silk_wasm_adapter STATIC adapter.c snapshot.c operations.c)
 target_link_libraries(silk_wasm_adapter PUBLIC silk PRIVATE silk_warnings)
 target_include_directories(silk_wasm_adapter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -16,7 +16,7 @@ if(EMSCRIPTEN)
         list(APPEND SL_WASM_EXPORTS "_${SL_WASM_NAME}")
     endforeach()
     list(JOIN SL_WASM_EXPORTS "," SL_WASM_EXPORT_FLAGS)
-    add_executable(silk_wasm adapter.c runtime.c)
+    add_executable(silk_wasm adapter.c snapshot.c operations.c runtime.c)
     target_link_libraries(silk_wasm PRIVATE silk silk_warnings)
     set_target_properties(silk_wasm PROPERTIES
         OUTPUT_NAME silk SUFFIX .mjs
@@ -40,5 +40,6 @@ if(EMSCRIPTEN)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/provision_memory.py"
             "${CMAKE_BINARY_DIR}/package/silk.wasm"
         VERBATIM)
+    configure_file(views.mjs "${CMAKE_BINARY_DIR}/package/views.mjs" COPYONLY)
     configure_file(index.mjs "${CMAKE_BINARY_DIR}/package/index.mjs" COPYONLY)
 endif()

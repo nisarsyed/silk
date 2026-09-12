@@ -1,11 +1,15 @@
 import createModule from './silk.mjs';
+import { makeViews, workCopy, statNames, stepNames, memoryNames } from './views.mjs';
+export { jsonReplacer } from './views.mjs';
 
 // Handles and shapes expose values for inspection but ownership/shape payloads
 // come exclusively from these private maps, never from caller-writable fields.
 const handles = new WeakMap();
 const shapes = new WeakMap();
+const steppers = new WeakMap();
 const worldKey = Symbol('world');
 const bodyTypes = Object.freeze({ dynamic: 0, kinematic: 1, static: 2 });
+export const queryMasks = Object.freeze({ dynamic: 1, kinematic: 2, static: 4, all: 7 });
 export const limits = Object.freeze({ bodies: 65536, contacts: 262144, joints: 65536,
   polygonVertices: 8, substeps: 8, position: 8192, shapeExtent: 1024 });
 
@@ -99,41 +103,59 @@ function configParse(input) {
 function configStage(io, parsed) { io.f.set(parsed.floats); io.iu.set(parsed.words); }
 
 class World {
-  #m; #io; #owner = {}; #release; #config; #arenaBytes;
+  #m; #io; #owner = {}; #release; #config; #arenaBytes; #views;
   constructor(key, m, io, config, arenaBytes, release) {
     if (key !== worldKey) throw new TypeError('Use createWorld');
     this.#m = m; this.#io = io; this.#config = config; this.#arenaBytes = arenaBytes;
     this.#release = release;
+    this.#views = makeViews(m, io, config, (index, generation) => {
+      this.#live();
+      if (!m._sl_wasm_body_valid(this.#io.ptr, index, generation)) throw new TypeError('Query body is stale');
+      return this.#handle(index, generation);
+    });
   }
   #live() { if (!this.#io) throw new Error('World is disposed'); return this.#io; }
-  #handle(index, generation) {
+  #handle(index, generation, kind = 'body') {
     const value = Object.freeze({ index, generation });
-    handles.set(value, { owner: this.#owner, index, generation });
+    handles.set(value, { owner: this.#owner, index, generation, kind });
     return value;
   }
-  #outputHandle() { return this.#handle(this.#io.ou[0], this.#io.ou[1]); }
+  #outputHandle(kind = 'body') { return this.#handle(this.#io.ou[0], this.#io.ou[1], kind); }
   #body(value) {
     const io = this.#live();
     const h = handles.get(value);
-    if (!h || h.owner !== this.#owner || !this.#m._sl_wasm_body_valid(io.ptr, h.index, h.generation)) {
+    if (!h || h.kind !== 'body' || h.owner !== this.#owner || !this.#m._sl_wasm_body_valid(io.ptr, h.index, h.generation)) {
       throw new TypeError('Body handle is stale or belongs to another world');
     }
     return h;
   }
+  #invalidate() {
+    this.#views.state.valid = false;
+    this.#views.queryState.valid = false;
+    this.#views.rayState.valid = false;
+  }
+  #revision(state) {
+    if (state.revision === Number.MAX_SAFE_INTEGER) throw new RangeError('View revision exhausted; create a new world');
+    state.revision += 1;
+  }
   get configuration() { this.#live(); return this.#config; }
   get bodyCount() { return this.#m._sl_wasm_body_count(this.#live().ptr); }
-  get memory() { this.#live(); return Object.freeze({ arenaBytes: this.#arenaBytes,
-    adapterBytes: this.#m._sl_wasm_context_bytes() }); }
+  get memory() {
+    const io = this.#live(); this.#m._sl_wasm_memory_read(io.ptr);
+    return Object.freeze({ ...Object.fromEntries(memoryNames.map((name, i) => [name, io.ou[i]])),
+      adapterBytes: this.#m._sl_wasm_adapter_bytes(io.ptr), outputBytes: this.#views.outputBytes });
+  }
   dispose() {
     if (!this.#io) return;
+    this.#invalidate();
     this.#m._sl_wasm_context_destroy(this.#io.ptr);
     this.#io = null; this.#owner = {}; this.#release(this);
   }
-  reset() { this.#m._sl_wasm_world_reset(this.#live().ptr); this.#owner = {}; }
-  step(dt) { return !!this.#m._sl_wasm_world_step(this.#live().ptr, f32(dt, 'dt')); }
+  reset() { const io = this.#live(); this.#invalidate(); this.#m._sl_wasm_world_reset(io.ptr); this.#owner = {}; }
+  step(dt) { const io = this.#live(), value = f32(dt, 'dt'); this.#invalidate(); return !!this.#m._sl_wasm_world_step(io.ptr, value); }
   isBodyValid(body) {
     const io = this.#live(), h = handles.get(body);
-    return !!h && h.owner === this.#owner && !!this.#m._sl_wasm_body_valid(io.ptr, h.index, h.generation);
+    return !!h && h.kind === 'body' && h.owner === this.#owner && !!this.#m._sl_wasm_body_valid(io.ptr, h.index, h.generation);
   }
   bodyAt(row) {
     const io = this.#live(); uint(row, limits.bodies, 'row');
@@ -156,12 +178,13 @@ class World {
     const shape = shapeData(desc.shape);
     this.#live();
     stageShape(this.#m, io, shape);
-    io.f.set(values); io.iu[0] = bodyTypes[type];
+    io.f.set(values); io.iu[0] = bodyTypes[type]; this.#invalidate();
     return this.#m._sl_wasm_body_create(io.ptr) ? this.#outputHandle() : null;
   }
   destroyBody(body) {
     const io = this.#live(), h = handles.get(body);
-    if (!h || h.owner !== this.#owner) return false;
+    if (!h || h.kind !== 'body' || h.owner !== this.#owner) return false;
+    this.#invalidate();
     return !!this.#m._sl_wasm_body_destroy(io.ptr, h.index, h.generation);
   }
   readBody(body) {
@@ -177,10 +200,12 @@ class World {
   }
   #scalar(body, value, operation) {
     const h = this.#body(body), v = f32(value, 'value');
+    this.#invalidate();
     return !!this.#m[operation](this.#io.ptr, h.index, h.generation, v);
   }
   #vector(body, value, operation) {
     const v = vec(value, 'value'), h = this.#body(body);
+    this.#invalidate();
     return !!this.#m[operation](this.#io.ptr, h.index, h.generation, ...v);
   }
   setPosition(h, v) { return this.#vector(h, v, '_sl_wasm_body_set_position'); }
@@ -194,17 +219,153 @@ class World {
   applyTorque(h, v) { return this.#scalar(h, v, '_sl_wasm_body_apply_torque'); }
   applyForceAtPoint(body, force, point) {
     const f = vec(force, 'force'), p = vec(point, 'point'), h = this.#body(body);
+    this.#invalidate();
     return !!this.#m._sl_wasm_body_apply_force_at_point(this.#io.ptr, h.index, h.generation, ...f, ...p);
   }
   setShape(body, shape) {
     const h = this.#body(body), data = shapeData(shape);
     stageShape(this.#m, this.#io, data);
+    this.#invalidate();
     return !!this.#m._sl_wasm_body_set_shape(this.#io.ptr, h.index, h.generation);
   }
   wakeBody(body) {
     const h = this.#body(body);
+    this.#invalidate();
     return !!this.#m._sl_wasm_body_wake(this.#io.ptr, h.index, h.generation);
   }
+  createStepper(dt) {
+    const io = this.#live(), timestep = f32(dt, 'dt');
+    if (!this.#m._sl_wasm_timestep_valid(io.ptr, timestep)) return null;
+    const data = { owner: this.#owner, timestep, remainder: 0, droppedTime: 0, steps: 0 };
+    const value = Object.freeze({ get timestep() { return data.timestep; }, get remainder() { return data.remainder; },
+      get droppedTime() { return data.droppedTime; }, get steps() { return data.steps; } });
+    steppers.set(value, data); return value;
+  }
+  advance(stepper, frameTime) {
+    const io = this.#live(), time = f32(frameTime, 'frameTime'), data = steppers.get(stepper);
+    if (!data || data.owner !== this.#owner) throw new TypeError('Stepper is stale or belongs to another world');
+    this.#invalidate();
+    if (!this.#m._sl_wasm_world_advance(io.ptr, data.timestep, data.remainder, time)) return false;
+    data.steps = io.ou[0]; data.remainder = io.of[0]; data.droppedTime = this.#m._sl_wasm_dropped_time(io.ptr);
+    return true;
+  }
+  get snapshot() { this.#live(); return this.#views.snapshot; }
+  refreshSnapshot(diagnostics = false) {
+    const io = this.#live(), flag = boolean(diagnostics, 'diagnostics');
+    this.#revision(this.#views.state); this.#invalidate();
+    if (!this.#m._sl_wasm_snapshot_refresh(io.ptr, flag ? 1 : 0)) return false;
+    const state = this.#views.state;
+    this.#views.refreshCopy(io.ou[3], io.ou[1], io.ou[2]);
+    state.bodyCount = io.ou[0]; state.contactCount = io.ou[1]; state.jointCount = io.ou[2];
+    state.geometryUpdates = io.ou[3]; state.valid = true;
+    return true;
+  }
+  #queryDone(operation, mask, capacity) {
+    const io = this.#live();
+    uint(mask, 0xffffffff, 'typeMask'); uint(capacity, limits.bodies, 'capacity');
+    const state = this.#views.queryState;
+    if (state.revision === Number.MAX_SAFE_INTEGER) throw new RangeError('Query revision exhausted');
+    if (!this.#m[operation](io.ptr, mask, capacity)) return null;
+    this.#views.queryCopy();
+    this.#revision(state); state.count = io.ou[0]; state.truncated = !!io.ou[1];
+    state.written = io.ou[2]; state.valid = true;
+    return this.#views.query;
+  }
+  // Scalar query inputs and reused result views keep the hot path allocation-free.
+  queryPoint(x, y, typeMask = 0, capacity = this.#config.bodyCapacity) {
+    const px = f32(x, 'x'), py = f32(y, 'y'), io = this.#live();
+    io.f[0] = px; io.f[1] = py;
+    return this.#queryDone('_sl_wasm_query_point', typeMask, capacity);
+  }
+  queryAabb(lowerX, lowerY, upperX, upperY, typeMask = 0, capacity = this.#config.bodyCapacity) {
+    const lx = f32(lowerX, 'lowerX'), ly = f32(lowerY, 'lowerY');
+    const ux = f32(upperX, 'upperX'), uy = f32(upperY, 'upperY'), io = this.#live();
+    io.f[0] = lx; io.f[1] = ly; io.f[2] = ux; io.f[3] = uy;
+    return this.#queryDone('_sl_wasm_query_aabb', typeMask, capacity);
+  }
+  queryRay(originX, originY, translationX, translationY, typeMask = 0) {
+    const ox = f32(originX, 'originX'), oy = f32(originY, 'originY');
+    const tx = f32(translationX, 'translationX'), ty = f32(translationY, 'translationY');
+    uint(typeMask, 0xffffffff, 'typeMask'); const io = this.#live(), state = this.#views.rayState;
+    if (state.revision === Number.MAX_SAFE_INTEGER) throw new RangeError('Ray revision exhausted');
+    io.f[0] = ox; io.f[1] = oy; io.f[2] = tx; io.f[3] = ty;
+    if (!this.#m._sl_wasm_query_ray(io.ptr, typeMask)) return null;
+    this.#revision(state); state.hit = !!io.ou[0]; state.index = io.ou[1]; state.generation = io.ou[2];
+    state.fraction = io.of[0]; state.pointX = io.of[1]; state.pointY = io.of[2];
+    state.normalX = io.of[3]; state.normalY = io.of[4]; state.valid = true;
+    return this.#views.ray;
+  }
+  islandStats(body) {
+    const h = this.#body(body), io = this.#io;
+    if (!this.#m._sl_wasm_island_read(io.ptr, h.index, h.generation)) return null;
+    return { id: io.ou[0], dynamicBodyCount: io.ou[1], contactCount: io.ou[2], jointCount: io.ou[3] };
+  }
+  stats() {
+    const io = this.#live(); this.#m._sl_wasm_stats_read(io.ptr);
+    return { ...Object.fromEntries(statNames.map((name, i) => [name, io.ou[i]])),
+      step: { ...Object.fromEntries(stepNames.map((name, i) => [name, io.ou[i+13]])), work: workCopy(this.#views.work) },
+      cumulative: workCopy(this.#views.work, 13), contactDropCount: io.ou[22] };
+  }
+  get jointCount() { return this.#m._sl_wasm_joint_count(this.#live().ptr); }
+  get contactCount() { return this.#m._sl_wasm_contact_count(this.#live().ptr); }
+  #joint(value) {
+    const io = this.#live(), h = handles.get(value);
+    if (!h || h.kind !== 'joint' || h.owner !== this.#owner || !this.#m._sl_wasm_joint_valid(io.ptr, h.index, h.generation)) {
+      throw new TypeError('Joint handle is stale or belongs to another world');
+    }
+    return h;
+  }
+  isJointValid(value) {
+    const io = this.#live(), h = handles.get(value);
+    return !!h && h.kind === 'joint' && h.owner === this.#owner && !!this.#m._sl_wasm_joint_valid(io.ptr, h.index, h.generation);
+  }
+  createJoint(desc) {
+    fields(desc, ['kind', 'bodyA', 'bodyB', 'localAnchorA', 'localAnchorB', 'length', 'collideConnected'], 'joint');
+    const kind = desc.kind;
+    if (kind !== 'distance' && kind !== 'revolute') throw new TypeError('Invalid joint kind');
+    const a = vec(defaultValue(desc.localAnchorA, vector(0, 0)), 'localAnchorA');
+    const b = vec(defaultValue(desc.localAnchorB, vector(0, 0)), 'localAnchorB');
+    const length = f32(defaultValue(desc.length, 0), 'length');
+    const collide = boolean(defaultValue(desc.collideConnected, false), 'collideConnected');
+    // Read both input references before checking either: getters may call application code.
+    const bodyA = desc.bodyA, bodyB = desc.bodyB;
+    const ha = this.#body(bodyA), hb = this.#body(bodyB), io = this.#io;
+    io.f[0] = a[0]; io.f[1] = a[1]; io.f[2] = b[0]; io.f[3] = b[1]; io.f[4] = length;
+    io.iu[0] = kind === 'distance' ? 0 : 1; io.iu[1] = ha.index; io.iu[2] = ha.generation;
+    io.iu[3] = hb.index; io.iu[4] = hb.generation; io.iu[5] = collide ? 1 : 0;
+    this.#invalidate();
+    return this.#m._sl_wasm_joint_create(io.ptr) ? this.#outputHandle('joint') : null;
+  }
+  jointAt(row) {
+    const io = this.#live(); uint(row, limits.joints, 'row');
+    return this.#m._sl_wasm_joint_at(io.ptr, row) ? this.#outputHandle('joint') : null;
+  }
+  destroyJoint(value) {
+    const io = this.#live(), h = handles.get(value);
+    if (!h || h.kind !== 'joint' || h.owner !== this.#owner) return false;
+    this.#invalidate(); return !!this.#m._sl_wasm_joint_destroy(io.ptr, h.index, h.generation);
+  }
+  readJoint(value) {
+    const h = this.#joint(value), io = this.#io;
+    this.#m._sl_wasm_joint_read(io.ptr, h.index, h.generation);
+    return { handle: value, kind: io.ou[2] === 0 ? 'distance' : 'revolute',
+      bodyA: this.#handle(io.ou[3], io.ou[4]), bodyB: this.#handle(io.ou[5], io.ou[6]),
+      collideConnected: !!io.ou[7], localAnchorA: vector(io.of[0], io.of[1]), localAnchorB: vector(io.of[2], io.of[3]),
+      length: io.of[4], linearImpulse: vector(io.of[5], io.of[6]) };
+  }
+  contactAt(row) {
+    const io = this.#live(); uint(row, limits.contacts, 'row');
+    if (!this.#m._sl_wasm_contact_read(io.ptr, row)) return null;
+    const f = io.of, u = io.ou, points = [];
+    for (let i = 0; i < u[5]; ++i) {
+      const p = 4 + 10*i;
+      points.push({ anchorA: vector(f[p], f[p+1]), anchorB: vector(f[p+2], f[p+3]), point: vector(f[p+4], f[p+5]),
+        separation: f[p+6], normalImpulse: f[p+7], tangentImpulse: f[p+8], normalVelocity: f[p+9], id: u[6+2*i], persisted: !!u[7+2*i] });
+    }
+    return { bodyA: this.#handle(u[0], u[1]), bodyB: this.#handle(u[2], u[3]), touching: !!u[4],
+      friction: f[0], restitution: f[1], normal: vector(f[2], f[3]), points };
+  }
+
 }
 
 export async function createSilk(options = {}) {
@@ -246,11 +407,15 @@ export async function createSilk(options = {}) {
     version: `${version >>> 16}.${(version >>> 8) & 255}.${version & 255}`,
     get memory() {
       live();
-      let requestedBytes = m._sl_wasm_context_bytes();
-      for (const world of worlds) requestedBytes += world.memory.arenaBytes + world.memory.adapterBytes;
+      let requestedBytes = m._sl_wasm_context_bytes(), outputBytes = 0;
+      for (const world of worlds) {
+        const memory = world.memory;
+        requestedBytes += memory.arenaBytes + memory.adapterBytes;
+        outputBytes += memory.outputBytes;
+      }
       return Object.freeze({ linearMemoryBytes: m.HEAPU32.byteLength, stackBytes: 1048576,
         staticEnd: m._sl_wasm_static_end(), heapBase: m._sl_wasm_heap_base(),
-        allocatorUsedBytes: m._sl_wasm_allocator_used(), requestedBytes });
+        allocatorUsedBytes: m._sl_wasm_allocator_used(), requestedBytes, outputBytes });
     },
     none: () => makeShape(() => { m._sl_wasm_shape_none(scratch.ptr); return true; }),
     circle: radius => { live(); const r = f32(radius, 'radius'); return makeShape(() => m._sl_wasm_shape_circle(scratch.ptr, r)); },
@@ -291,6 +456,10 @@ export async function createSilk(options = {}) {
       const parsed = configParse(config); live(); configStage(scratch, parsed);
       return m._sl_wasm_world_bytes(scratch.ptr);
     },
+    worldAdapterBytes: config => {
+      const parsed = configParse(config); live(); configStage(scratch, parsed);
+      return m._sl_wasm_adapter_bytes(scratch.ptr);
+    },
     createWorld: config => {
       const parsed = configParse(config); live();
       configStage(scratch, parsed);
@@ -300,7 +469,13 @@ export async function createSilk(options = {}) {
       if (!io) return null;
       configStage(io, parsed);
       if (!m._sl_wasm_world_init(io.ptr)) { m._sl_wasm_context_destroy(io.ptr); return null; }
-      const world = new World(worldKey, m, io, parsed.resolved, bytes, value => worlds.delete(value));
+      let world;
+      try { world = new World(worldKey, m, io, parsed.resolved, bytes, value => worlds.delete(value)); }
+      catch (error) {
+        m._sl_wasm_context_destroy(io.ptr);
+        if (error instanceof RangeError) return null;
+        throw error;
+      }
       worlds.add(world); return world;
     },
     dispose: () => {
