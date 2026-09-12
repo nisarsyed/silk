@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: cmake --preset debug -DSL_BUILD_BENCH=ON
+      - run: cmake --preset debug -DSL_BUILD_BENCH=ON -DSL_BUILD_WASM_ADAPTER=ON
       - run: cmake --build --preset debug
       - run: ctest --preset debug
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
@@ -71,7 +71,7 @@ jobs:
           python-version: "3.13"
       # Execute the tests with NDEBUG; compiling the release sandbox alone
       # does not exercise release behavior.
-      - run: cmake --preset release -DSL_BUILD_BENCH=ON
+      - run: cmake --preset release -DSL_BUILD_BENCH=ON -DSL_BUILD_WASM_ADAPTER=ON
       - run: cmake --build --preset release
       - run: ctest --preset release
       - run: python tools/check_consumer.py --output build/consumer-reports --config Release
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: cmake --preset debug -DSL_BUILD_BENCH=ON
+      - run: cmake --preset debug -DSL_BUILD_BENCH=ON -DSL_BUILD_WASM_ADAPTER=ON
       - run: cmake --build --preset debug
       - run: ctest --preset debug
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
@@ -125,7 +125,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: cmake --preset windows -DSL_BUILD_BENCH=ON
+      - run: cmake --preset windows -DSL_BUILD_BENCH=ON -DSL_BUILD_WASM_ADAPTER=ON
       - run: cmake --build --preset windows
       - run: ctest --preset windows
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
@@ -151,7 +151,7 @@ jobs:
       CC: clang
     steps:
       - uses: actions/checkout@v7
-      - run: cmake --preset sanitize
+      - run: cmake --preset sanitize -DSL_BUILD_WASM_ADAPTER=ON
       - run: cmake --build --preset sanitize
       - run: ctest --preset sanitize
 
