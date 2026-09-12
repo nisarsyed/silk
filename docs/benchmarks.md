@@ -27,7 +27,7 @@ The runner preserves raw stdout/stderr when validation fails. Use
 ## Choose a fixture
 
 Every fixture uses dt = binary32(1/60), four substeps and zero
-drag. [Fixture builders](../bench/main.c) define geometry, seeds, materials and
+drag. [Fixture builders](../bench/fixtures.c) define geometry, seeds, materials and
 capacities; each report's `settings` records the resolved workload.
 
 | Scene | Workload |
