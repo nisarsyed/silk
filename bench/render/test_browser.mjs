@@ -23,6 +23,7 @@ try {
   for (const [width,height] of [[1280,720],[720,1280]]) {
     const profiles=[];
     for (const scene of ['pyramid','rain','chains']) for (const steps of [0,120]) profiles.push({scene,steps,width,height});
+    for(const scene of ['pyramid','rain','chains']) profiles.push({scene,steps:3,copies:16,width,height});
     for (const instances of [256,65536]) profiles.push({scene:'rain',steps:120,instances,width,height});
     for (const profile of profiles) {
       const page=await browser.newPage({viewport:{width:width===720?360:width,height:height===1280?640:height},deviceScaleFactor:width===720?2:1}), errors=[];
@@ -33,7 +34,7 @@ try {
         await page.goto(`http://127.0.0.1:${server.address().port}/verify.html`);
         await page.waitForFunction(()=>typeof window.verifyRenderers==='function');
         const result=await page.evaluate(profile=>window.verifyRenderers(profile),{...profile,images:true});
-        for (let i=0;i<result.previews.length;++i) await fs.writeFile(path.join(output,`${profile.scene}-${profile.steps}-${profile.instances??"default"}-${width}x${height}-${["canvas","webgl","raylib"][i]}.png`),Buffer.from(result.previews[i].split(",")[1],"base64"));
+        for (let i=0;i<result.previews.length;++i) await fs.writeFile(path.join(output,`${profile.scene}-${profile.steps}-${profile.copies??1}copies-${profile.instances??"default"}-${width}x${height}-${["canvas","webgl","raylib"][i]}.png`),Buffer.from(result.previews[i].split(",")[1],"base64"));
         delete result.previews;
         result.errors=errors; Object.assign(entry,result); console.log(JSON.stringify(result));
         assert.deepEqual(errors,[]);

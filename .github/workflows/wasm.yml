@@ -54,6 +54,7 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           node bench/wasm/test_driver.mjs build/wasm-${{ matrix.mode }}/benchmark/driver.mjs
+          node bench/render/test_study.mjs build/wasm-${{ matrix.mode }}/render-physics
           for sleep in off on; do
             for host in node browser; do
               browser_args=()
@@ -93,6 +94,7 @@ jobs:
             build/wasm-${{ matrix.mode }}/tests/CMakeFiles/sl_tests.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_bench.dir/link.txt
+            build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_study.dir/link.txt
             build/wasm-${{ matrix.mode }}/benchmark/build.json
             build/wasm-${{ matrix.mode }}/benchmark-reports/
             build/wasm-${{ matrix.mode }}/Testing/Temporary/

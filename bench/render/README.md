@@ -19,6 +19,7 @@ cmake --build build/wasm-render
 npm --prefix wasm ci --ignore-scripts --no-audit --no-fund
 PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install chromium
 python3 bench/render/build.py
+node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
 node bench/render/test_browser.mjs
 ```
@@ -35,7 +36,8 @@ it does not modify vendored source or change the sandbox pin/configuration.
 
 `build.py` compiles the TypeScript and copies the separately built modules into
 ignored `build/render-study`. Its `--benchmark`, `--raylib`, and `--output`
-arguments select other build directories. The browser test takes the assembled
+arguments select other build directories. `--physics` defaults to the sibling
+`render-physics` directory beside the selected benchmark. The browser test takes the assembled
 directory and report directory as positional arguments. It starts an ephemeral
 loopback-only static server and fresh Playwright Chromium pages, preserving
 JSON results (including failures) and PNGs under `build/reports/render-correctness`. This is browser
@@ -99,8 +101,22 @@ contact drops as uint64, and stops at the caller's declared bound. Its separate
 the warm-up world and limit measured intervals to the contract's 60/300 seconds.
 Clocks and scheduling are outside C. The native benchmark retains its original
 10,000-step bound and unchanged full-quality oracle. The driver supplies a
-private borrowed world/adapter to support co-located raylib rendering; browser
-ownership and timing integration are still in progress.
+private borrowed world/adapter to support co-located raylib rendering. Its
+separate generated `render-physics/driver.mjs` browser/worker/Node factory owns
+world lifetimes, validates fixed budgets and step/tier inputs, returns copied
+settings, and reuses the package's isolated snapshot columns. `step()` and
+`refreshSnapshot()` have no per-frame object allocation. `report()` explicitly
+allocates copied settings/statistics/counters outside the measured path.
+
+Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
+point/AABB/ray results. These extra C buffers cost `20*bodyCapacity + 32` bytes;
+the JS copies cost the same outside linear memory. Per-slot flags distinguish
+query membership and proxy validity, and the output retains exact total counts
+and ray geometry. `diagnostics.valid` becomes false after stepping, disposal, or
+a refresh without diagnostics. C column packing is checked against public
+queries and a twin-world replay; JS writes cannot mutate physics. Contacts and
+joints still use the existing snapshot buffers. Overlay rendering and timed
+collection remain in progress.
 
 The native and WASM C suite checks every physics tier with sleep off/on,
 compares every copied descriptor, verifies within-copy joint remapping, and
@@ -115,7 +131,8 @@ the next call without changing state or its fixed storage.
 The geometry test checks C snapshot row order, changing transforms, all nine
 render-only tiers, circle vertices, and both camera profiles. Browser checks
 compare every pixel for the three default scenes before and after stepping,
-including a further transform update, plus the smallest/largest frozen tiers,
+including a further transform update and 16-copy physics tiers, plus the
+smallest/largest frozen render-only tiers,
 at 1280×720 and 720×1280. They also check zero repeated pose uploads, exact
 changed-pose byte counts, idempotent disposal, disposed-call rejection and
 console errors. Pixel readbacks run only in this correctness harness.
@@ -128,7 +145,7 @@ An analytical edge test pins the one-pixel band and rejects a changed pixel
 outside it. All pixels outside the band must match exactly.
 
 Still required for #95: diagnostic overlays and queries; browser integration
-of the bounded sustained and physics-scaling drivers; matched render-only/end-to-end timing and input
+of the sustained measurement loop and co-located raylib driver; matched render-only/end-to-end timing and input
 collection; GPU/upload/draw instrumentation; startup, memory and allocation
 records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete
 five-repeat desktop and physical Android protocol; and an evidence-backed

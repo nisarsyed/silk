@@ -1,4 +1,4 @@
-import {createBenchmarkModule} from './benchmark/driver.mjs';
+import {createStudyModule} from './physics/driver.mjs';
 import {DrawScene} from './geometry.js';
 import {edgeMask,compare} from './pixels.js';
 import {CanvasCandidate} from './canvas.js';
@@ -24,17 +24,17 @@ function capture(canvas, candidate) {
     } catch(error) { reject(error); }
   }));
 }
-window.verifyRenderers=async ({scene='rain',steps=120,instances,width=1280,height=720,images=false}={})=>{
-  const module=await createBenchmarkModule();
-  const world=module.create(scene,{warmup:0,steps:steps+1});
+window.verifyRenderers=async ({scene='rain',steps=120,copies=1,instances,width=1280,height=720,images=false}={})=>{
+  const module=await createStudyModule({memoryBytes:256*1024*1024});
+  const world=module.create(scene,{copies,steps:steps+1});
   if (!world) throw new Error('Fixture allocation failed');
   const canvases=[], candidates=[];
   try {
     for (let i=0; i<steps; ++i) {
-      if (!world.prepare() || !world.mutate() || !world.step() || !world.sample()) throw new Error('Fixture stepping failed');
+      if (!world.step()) throw new Error('Fixture stepping failed');
     }
     if (!world.refreshSnapshot()) throw new Error('Snapshot failed');
-    const drawScene=new DrawScene(world.snapshot,scene,instances), pixels=[];
+    const drawScene=new DrawScene(world.snapshot,scene,instances,copies), pixels=[];
     const initialPoses=drawScene.poses.slice();
     for (const name of ['canvas','webgl','raylib']) {
       const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;canvas.dataset.candidate=name;canvas.id=`silk-study-${name}`;
@@ -51,7 +51,7 @@ window.verifyRenderers=async ({scene='rain',steps=120,instances,width=1280,heigh
     if(candidates[1].uploadBytes!==0 || candidates[2].poseCopyBytes!==0) throw new Error('Unchanged poses copied again');
     let updated;
     if (!drawScene.frozen) {
-      if(!world.prepare() || !world.mutate() || !world.step() || !world.sample() || !world.refreshSnapshot())
+      if(!world.step() || !world.refreshSnapshot())
         throw new Error('Transform update failed');
       drawScene.copyTransforms(world.snapshot);
       const next=[];
@@ -69,7 +69,7 @@ window.verifyRenderers=async ({scene='rain',steps=120,instances,width=1280,heigh
       canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(bytes),width,height),0,0);
       return canvas.toDataURL('image/png');
     }):undefined;
-    return {scene,steps,instances:drawScene.count,width,height,previews,updated,
+    return {scene,steps,copies,instances:drawScene.count,width,height,previews,updated,
       webgl:compare(pixels[0],pixels[1],width,height,edges),raylib:compare(pixels[0],pixels[2],width,height,edges),
       frozen:drawScene.frozen,batches:drawScene.batches.length,meshes:drawScene.meshes.length};
   } finally {

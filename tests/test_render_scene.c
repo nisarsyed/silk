@@ -211,8 +211,101 @@ static void driver_bounds(void)
     SL_EXPECT_INT_EQ(sl_render_study_status(study)[4], 10001u);
     sl_render_study_destroy(study);
 }
+static void diagnostic_columns(void)
+{
+    SL_EXPECT(!sl_render_study_diagnostics(NULL));
+    SL_EXPECT(sl_render_study_diagnostic_f32(NULL) == NULL);
+    SL_EXPECT(sl_render_study_diagnostic_u32(NULL) == NULL);
+    SL_EXPECT(sl_render_study_diagnostic_bytes(NULL) == 0u);
+    sl_render_study *study = sl_render_study_create(1u, 1u, 0u, 3u);
+    SL_EXPECT(study != NULL);
+    if (study == NULL) {
+        return;
+    }
+    sl_world twin = { 0 };
+    sl_world_config config = { 0 };
+    const bool built = sl_render_scene_build(&twin, &config, 1u, 1u, false);
+    SL_EXPECT(built);
+    if (!built) {
+        sl_render_study_destroy(study);
+        return;
+    }
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        SL_EXPECT(sl_render_study_step(study));
+        sl_world_step(&twin, SL_BENCH_TIMESTEP);
+    }
+    const uint32_t capacity = config.body_capacity;
+    sl_body_handle *handles = calloc(capacity, sizeof(*handles));
+    uint32_t *expected = calloc(capacity, sizeof(*expected));
+    SL_EXPECT(handles != NULL && expected != NULL);
+    if (handles == NULL || expected == NULL) {
+        free(handles);
+        free(expected);
+        sl_world_destroy(&twin);
+        sl_render_study_destroy(study);
+        return;
+    }
+    SL_EXPECT(sl_render_study_diagnostics(study));
+    SL_EXPECT(sl_replay_check(&twin, sl_render_study_world(study),
+                              "diagnostic const refresh", SL_BENCH_RAIN_SEED,
+                              3u));
+    const float *values = sl_render_study_diagnostic_f32(study);
+    const uint32_t *words = sl_render_study_diagnostic_u32(study);
+    SL_EXPECT(sl_render_study_diagnostic_bytes(study) ==
+              (size_t)capacity * 20u + 32u);
+    for (uint32_t row = 0u; row < sl_world_body_count(&twin); ++row) {
+        const sl_body_handle body = sl_world_body_at(&twin, row);
+        sl_aabb bounds;
+        const bool has_proxy =
+            sl_world_body_get_proxy_aabb(&twin, body, &bounds);
+        SL_EXPECT(((words[body.index] & 8u) != 0u) == has_proxy);
+        if (has_proxy) {
+            expected[body.index] = 8u;
+            SL_EXPECT(values[body.index] == bounds.lower.x);
+            SL_EXPECT(values[capacity + body.index] == bounds.lower.y);
+            SL_EXPECT(values[2u * capacity + body.index] == bounds.upper.x);
+            SL_EXPECT(values[3u * capacity + body.index] == bounds.upper.y);
+        }
+    }
+    sl_query_result query = { 0 };
+    SL_EXPECT(sl_world_query_point(&twin, (sl_vec2){ 0.0f, 12.0f },
+                                   SL_QUERY_ALL, handles, capacity, &query));
+    SL_EXPECT_INT_EQ(words[capacity], query.count);
+    for (uint32_t i = 0u; i < query.count; ++i) {
+        expected[handles[i].index] |= 1u;
+    }
+    SL_EXPECT(sl_world_query_aabb(
+        &twin, (sl_aabb){ { -1.0f, 11.0f }, { 1.0f, 13.0f } }, SL_QUERY_ALL,
+        handles, capacity, &query));
+    SL_EXPECT_INT_EQ(words[capacity + 1u], query.count);
+    for (uint32_t i = 0u; i < query.count; ++i) {
+        expected[handles[i].index] |= 2u;
+    }
+    sl_query_ray_result ray = { 0 };
+    SL_EXPECT(sl_world_query_ray(&twin,
+                                 (sl_ray){ { -9.0f, 12.0f }, { 18.0f, 0.0f } },
+                                 SL_QUERY_ALL, &ray));
+    SL_EXPECT_INT_EQ(words[capacity + 2u], ray.hit ? 1u : 0u);
+    if (ray.hit) {
+        expected[ray.body.index] |= 4u;
+    }
+    SL_EXPECT(values[4u * capacity] == ray.geometry.fraction);
+    SL_EXPECT(values[4u * capacity + 1u] == ray.geometry.point.x);
+    SL_EXPECT(values[4u * capacity + 2u] == ray.geometry.point.y);
+    SL_EXPECT(values[4u * capacity + 3u] == ray.geometry.normal.x);
+    SL_EXPECT(values[4u * capacity + 4u] == ray.geometry.normal.y);
+    for (uint32_t i = 0u; i < capacity; ++i) {
+        SL_EXPECT_INT_EQ(words[i], expected[i]);
+    }
+    free(handles);
+    free(expected);
+    sl_world_destroy(&twin);
+    sl_render_study_destroy(study);
+}
 static const sl_test_case k_cases[] = {
     { "reject unsupported scaling inputs", invalid_arguments },
+    { "diagnostic columns match public queries without changing physics",
+      diagnostic_columns },
     { "long study driver is bounded and keeps fixed storage", driver_bounds },
     { "all frozen physics tiers preserve descriptors and replay",
       scaling_matrix }
