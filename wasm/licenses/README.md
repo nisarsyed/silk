@@ -4,6 +4,8 @@ Silk and its wrapper are MIT-licensed (see the package LICENSE).
 The binary and JavaScript glue are built with Emscripten 6.0.9.
 This directory preserves the SDK notices for Emscripten, musl libc/math,
 and compiler-rt builtins; the SDK dlmalloc allocator is public-domain code.
+`fmaf.txt` retains the file-specific BSD notice for the scalar fused
+multiply-add implementation used by vector dot products.
 No renderer or JavaScript runtime dependency is bundled. Development tooling
 is excluded from the archive. Review these notices when upgrading the SDK.
 
