@@ -1,0 +1,35 @@
+{
+  "name": "@nisarsyed/silk",
+  "version": "@PROJECT_VERSION@",
+  "description": "Portable deterministic 2D physics with a bounded WebAssembly API",
+  "type": "module",
+  "main": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs"
+    },
+    "./silk.wasm": "./silk.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "views.mjs",
+    "silk.mjs",
+    "silk.wasm",
+    "index.d.ts",
+    "README.md",
+    "LICENSE",
+    "licenses"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nisarsyed/silk.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "sideEffects": false
+}
