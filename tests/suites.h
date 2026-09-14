@@ -26,6 +26,7 @@ int sl_query_suite(void);
 #ifdef SL_TEST_WASM_ADAPTER
 int sl_wasm_suite(void);
 int sl_wasm_bench_suite(void);
+int sl_render_scene_suite(void);
 #endif
 
 #endif /* SILK_SUITES_H */

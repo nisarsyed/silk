@@ -20,7 +20,7 @@ add_executable(sl_tests
     test_step.c
 )
 if(SL_BUILD_WASM_ADAPTER)
-    target_link_libraries(sl_tests PRIVATE silk_wasm_bench_adapter silk_warnings)
+    target_link_libraries(sl_tests PRIVATE silk_render_scene silk_warnings)
 else()
     target_link_libraries(sl_tests PRIVATE silk silk_warnings)
 endif()
@@ -46,6 +46,6 @@ if(EMSCRIPTEN)
 endif()
 
 if(SL_BUILD_WASM_ADAPTER)
-    target_sources(sl_tests PRIVATE test_wasm.c test_wasm_bench.c)
+    target_sources(sl_tests PRIVATE test_wasm.c test_wasm_bench.c test_render_scene.c)
     target_compile_definitions(sl_tests PRIVATE SL_TEST_WASM_ADAPTER=1)
 endif()
