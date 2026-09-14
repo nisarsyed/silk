@@ -265,3 +265,7 @@ See [the package API guide](../wasm/README.md) for loading examples, all lifetim
 and memory contracts, bundler and worker details, and intentional C omissions.
 `wasm/consumer/` contains minimal consumers using only public package exports.
 CI runs archive checks for both debug and release outputs.
+
+The separate [WASM benchmark guide](wasm-benchmarks.md) covers shared C
+workloads, Node/browser smoke and full profiles, exact counters, memory
+accounting, timing regions, and physical/replay validation.
