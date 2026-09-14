@@ -79,6 +79,17 @@ static void test_vec2_cross_sign(void)
     SL_EXPECT_NEAR(sl_vec2_cross(y, x), -1.0f, SL_EPSILON);
 }
 
+static void test_vec2_dot_retains_fused_cancellation(void)
+{
+    /* (1 + 2^-23)(1 - 2^-23) - 1 = -2^-46 exactly. Rounding the
+     * multiplication first loses this nonzero result. These assertions pin
+     * the explicit fused rounding contract, rather than an approximate
+     * geometric tolerance. */
+    const sl_vec2 a = { 0x1.000002p0f, 1.0f };
+    const sl_vec2 b = { 0x1.fffffcp-1f, -1.0f };
+    SL_EXPECT(sl_vec2_dot(a, b) == -0x1p-46f);
+}
+
 static void test_vec2_length_normalize(void)
 {
     sl_vec2 v = sl_vec2_make(3.0f, 4.0f);
@@ -604,6 +615,7 @@ static const sl_test_case k_cases[] = {
     { "vec2_add_sub_neg_scale", test_vec2_add_sub_neg_scale },
     { "vec2_dot", test_vec2_dot },
     { "vec2_cross_sign", test_vec2_cross_sign },
+    { "vec2 dot fused cancellation", test_vec2_dot_retains_fused_cancellation },
     { "vec2_length_normalize", test_vec2_length_normalize },
     { "vec2_perp_is_orthogonal_ccw", test_vec2_perp_is_orthogonal_ccw },
     { "vec2_right_perp_and_scalar_cross_order",

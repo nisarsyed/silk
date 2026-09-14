@@ -8,6 +8,7 @@ int main(void)
 
 #ifdef SL_TEST_WASM_ADAPTER
     failures += sl_wasm_suite();
+    failures += sl_wasm_bench_suite();
 #endif
 
     failures += sl_replay_suite();
