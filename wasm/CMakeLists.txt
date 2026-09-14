@@ -6,6 +6,11 @@ target_include_directories(silk_wasm_adapter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_library(silk_wasm_bench_adapter STATIC ../bench/wasm/driver.c ../bench/fixtures.c ../bench/quality.c)
 target_link_libraries(silk_wasm_bench_adapter PUBLIC silk_wasm_adapter PRIVATE silk_warnings)
 
+# Browser study setup reuses the existing fixture object code; it does not
+# alter the native/WASM step-only benchmark target or distributed package.
+add_library(silk_render_scene STATIC ../bench/render/scene.c ../bench/render/driver.c)
+target_link_libraries(silk_render_scene PUBLIC silk_wasm_bench_adapter PRIVATE silk_warnings)
+
 if(EMSCRIPTEN)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS adapter.h runtime.h)

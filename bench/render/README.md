@@ -82,6 +82,34 @@ and raylib's internal GPU uploads/draw counts are currently unavailable, not
 zero. Instrumentation and nonblocking GPU timing remain required before the
 measurement study.
 
+## Shared physics setup and sustained driver
+
+`scene.c` builds the default fixture through `bench/fixtures.c`. The one-copy
+case uses that original construction directly. Scaling copies the original
+body and joint descriptors through public C APIs, translates each copy by the
+contract's 32-unit formula, and multiplies capacities by exactly 1/2/4/8/16.
+The temporary source world, fixture record and handle map are released after
+initialization. No JS scene definitions or engine limits change. Body/joint
+insertion order and within-copy joint endpoints are preserved.
+
+`driver.c` owns one such world and its existing bounded snapshot/query adapter.
+Each call steps at the original binary32 timestep and four substeps, records
+contact drops as uint64, and stops at the caller's declared bound. Its separate
+21,600-step maximum covers six minutes at 60 Hz; the host still must discard
+the warm-up world and limit measured intervals to the contract's 60/300 seconds.
+Clocks and scheduling are outside C. The native benchmark retains its original
+10,000-step bound and unchanged full-quality oracle. The driver supplies a
+private borrowed world/adapter to support co-located raylib rendering; browser
+ownership and timing integration are still in progress.
+
+The native and WASM C suite checks every physics tier with sleep off/on,
+compares every copied descriptor, verifies within-copy joint remapping, and
+checks deterministic replay. The one-copy world matches the original fixture
+including private replay state. The largest 32,048-body/262,144-contact driver
+must allocate and refresh its bounded snapshot. A 10,001-step run demonstrates
+that this independent owner crosses the original benchmark limit, then rejects
+the next call without changing state or its fixed storage.
+
 ## Correctness scope
 
 The geometry test checks C snapshot row order, changing transforms, all nine
@@ -99,8 +127,8 @@ transitions: Canvas coverage can hide a subpixel gap between same-color bodies.
 An analytical edge test pins the one-pixel band and rejects a changed pixel
 outside it. All pixels outside the band must match exactly.
 
-Still required for #95: diagnostic overlays and queries; bounded sustained and
-physics-scaling drivers; matched render-only/end-to-end timing and input
+Still required for #95: diagnostic overlays and queries; browser integration
+of the bounded sustained and physics-scaling drivers; matched render-only/end-to-end timing and input
 collection; GPU/upload/draw instrumentation; startup, memory and allocation
 records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete
 five-repeat desktop and physical Android protocol; and an evidence-backed
