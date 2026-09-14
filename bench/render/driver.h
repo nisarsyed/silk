@@ -25,8 +25,22 @@ bool sl_render_study_step(sl_render_study *study);
  * also available to the co-located raylib candidate without a JS pose copy. */
 sl_wasm_context *sl_render_study_adapter(sl_render_study *study);
 sl_world *sl_render_study_world(sl_render_study *study);
-/* fixture, copies, sleep, step_limit, completed_steps, B/C/J capacities. */
+/* fixture, copies, sleep, step_limit, completed_steps, B/C/J capacities,
+ * resolved substeps, seed. Settings: gravity x/y; linear/angular drag; speed
+ * cap; contact hertz/damping/push/restitution threshold; joint hertz/damping;
+ * sleep speed/angular speed/time; friction/restitution; fixed dt; camera
+ * left/bottom/right/top. */
 const uint32_t *sl_render_study_status(const sl_render_study *study);
+const float *sl_render_study_settings(const sl_render_study *study);
 uint64_t sl_render_study_drops(const sl_render_study *study);
 size_t sl_render_study_bytes(void);
+/* Diagnostic arrays: four proxy-AABB float columns keyed by body slot, then
+ * ray fraction/point x/y/normal x/y. Words: per-slot point/AABB/ray/proxy bits
+ * (1/2/4/8), then point count, AABB count, ray-hit flag. All queries use the
+ * fixed camera center and SL_QUERY_ALL with full body-capacity output.
+ * Refresh is const with respect to physics and allocates no storage. */
+bool sl_render_study_diagnostics(sl_render_study *study);
+const float *sl_render_study_diagnostic_f32(const sl_render_study *study);
+const uint32_t *sl_render_study_diagnostic_u32(const sl_render_study *study);
+size_t sl_render_study_diagnostic_bytes(const sl_render_study *study);
 #endif
