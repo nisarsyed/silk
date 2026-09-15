@@ -77,11 +77,13 @@ transforms. The original seven native workloads and their limits are unchanged.
   separate `createRaylibStudyModule` entry point owns physics and graphics in
   one fixed 64–512 MiB memory. It retains the prototype's 64 MiB graphics budget
   as its minimum; the independent physics/package owner still allows 2–512 MiB.
-  Its base renderer writes 16 pose bytes per body directly in C after a step,
+  Its renderer writes 16 pose bytes per body directly in C after a step,
   using stored transforms without trigonometry or snapshot packing. Repeated
   draws reuse those poses. Meshes cross JS once during setup; live pose copies
-  across JS are zero. This path still needs direct C diagnostic preparation
-  before the end-to-end comparison can be measured fairly.
+  across JS are zero. Diagnostic commands are also prepared directly in the
+  same C memory, with no JS command arrays or bulk diagnostic boundary copy.
+  Two scalar command counts cross the boundary for reporting. Repeated draws
+  reuse both poses and diagnostics until the next simulation step.
 
 Shared pose payload is 16 bytes/instance, source rows and tile offsets another
 8 bytes/instance, plus cached unique meshes/batches and JS object overhead.
@@ -145,11 +147,18 @@ For capacities B/C/J, commands reserve `4B + 2C + J + 6` lines at 20 bytes each,
 `2C + 2J + 2` markers at 12 bytes each, four bytes per rendered body color,
 and a four-byte-per-slot row map. Storage is allocated once; overflow fails the
 frame. WebGL uses fixed GPU storage and uploads active prefixes plus body
-colors only on revision changes. The current separate raylib module copies
+colors only on revision changes. The standalone raylib correctness path copies
 the same payload, validates finite coordinates and color/count ranges before
 drawing, and reports these diagnostic bytes separately from pose bytes. That
-prototype copy must also be removed by the co-located path before timing.
+prototype copy is absent from the co-located path used for future timing.
 Canvas reports API submission calls; its internal GPU draw count is unknown.
+For the co-located path, `overlay.c` builds the identical ordered commands from
+public C getters and the driver's central queries. It uses double camera and
+anchor arithmetic before storing floats to match TS preparation, preserves the
+same normal glyph length, validates finite output and GPU arithmetic, and
+rejects insufficient worst-case capacities. Its transient arrays live in the
+raylib renderer; preparation allocates nothing and cannot mutate physics.
+`diagnosticPrepareBytes` reports C writes separately from JS boundary copies.
 
 The 4 Hz work/memory HUD and frozen render-only diagnostic replication remain
 unfinished. The current overlay builder explicitly rejects frozen scenes.
@@ -186,16 +195,18 @@ and adjacent background pixels for every candidate. Command tests check
 counts, frames, colors, buffer reuse and overflow at one and sixteen copies.
 Browser checks also exercise thirteen private raylib validation failures and
 successful drawing after repairing the caller-owned buffers.
-An additional 24 base profiles compare co-located raylib against Canvas at one
+An additional 48 base/diagnostic profiles compare co-located raylib against Canvas at one
 and sixteen physics copies, sleep off/on and both buffer sizes. They check
 initial and updated images, zero JS pose copies, reuse on repeated draws,
 unchanged allocator usage, owner disposal and replacement. Poisoned JS snapshot
 copies cannot affect direct drawing, and snapshots match the separately stepped
-physics module before and after drawing. Native/WASM C tests pin pose bits and
-output bounds for the same scene/tier/sleep matrix.
+physics module before and after drawing. Poisoned JS diagnostic arrays also
+cannot affect direct drawing. Native/WASM C tests pin pose bits, command counts,
+query colors, normal length, joint anchors, output bounds and invalid-input
+recovery for the same scene/tier/sleep matrix, plus a settled sleeping world.
 
 Still required for #95: the diagnostic HUD and render-only diagnostic coverage; browser integration
-of the sustained measurement loop and co-located raylib driver; matched render-only/end-to-end timing and input
+of the sustained measurement loop; matched render-only/end-to-end timing and input
 collection; GPU/upload/draw instrumentation; startup, memory and allocation
 records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete
 five-repeat desktop and physical Android protocol; and an evidence-backed

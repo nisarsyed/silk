@@ -141,7 +141,7 @@ window.verifyRaylibValidation=async()=>{
   }finally{m._sl_render_dispose();canvas.remove();}
 };
 
-window.verifyColocated=async({scene,copies=1,sleep=false,width=1280,height=720})=>{
+window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=1280,height=720})=>{
   const canvases=[],candidates=[];let module,referenceModule,world,reference;
   const expect=(condition,message)=>{if(!condition)throw new Error(message);};
   const equalSnapshot=(a,b)=>{
@@ -163,26 +163,34 @@ window.verifyColocated=async({scene,copies=1,sleep=false,width=1280,height=720})
     world=module.create(scene,{copies,sleep,steps:steps+1});reference=referenceModule.create(scene,{copies,sleep,steps:steps+1});
     expect(world&&reference,'Co-located fixture allocation failed');
     for(let i=0;i<steps;++i)expect(world.step()&&reference.step(),'Co-located step failed');
-    const candidate=world.createRenderer();candidates.push(candidate);
+    const candidate=world.createRenderer({diagnostic});candidates.push(candidate);
     expect(candidate.linearMemoryBytes===256*1024*1024&&module.memory.linearMemoryBytes===candidate.linearMemoryBytes,'Fixed memory budget differs');
     let rejected=false;try{world.createRenderer();}catch{rejected=true;}expect(rejected,'Duplicate renderer accepted');
     expect(reference.refreshSnapshot(true)&&world.refreshSnapshot(true),'Snapshot failed');
     equalSnapshot(world.snapshot,reference.snapshot);
-    const draw=new DrawScene(reference.snapshot,scene,undefined,copies),canvasCandidate=new CanvasCandidate(canvases[0],draw);candidates.push(canvasCandidate);
+    const draw=new DrawScene(reference.snapshot,scene,undefined,copies),config=reference.configuration;
+    const overlay=diagnostic?new Overlay(draw,config.bodyCapacity,config.contactCapacity,config.jointCapacity,width,height):undefined;
+    if(overlay)overlay.refresh(reference.snapshot,reference.diagnostics);
+    const canvasCandidate=new CanvasCandidate(canvases[0],draw,overlay);candidates.push(canvasCandidate);
     const results=[];
     let allocatorUsed;
     for(let frame=0;frame<2;++frame){
       if(frame){
         expect(world.step()&&reference.step()&&reference.refreshSnapshot(true),'Updated step failed');draw.copyTransforms(reference.snapshot);
+        if(overlay)overlay.refresh(reference.snapshot,reference.diagnostics);
       }
       // A retained JS snapshot is caller-writable. Poisoning it must not affect
       // direct C drawing or the authoritative simulation.
       world.snapshot.bodies.x.fill(1e6);world.snapshot.bodies.y.fill(1e6);
+      world.diagnostics.floats.fill(1e6);world.diagnostics.words.fill(0xffffffff);
       const actual=await capture(canvases[1],candidate),expected=await capture(canvases[0],canvasCandidate);
       expect(candidate.poseCopyBytes===0&&candidate.posePrepareBytes===16*draw.count,'Direct pose payload incorrect');
-      results.push(compare(expected,actual,width,height,edgeMask(draw,width,height)));
+      expect(candidate.diagnosticCopyBytes===0,'Direct diagnostics copied through JS');
+      expect(candidate.lineCount===(overlay?.lineCount??0)&&candidate.markerCount===(overlay?.markerCount??0),'Direct diagnostic counts differ');
+      expect(candidate.diagnosticPrepareBytes===(overlay?overlay.lineCount*20+overlay.markerCount*12+draw.count*4:0),'Direct diagnostic payload differs');
+      results.push(compare(expected,actual,width,height,edgeMask(draw,width,height,overlay)));
       expect(world.refreshSnapshot(true),'Post-draw snapshot failed');equalSnapshot(world.snapshot,reference.snapshot);
-      candidate.draw();expect(candidate.poseCopyBytes===0&&candidate.posePrepareBytes===0,'Repeated direct poses prepared again');
+      candidate.draw();expect(candidate.poseCopyBytes===0&&candidate.posePrepareBytes===0&&candidate.diagnosticPrepareBytes===0,'Repeated direct commands prepared again');
       if(frame===0)allocatorUsed=module.memory.allocatorUsedBytes;
       else expect(module.memory.allocatorUsedBytes===allocatorUsed,'Steady-state C allocation changed');
     }
@@ -191,7 +199,7 @@ window.verifyColocated=async({scene,copies=1,sleep=false,width=1280,height=720})
     const recovered=module.create('pyramid',{steps:1});expect(recovered,'Replacement world failed');
     const replacement=recovered.createRenderer();replacement.draw();module.dispose();
     rejected=false;try{replacement.draw();}catch{rejected=true;}expect(rejected,'Renderer outlived its module');
-    return {scene,copies,sleep,width,height,results,poseCopyBytes:0,linearMemoryBytes:256*1024*1024};
+    return {scene,copies,sleep,diagnostic,width,height,results,poseCopyBytes:0,diagnosticCopyBytes:0,linearMemoryBytes:256*1024*1024};
   }finally{
     for(const candidate of candidates)candidate.dispose();world?.dispose();reference?.dispose();module?.dispose();referenceModule?.dispose();
     for(const canvas of canvases)canvas.remove();

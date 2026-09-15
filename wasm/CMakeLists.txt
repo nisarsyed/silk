@@ -8,7 +8,7 @@ target_link_libraries(silk_wasm_bench_adapter PUBLIC silk_wasm_adapter PRIVATE s
 
 # Browser study setup reuses the existing fixture object code; it does not
 # alter the native/WASM step-only benchmark target or distributed package.
-add_library(silk_render_scene STATIC ../bench/render/scene.c ../bench/render/driver.c)
+add_library(silk_render_scene STATIC ../bench/render/scene.c ../bench/render/driver.c ../bench/render/overlay.c)
 target_link_libraries(silk_render_scene PUBLIC silk_wasm_bench_adapter PRIVATE silk_warnings)
 
 if(EMSCRIPTEN)
