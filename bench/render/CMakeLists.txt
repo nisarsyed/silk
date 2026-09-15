@@ -21,6 +21,15 @@ set_target_properties(raylib PROPERTIES C_EXTENSIONS ON)
 get_target_property(SL_RAYLIB_LINK_OPTIONS raylib INTERFACE_LINK_OPTIONS)
 list(REMOVE_ITEM SL_RAYLIB_LINK_OPTIONS "-sEXPORTED_RUNTIME_METHODS=ccall")
 set_property(TARGET raylib PROPERTY INTERFACE_LINK_OPTIONS "${SL_RAYLIB_LINK_OPTIONS}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS raylib.h)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/raylib.h" SL_RENDER_HEADER)
+string(REGEX MATCHALL "sl_render_[a-z_0-9]+\\(" SL_RENDER_NAMES "${SL_RENDER_HEADER}")
+set(SL_RENDER_EXPORTS "")
+foreach(SL_RENDER_NAME IN LISTS SL_RENDER_NAMES)
+    string(REPLACE "(" "" SL_RENDER_NAME "${SL_RENDER_NAME}")
+    list(APPEND SL_RENDER_EXPORTS "_${SL_RENDER_NAME}")
+endforeach()
+list(JOIN SL_RENDER_EXPORTS "," SL_RENDER_EXPORT_FLAGS)
 add_executable(silk_render_raylib raylib.c)
 target_include_directories(silk_render_raylib SYSTEM PRIVATE "${raylib_SOURCE_DIR}/src")
 target_link_libraries(silk_render_raylib PRIVATE raylib silk_warnings)
@@ -32,7 +41,7 @@ target_link_options(silk_render_raylib PRIVATE --no-entry
     -sSTACK_SIZE=1048576 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
     -sINCOMING_MODULE_JS_API=canvas,locateFile,print,printErr,onAbort
     -sEXPORTED_RUNTIME_METHODS=ccall,HEAPF32,HEAPU32
-    -sEXPORTED_FUNCTIONS=_sl_render_init,_sl_render_vertices,_sl_render_poses,_sl_render_batches,_sl_render_draw,_sl_render_dispose
+    "-sEXPORTED_FUNCTIONS=${SL_RENDER_EXPORT_FLAGS}"
     "$<$<CONFIG:Debug>:-sASSERTIONS=2>" "$<$<CONFIG:Release>:-sASSERTIONS=0>")
 
 configure_file("${raylib_SOURCE_DIR}/LICENSE" "${CMAKE_BINARY_DIR}/render-study/licenses/raylib.txt" COPYONLY)

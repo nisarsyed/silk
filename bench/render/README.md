@@ -1,8 +1,8 @@
 # Renderer comparison tooling
 
 This directory belongs to [#95](https://github.com/nisarsyed/silk/issues/95).
-It currently contains the three **base-visual correctness prototypes** and their
-shared geometry checks. No renderer is selected. This is developer tooling,
+It currently contains three **base and diagnostic correctness prototypes** and
+their shared geometry checks. No renderer is selected. This is developer tooling,
 excluded from the independent package and from any production sandbox.
 The frozen [browser contract](../../docs/browser-contract.md) remains binding.
 
@@ -21,6 +21,7 @@ PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js inst
 python3 bench/render/build.py
 node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
+node bench/render/test_overlay.mjs
 node bench/render/test_browser.mjs
 ```
 
@@ -115,8 +116,33 @@ query membership and proxy validity, and the output retains exact total counts
 and ray geometry. `diagnostics.valid` becomes false after stepping, disposal, or
 a refresh without diagnostics. C column packing is checked against public
 queries and a twin-world replay; JS writes cannot mutate physics. Contacts and
-joints still use the existing snapshot buffers. Overlay rendering and timed
-collection remain in progress.
+joints still use the existing snapshot buffers. Timed collection remains in
+progress.
+
+## Diagnostic drawing
+
+The default and scaled physics scenes share one bounded command builder for
+proxy boxes, contact points/normals, joints, sleep/island colors and central
+queries. Joint anchors are transformed from the snapshot's body-local frame;
+stale endpoint generations fail. Query membership highlights matching proxy
+boxes. Display normals are normalized to a 12-buffer-pixel glyph without
+changing the raw physics normals. Markers have a three-pixel radius and the
+same 32-vertex mesh in every candidate. Lines use filled one-pixel quads in all
+three paths: Canvas strokes produced a faint pixel outside the frozen edge
+allowance, so the geometry was corrected with that allowance unchanged.
+
+For capacities B/C/J, commands reserve `4B + 2C + J + 6` lines at 20 bytes each,
+`2C + 2J + 2` markers at 12 bytes each, four bytes per rendered body color,
+and a four-byte-per-slot row map. Storage is allocated once; overflow fails the
+frame. WebGL uses fixed GPU storage and uploads active prefixes plus body
+colors only on revision changes. The current separate raylib module copies
+the same payload, validates finite coordinates and color/count ranges before
+drawing, and reports these diagnostic bytes separately from pose bytes. That
+prototype copy must also be removed by the co-located path before timing.
+Canvas reports API submission calls; its internal GPU draw count is unknown.
+
+The 4 Hz work/memory HUD and frozen render-only diagnostic replication remain
+unfinished. The current overlay builder explicitly rejects frozen scenes.
 
 The native and WASM C suite checks every physics tier with sleep off/on,
 compares every copied descriptor, verifies within-copy joint remapping, and
@@ -132,8 +158,8 @@ The geometry test checks C snapshot row order, changing transforms, all nine
 render-only tiers, circle vertices, and both camera profiles. Browser checks
 compare every pixel for the three default scenes before and after stepping,
 including a further transform update and 16-copy physics tiers, plus the
-smallest/largest frozen render-only tiers,
-at 1280×720 and 720×1280. They also check zero repeated pose uploads, exact
+smallest/largest frozen render-only tiers, and diagnostic default scenes with
+sleep off/on, at 1280×720 and 720×1280 (34 profiles per build). They also check zero repeated pose uploads, exact
 changed-pose byte counts, idempotent disposal, disposed-call rejection and
 console errors. Pixel readbacks run only in this correctness harness.
 
@@ -143,8 +169,15 @@ that band from shared geometry, rather than from a reference image's color
 transitions: Canvas coverage can hide a subpixel gap between same-color bodies.
 An analytical edge test pins the one-pixel band and rejects a changed pixel
 outside it. All pixels outside the band must match exactly.
+The diagnostic band includes actual quad and marker edges with the same
+one-pixel radius. Since a one-pixel line fits entirely inside that allowance,
+an independent opaque-primitive probe checks exact line/marker center colors
+and adjacent background pixels for every candidate. Command tests check
+counts, frames, colors, buffer reuse and overflow at one and sixteen copies.
+Browser checks also exercise thirteen private raylib validation failures and
+successful drawing after repairing the caller-owned buffers.
 
-Still required for #95: diagnostic overlays and queries; browser integration
+Still required for #95: the diagnostic HUD and render-only diagnostic coverage; browser integration
 of the sustained measurement loop and co-located raylib driver; matched render-only/end-to-end timing and input
 collection; GPU/upload/draw instrumentation; startup, memory and allocation
 records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete

@@ -79,6 +79,7 @@ jobs:
           python3 bench/render/build.py --benchmark "build/wasm-$mode/benchmark" \
             --raylib "build/wasm-render-$mode/render-study" --output "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
+          node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_browser.mjs "build/render-study-$mode" "build/reports/render-$mode"
       - uses: actions/upload-artifact@v7
         if: always()
