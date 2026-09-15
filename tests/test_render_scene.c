@@ -7,6 +7,7 @@
 #include "suites.h"
 #include <silk/step.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void invalid_arguments(void)
 {
@@ -302,7 +303,66 @@ static void diagnostic_columns(void)
     sl_world_destroy(&twin);
     sl_render_study_destroy(study);
 }
+static void direct_poses(void)
+{
+    float sentinel = 71.0f;
+    SL_EXPECT(!sl_render_study_poses(NULL, &sentinel, 1u));
+    SL_EXPECT(sentinel == 71.0f);
+    const uint32_t fixtures[] = { 0u, 1u, 3u };
+    const uint32_t tiers[] = { 1u, 16u };
+    for (uint32_t fixture = 0u; fixture < 3u; ++fixture) {
+        for (uint32_t tier = 0u; tier < 2u; ++tier) {
+            for (uint32_t sleep = 0u; sleep < 2u; ++sleep) {
+                sl_render_study *study = sl_render_study_create(
+                    fixtures[fixture], tiers[tier], sleep, 3u);
+                SL_EXPECT(study != NULL);
+                if (study == NULL) {
+                    continue;
+                }
+                sl_wasm_context *adapter = sl_render_study_adapter(study);
+                const uint32_t count = sl_world_body_count(&adapter->world);
+                const uint32_t capacity = sl_render_study_status(study)[5];
+                float *storage = calloc((size_t)count * 4u + 2u, sizeof(float));
+                SL_EXPECT(storage != NULL);
+                if (storage == NULL) {
+                    sl_render_study_destroy(study);
+                    continue;
+                }
+                storage[0] = 71.0f;
+                storage[4u * count + 1u] = 79.0f;
+                SL_EXPECT(!sl_render_study_poses(study, NULL, count));
+                SL_EXPECT(!sl_render_study_poses(study, &sentinel, count - 1u));
+                SL_EXPECT(!sl_render_study_poses(study, &sentinel, count + 1u));
+                SL_EXPECT(sentinel == 71.0f);
+                for (uint32_t step = 0u; step < 3u; ++step) {
+                    SL_EXPECT(sl_render_study_step(study));
+                    SL_EXPECT(sl_wasm_snapshot_refresh(adapter, 0u));
+                    SL_EXPECT(
+                        sl_render_study_poses(study, storage + 1u, count));
+                    const float *snapshot = sl_wasm_snapshot_f32(adapter);
+                    for (uint32_t row = 0u; row < count; ++row) {
+                        for (uint32_t column = 0u; column < 4u; ++column) {
+                            // Packing must preserve every float bit, including
+                            // signed zero; this is not an approximate oracle.
+                            SL_EXPECT(memcmp(storage + 1u + 4u * row + column,
+                                             snapshot + column * capacity + row,
+                                             sizeof(float)) == 0);
+                        }
+                    }
+                    SL_EXPECT(storage[0] == 71.0f);
+                    SL_EXPECT(storage[4u * count + 1u] == 79.0f);
+                    SL_EXPECT_INT_EQ(sl_render_study_status(study)[4],
+                                     step + 1u);
+                }
+                free(storage);
+                sl_render_study_destroy(study);
+            }
+        }
+    }
+}
 static const sl_test_case k_cases[] = {
+    { "co-located poses preserve snapshot bits and output bounds",
+      direct_poses },
     { "reject unsupported scaling inputs", invalid_arguments },
     { "diagnostic columns match public queries without changing physics",
       diagnostic_columns },

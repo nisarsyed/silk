@@ -71,11 +71,17 @@ transforms. The original seven native workloads and their limits are unchanged.
 - The raylib prototype consumes exactly those triangles and poses through one
   private call, emits them through raylib's `rlgl` batching, and uses the pin's
   normal `BeginDrawing`/`EndDrawing` path with no frame sleep. Its current
-  standalone graphics module has a fixed 64 MiB budget and copies 16 pose bytes
-  per changed instance across the JS/module boundary. This extra memory and
-  copy must be reported. The end-to-end study still needs a co-located C
-  physics/render path so that this intermediate comparison module does not
-  impose an avoidable boundary on raylib's production candidate.
+  standalone correctness entry point has a fixed 64 MiB budget and copies 16
+  pose bytes per changed instance across the JS/module boundary. This copy is
+  reported. The same binary now also contains the shared C study owner: the
+  separate `createRaylibStudyModule` entry point owns physics and graphics in
+  one fixed 64–512 MiB memory. It retains the prototype's 64 MiB graphics budget
+  as its minimum; the independent physics/package owner still allows 2–512 MiB.
+  Its base renderer writes 16 pose bytes per body directly in C after a step,
+  using stored transforms without trigonometry or snapshot packing. Repeated
+  draws reuse those poses. Meshes cross JS once during setup; live pose copies
+  across JS are zero. This path still needs direct C diagnostic preparation
+  before the end-to-end comparison can be measured fairly.
 
 Shared pose payload is 16 bytes/instance, source rows and tile offsets another
 8 bytes/instance, plus cached unique meshes/batches and JS object overhead.
@@ -108,6 +114,10 @@ world lifetimes, validates fixed budgets and step/tier inputs, returns copied
 settings, and reuses the package's isolated snapshot columns. `step()` and
 `refreshSnapshot()` have no per-frame object allocation. `report()` explicitly
 allocates copied settings/statistics/counters outside the measured path.
+The private JS ownership implementation is shared by standalone physics and
+raylib. A world can attach one renderer; world/module disposal closes graphics
+before freeing physics. A replacement world can reuse the canvas. Neither raw
+WASM pointers nor writable C pose buffers escape that ownership closure.
 
 Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
 point/AABB/ray results. These extra C buffers cost `20*bodyCapacity + 32` bytes;
@@ -176,6 +186,13 @@ and adjacent background pixels for every candidate. Command tests check
 counts, frames, colors, buffer reuse and overflow at one and sixteen copies.
 Browser checks also exercise thirteen private raylib validation failures and
 successful drawing after repairing the caller-owned buffers.
+An additional 24 base profiles compare co-located raylib against Canvas at one
+and sixteen physics copies, sleep off/on and both buffer sizes. They check
+initial and updated images, zero JS pose copies, reuse on repeated draws,
+unchanged allocator usage, owner disposal and replacement. Poisoned JS snapshot
+copies cannot affect direct drawing, and snapshots match the separately stepped
+physics module before and after drawing. Native/WASM C tests pin pose bits and
+output bounds for the same scene/tier/sleep matrix.
 
 Still required for #95: the diagnostic HUD and render-only diagnostic coverage; browser integration
 of the sustained measurement loop and co-located raylib driver; matched render-only/end-to-end timing and input

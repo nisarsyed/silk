@@ -4,7 +4,7 @@ import {Overlay} from './overlay.js';
 import {edgeMask,compare} from './pixels.js';
 import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
-import {createRaylibCandidate} from './raylib.js';
+import {createRaylibCandidate,createRaylibStudyModule} from './raylib.js';
 
 // Readbacks are correctness-only, outside every measured run. A single callback
 // draws and reads before the non-preserved WebGL buffer can be discarded.
@@ -116,7 +116,7 @@ window.verifyOverlayPrimitives=async()=>{
 window.verifyRaylibValidation=async()=>{
   const {default:factory}=await import('./raylib.mjs');
   const canvas=document.createElement('canvas');canvas.id='silk-raylib-validation';canvas.width=128;canvas.height=128;document.body.append(canvas);
-  const m=await factory({canvas});let rejected=0;
+  const m=await factory({canvas,wasmMemory:new WebAssembly.Memory({initial:1024,maximum:1024})});let rejected=0;
   const expect=(value,message)=>{if(!value)throw new Error(message);};
   try{
     expect(!m._sl_render_overlay_init(1,1),'Overlay accepted before renderer setup');++rejected;
@@ -139,4 +139,61 @@ window.verifyRaylibValidation=async()=>{
     expect(m._sl_render_draw(1,0,0),'Repaired renderer draw failed');
     return {rejected};
   }finally{m._sl_render_dispose();canvas.remove();}
+};
+
+window.verifyColocated=async({scene,copies=1,sleep=false,width=1280,height=720})=>{
+  const canvases=[],candidates=[];let module,referenceModule,world,reference;
+  const expect=(condition,message)=>{if(!condition)throw new Error(message);};
+  const equalSnapshot=(a,b)=>{
+    for(const name of ['bodyCount','contactCount','jointCount'])expect(a[name]===b[name],`Snapshot ${name} differs`);
+    for(const name of ['bodies','geometry','contacts','joints'])for(const key of Object.keys(a[name])){
+      const x=a[name][key],y=b[name][key];expect(x.length===y.length,'Snapshot capacity differs');
+      for(let i=0;i<x.length;++i)expect(Object.is(x[i],y[i]),`Snapshot ${name}.${key}[${i}] differs`);
+    }
+  };
+  try{
+    for(const id of ['reference','direct']){
+      const canvas=document.createElement('canvas');canvas.id=`silk-colocated-${id}`;canvas.width=width;canvas.height=height;
+      canvas.style.width=`${width===720?360:width}px`;canvas.style.height=`${height===1280?640:height}px`;
+      document.body.append(canvas);canvases.push(canvas);
+    }
+    module=await createRaylibStudyModule(canvases[1],{memoryBytes:256*1024*1024});
+    referenceModule=await createStudyModule({memoryBytes:256*1024*1024});
+    const steps=copies===1?120:3;
+    world=module.create(scene,{copies,sleep,steps:steps+1});reference=referenceModule.create(scene,{copies,sleep,steps:steps+1});
+    expect(world&&reference,'Co-located fixture allocation failed');
+    for(let i=0;i<steps;++i)expect(world.step()&&reference.step(),'Co-located step failed');
+    const candidate=world.createRenderer();candidates.push(candidate);
+    expect(candidate.linearMemoryBytes===256*1024*1024&&module.memory.linearMemoryBytes===candidate.linearMemoryBytes,'Fixed memory budget differs');
+    let rejected=false;try{world.createRenderer();}catch{rejected=true;}expect(rejected,'Duplicate renderer accepted');
+    expect(reference.refreshSnapshot(true)&&world.refreshSnapshot(true),'Snapshot failed');
+    equalSnapshot(world.snapshot,reference.snapshot);
+    const draw=new DrawScene(reference.snapshot,scene,undefined,copies),canvasCandidate=new CanvasCandidate(canvases[0],draw);candidates.push(canvasCandidate);
+    const results=[];
+    let allocatorUsed;
+    for(let frame=0;frame<2;++frame){
+      if(frame){
+        expect(world.step()&&reference.step()&&reference.refreshSnapshot(true),'Updated step failed');draw.copyTransforms(reference.snapshot);
+      }
+      // A retained JS snapshot is caller-writable. Poisoning it must not affect
+      // direct C drawing or the authoritative simulation.
+      world.snapshot.bodies.x.fill(1e6);world.snapshot.bodies.y.fill(1e6);
+      const actual=await capture(canvases[1],candidate),expected=await capture(canvases[0],canvasCandidate);
+      expect(candidate.poseCopyBytes===0&&candidate.posePrepareBytes===16*draw.count,'Direct pose payload incorrect');
+      results.push(compare(expected,actual,width,height,edgeMask(draw,width,height)));
+      expect(world.refreshSnapshot(true),'Post-draw snapshot failed');equalSnapshot(world.snapshot,reference.snapshot);
+      candidate.draw();expect(candidate.poseCopyBytes===0&&candidate.posePrepareBytes===0,'Repeated direct poses prepared again');
+      if(frame===0)allocatorUsed=module.memory.allocatorUsedBytes;
+      else expect(module.memory.allocatorUsedBytes===allocatorUsed,'Steady-state C allocation changed');
+    }
+    world.dispose();rejected=false;try{candidate.draw();}catch{rejected=true;}expect(rejected,'Renderer outlived its world');
+    // A disposed world releases the sole raylib window; a new owner can attach.
+    const recovered=module.create('pyramid',{steps:1});expect(recovered,'Replacement world failed');
+    const replacement=recovered.createRenderer();replacement.draw();module.dispose();
+    rejected=false;try{replacement.draw();}catch{rejected=true;}expect(rejected,'Renderer outlived its module');
+    return {scene,copies,sleep,width,height,results,poseCopyBytes:0,linearMemoryBytes:256*1024*1024};
+  }finally{
+    for(const candidate of candidates)candidate.dispose();world?.dispose();reference?.dispose();module?.dispose();referenceModule?.dispose();
+    for(const canvas of canvases)canvas.remove();
+  }
 };

@@ -18,6 +18,7 @@ const server=http.createServer(async (req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser, harnessError=null, primitive=null, raylibValidation=null;
 const results=[];
+const colocated=[];
 try {
   browser=await chromium.launch({headless:true});
   const probe=await browser.newPage();
@@ -32,6 +33,20 @@ try {
       assert.deepEqual(result.above,[16,24,32]);assert.deepEqual(result.below,[16,24,32]);assert.deepEqual(result.outside,[16,24,32]);
     }
   }finally{await probe.close();}
+  for(const [width,height]of [[1280,720],[720,1280]])for(const scene of ['pyramid','rain','chains'])for(const copies of [1,16])for(const sleep of [false,true]){
+    const page=await browser.newPage({viewport:{width:width===720?360:width,height:height===1280?640:height},deviceScaleFactor:width===720?2:1}),errors=[];
+    const entry={scene,copies,sleep,width,height,status:'running'};colocated.push(entry);
+    page.on('pageerror',error=>errors.push(String(error)));
+    page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon'))errors.push(message.text());});
+    try{
+      await page.goto(`http://127.0.0.1:${server.address().port}/verify.html`);
+      await page.waitForFunction(()=>typeof window.verifyColocated==='function');
+      Object.assign(entry,await page.evaluate(profile=>window.verifyColocated(profile),{scene,copies,sleep,width,height}));
+      assert.deepEqual(errors,[]);for(const result of entry.results)assert.equal(result.interiorMismatch,0);
+      entry.status='passed';console.log(JSON.stringify({colocated:entry}));
+    }catch(error){entry.status='failed';entry.error=String(error);throw error;}
+    finally{await page.close();}
+  }
   for (const [width,height] of [[1280,720],[720,1280]]) {
     const profiles=[];
     for (const scene of ['pyramid','rain','chains']) for (const steps of [0,120]) profiles.push({scene,steps,width,height});
@@ -61,6 +76,6 @@ try {
   }
 } catch(error) {harnessError=String(error);throw error;}
 finally {
-  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({browser:browser?.version()??null,kind:'correctness-only',harnessError,primitive,raylibValidation,results},null,2)+'\n');
+  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({browser:browser?.version()??null,kind:'correctness-only',harnessError,primitive,raylibValidation,colocated,results},null,2)+'\n');
   await browser?.close(); await new Promise(resolve=>server.close(resolve));
 }

@@ -114,6 +114,24 @@ sl_world *sl_render_study_world(sl_render_study *study)
 {
     return study != NULL ? &study->adapter.world : NULL;
 }
+bool sl_render_study_poses(const sl_render_study *study, float *poses,
+                           uint32_t count)
+{
+    if (study == NULL || poses == NULL ||
+        count != sl_world_body_count(&study->adapter.world)) {
+        return false;
+    }
+    const sl_world *world = &study->adapter.world;
+    for (uint32_t row = 0u; row < count; ++row) {
+        const sl_transform transform =
+            sl_world_body_get_transform(world, sl_world_body_at(world, row));
+        poses[4u * row] = transform.position.x;
+        poses[4u * row + 1u] = transform.position.y;
+        poses[4u * row + 2u] = transform.rotation.c;
+        poses[4u * row + 3u] = transform.rotation.s;
+    }
+    return true;
+}
 const uint32_t *sl_render_study_status(const sl_render_study *study)
 {
     return study != NULL ? study->status : NULL;

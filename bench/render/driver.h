@@ -25,6 +25,12 @@ bool sl_render_study_step(sl_render_study *study);
  * also available to the co-located raylib candidate without a JS pose copy. */
 sl_wasm_context *sl_render_study_adapter(sl_render_study *study);
 sl_world *sl_render_study_world(sl_render_study *study);
+/* Write 16 bytes per body directly into a co-located renderer's pose buffer,
+ * in packed row order: x/y/cos/sin. Caller supplies 4*count floats; count must
+ * equal the world body count. Invalid inputs leave output untouched. No
+ * allocation, snapshot packing, trigonometry or simulation mutation. */
+bool sl_render_study_poses(const sl_render_study *study, float *poses,
+                           uint32_t count);
 /* fixture, copies, sleep, step_limit, completed_steps, B/C/J capacities,
  * resolved substeps, seed. Settings: gravity x/y; linear/angular drag; speed
  * cap; contact hertz/damping/push/restitution threshold; joint hertz/damping;
