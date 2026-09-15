@@ -62,6 +62,7 @@ if(EMSCRIPTEN)
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/render-physics")
     configure_file(views.mjs "${CMAKE_BINARY_DIR}/render-physics/views.mjs" COPYONLY)
     configure_file(../bench/render/study.mjs "${CMAKE_BINARY_DIR}/render-physics/driver.mjs" COPYONLY)
+    configure_file(../bench/render/study_owner.mjs "${CMAKE_BINARY_DIR}/render-physics/owner.mjs" COPYONLY)
     foreach(SL_WASM_TARGET silk_wasm silk_wasm_bench silk_wasm_study)
         target_link_libraries(${SL_WASM_TARGET} PRIVATE silk silk_warnings)
         target_link_options(${SL_WASM_TARGET} PRIVATE
