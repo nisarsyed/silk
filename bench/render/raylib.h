@@ -1,5 +1,6 @@
 #ifndef SILK_RENDER_RAYLIB_H
 #define SILK_RENDER_RAYLIB_H
+#include "driver.h"
 #include <stdbool.h>
 #include <stdint.h>
 /* Private comparison ABI. One renderer per module. Setup allocates all storage;
@@ -25,4 +26,10 @@ float *sl_render_overlay_colors(void);
 float *sl_render_overlay_mesh(void);
 uint32_t *sl_render_overlay_palette(void);
 bool sl_render_overlay_counts(uint32_t lines, uint32_t markers);
+/* Prepare directly into private graphics buffers from the co-located world.
+ * Camera parameters match the TS double-precision pixel command builder. */
+bool sl_render_overlay_refresh(sl_render_study *study, double scale,
+                               double offset_x, double offset_y);
+uint32_t sl_render_overlay_line_count(void);
+uint32_t sl_render_overlay_marker_count(void);
 #endif

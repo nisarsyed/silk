@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "overlay.h"
 #include <math.h>
 #include <raylib.h>
 #include <rlgl.h>
@@ -15,6 +16,30 @@ static float *overlay_lines, *overlay_markers, *overlay_colors;
 static float overlay_mesh[180];
 static uint32_t overlay_palette[48];
 static uint32_t line_capacity, marker_capacity, line_count, marker_count;
+
+bool sl_render_overlay_refresh(sl_render_study *study, double scale,
+                               double offset_x, double offset_y)
+{
+    sl_render_overlay commands = { .lines = overlay_lines,
+                                   .markers = overlay_markers,
+                                   .colors = overlay_colors,
+                                   .line_capacity = line_capacity,
+                                   .marker_capacity = marker_capacity,
+                                   .color_count = instance_count,
+                                   .scale = scale,
+                                   .offset_x = offset_x,
+                                   .offset_y = offset_y };
+    return ready && sl_render_overlay_prepare(study, &commands) &&
+           sl_render_overlay_counts(commands.line_count, commands.marker_count);
+}
+uint32_t sl_render_overlay_line_count(void)
+{
+    return line_count;
+}
+uint32_t sl_render_overlay_marker_count(void)
+{
+    return marker_count;
+}
 
 static void overlay_color(float code)
 {

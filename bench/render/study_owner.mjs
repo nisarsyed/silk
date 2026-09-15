@@ -50,8 +50,8 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
         const revision=state=>{if(state.revision===Number.MAX_SAFE_INTEGER)throw new RangeError('View revision exhausted');++state.revision;};
         let renderer;
         const value=Object.freeze({
-          ...(attachRenderer?{createRenderer(){valid();if(renderer)throw new Error('Renderer already attached');
-            renderer=attachRenderer(ptr,value,valid);return renderer;}}:{}),
+          ...(attachRenderer?{createRenderer(options={}){valid();if(renderer)throw new Error('Renderer already attached');
+            renderer=attachRenderer(ptr,value,valid,options);return renderer;}}:{}),
           configuration,diagnostics,
           get snapshot(){valid();return views.snapshot;},
           get steps(){valid();return status[4];},

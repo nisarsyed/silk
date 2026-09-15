@@ -1,10 +1,13 @@
 #include "../bench/fixtures.h"
 #include "../bench/render/driver.h"
+#include "../bench/render/overlay.h"
 #include "../bench/render/scene.h"
 #include "../wasm/context.h"
 #include "replay.h"
 #include "silk_test.h"
 #include "suites.h"
+#include <float.h>
+#include <math.h>
 #include <silk/step.h>
 #include <stdlib.h>
 #include <string.h>
@@ -161,6 +164,112 @@ static void scaling_matrix(void)
         }
     }
 }
+static void check_overlay(sl_render_study *study)
+{
+    const uint32_t *status = sl_render_study_status(study);
+    const uint32_t b = status[5], c = status[6], j = status[7];
+    const uint32_t lines = 4u * b + 2u * c + j + 6u;
+    const uint32_t markers = 2u * c + 2u * j + 2u;
+    const float *rect = sl_render_study_settings(study) + 17;
+    const double scale = fmin(1280.0 / ((double)rect[2] - (double)rect[0]),
+                              720.0 / ((double)rect[3] - (double)rect[1]));
+    sl_render_overlay out = {
+        .lines = calloc((size_t)lines * 5u + 1u, sizeof(float)),
+        .markers = calloc((size_t)markers * 3u + 1u, sizeof(float)),
+        .colors = calloc((size_t)b + 1u, sizeof(float)),
+        .line_capacity = lines,
+        .marker_capacity = markers,
+        .color_count = b,
+        .scale = scale,
+        .offset_x = 640.0 - scale * ((double)rect[0] + (double)rect[2]) * 0.5,
+        .offset_y = 360.0 + scale * ((double)rect[1] + (double)rect[3]) * 0.5
+    };
+    SL_EXPECT(out.lines != NULL && out.markers != NULL && out.colors != NULL);
+    if (out.lines == NULL || out.markers == NULL || out.colors == NULL) {
+        free(out.lines);
+        free(out.markers);
+        free(out.colors);
+        return;
+    }
+    out.lines[5u * lines] = 73.0f;
+    out.markers[3u * markers] = 79.0f;
+    out.colors[b] = 83.0f;
+    sl_wasm_context *adapter = sl_render_study_adapter(study);
+    SL_EXPECT(sl_wasm_snapshot_refresh(adapter, 1u));
+    SL_EXPECT(sl_render_overlay_prepare(study, &out));
+    const uint32_t *snapshot = sl_wasm_snapshot_u32(adapter);
+    const uint32_t *flags = sl_render_study_diagnostic_u32(study);
+    uint32_t proxies = 0u, points = 0u;
+    for (uint32_t row = 0u; row < b; ++row) {
+        const uint32_t slot = snapshot[row];
+        const float color = snapshot[2u * b + row] == (uint32_t)SL_BODY_STATIC
+                                ? 0.0f
+                            : snapshot[3u * b + row] == 0u ? 2.0f
+                            : snapshot[4u * b + row] == UINT32_MAX
+                                ? 1.0f
+                                : (float)(3u + snapshot[4u * b + row] % 8u);
+        SL_EXPECT(out.colors[row] == color);
+        if ((flags[slot] & 8u) != 0u) {
+            for (uint32_t edge = 0u; edge < 4u; ++edge) {
+                SL_EXPECT(out.lines[5u * (4u * proxies + edge) + 4u] ==
+                          ((flags[slot] & 7u) != 0u ? 15.0f : 13.0f));
+            }
+            ++proxies;
+        }
+    }
+    const sl_world *world = sl_render_study_world(study);
+    for (uint32_t row = 0u; row < sl_world_contact_count(world); ++row) {
+        points += sl_world_contact_at(world, row)->manifold.point_count;
+    }
+    const uint32_t joints = sl_world_joint_count(world), hit = flags[b + 2u];
+    SL_EXPECT_INT_EQ(out.line_count, 4u * proxies + points + joints + 5u + hit);
+    SL_EXPECT_INT_EQ(out.marker_count, points + 2u * joints + 1u + hit);
+    for (uint32_t point = 0u; point < points; ++point) {
+        const float *line = out.lines + 5u * (4u * proxies + point);
+        SL_EXPECT(line[4] == 12.0f);
+        const double length = hypot((double)line[2] - (double)line[0],
+                                    (double)line[3] - (double)line[1]);
+        SL_EXPECT(fabs(length - 12.0) < 0.001);
+    }
+    for (uint32_t row = 0u; row < joints; ++row) {
+        const sl_joint_desc joint =
+            sl_world_joint_get_desc(world, sl_world_joint_at(world, row));
+        const sl_transform a = sl_world_body_get_transform(world, joint.body_a);
+        const double x = (double)a.position.x +
+                         (double)a.rotation.c * (double)joint.local_anchor_a.x -
+                         (double)a.rotation.s * (double)joint.local_anchor_a.y;
+        const double y = (double)a.position.y +
+                         (double)a.rotation.s * (double)joint.local_anchor_a.x +
+                         (double)a.rotation.c * (double)joint.local_anchor_a.y;
+        const float *line = out.lines + 5u * (4u * proxies + points + row);
+        SL_EXPECT_NEAR(line[0], (float)(out.offset_x + x * scale), 0.0001f);
+        SL_EXPECT_NEAR(line[1], (float)(out.offset_y - y * scale), 0.0001f);
+        SL_EXPECT(line[4] == 14.0f);
+    }
+    SL_EXPECT(out.lines[5u * lines] == 73.0f);
+    SL_EXPECT(out.markers[3u * markers] == 79.0f);
+    SL_EXPECT(out.colors[b] == 83.0f);
+    --out.line_capacity;
+    SL_EXPECT(!sl_render_overlay_prepare(study, &out));
+    ++out.line_capacity;
+    --out.marker_capacity;
+    SL_EXPECT(!sl_render_overlay_prepare(study, &out));
+    ++out.marker_capacity;
+    --out.color_count;
+    SL_EXPECT(!sl_render_overlay_prepare(study, &out));
+    ++out.color_count;
+    out.scale = (double)NAN;
+    SL_EXPECT(!sl_render_overlay_prepare(study, &out));
+    out.scale = DBL_MAX;
+    SL_EXPECT(!sl_render_overlay_prepare(study, &out));
+    out.scale = scale;
+    SL_EXPECT(sl_render_overlay_prepare(study, &out));
+    SL_EXPECT(!sl_render_overlay_prepare(NULL, &out));
+    SL_EXPECT(!sl_render_overlay_prepare(study, NULL));
+    free(out.lines);
+    free(out.markers);
+    free(out.colors);
+}
 static void driver_bounds(void)
 {
     SL_EXPECT(sl_render_study_create(0u, 1u, 0u, 0u) == NULL);
@@ -210,6 +319,7 @@ static void driver_bounds(void)
         &adapter->world, sl_world_body_at(&adapter->world, 1u));
     SL_EXPECT(position.x == after.x && position.y == after.y);
     SL_EXPECT_INT_EQ(sl_render_study_status(study)[4], 10001u);
+    check_overlay(study);
     sl_render_study_destroy(study);
 }
 static void diagnostic_columns(void)
@@ -354,6 +464,7 @@ static void direct_poses(void)
                     SL_EXPECT_INT_EQ(sl_render_study_status(study)[4],
                                      step + 1u);
                 }
+                check_overlay(study);
                 free(storage);
                 sl_render_study_destroy(study);
             }

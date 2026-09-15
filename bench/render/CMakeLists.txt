@@ -35,7 +35,7 @@ foreach(SL_RENDER_NAME IN LISTS SL_RENDER_NAMES)
     list(APPEND SL_RENDER_EXPORTS "_${SL_RENDER_NAME}")
 endforeach()
 list(JOIN SL_RENDER_EXPORTS "," SL_RENDER_EXPORT_FLAGS)
-add_executable(silk_render_raylib raylib.c driver.c scene.c ../fixtures.c ../quality.c
+add_executable(silk_render_raylib raylib.c driver.c scene.c overlay.c ../fixtures.c ../quality.c
     ../../wasm/adapter.c ../../wasm/snapshot.c ../../wasm/operations.c ../../wasm/runtime.c)
 target_include_directories(silk_render_raylib SYSTEM PRIVATE "${raylib_SOURCE_DIR}/src")
 target_link_libraries(silk_render_raylib PRIVATE raylib silk silk_warnings)
