@@ -10,6 +10,8 @@ interface RaylibModule {
   _sl_render_overlay_palette():number;_sl_render_overlay_mesh():number;
   _sl_render_overlay_counts(lines:number,markers:number):number;
   _sl_render_study_poses(study:number,poses:number,count:number):number;
+  _sl_render_overlay_refresh(study:number,scale:number,x:number,y:number):number;
+  _sl_render_overlay_line_count():number;_sl_render_overlay_marker_count():number;
   _sl_render_draw(scale:number,x:number,y:number):number; _sl_render_dispose():void;
 }
 export async function createRaylibCandidate(canvas:HTMLCanvasElement, scene:DrawScene,overlay?:Overlay) {
@@ -19,7 +21,8 @@ export async function createRaylibCandidate(canvas:HTMLCanvasElement, scene:Draw
   const m:RaylibModule=await factory({canvas,wasmMemory:new WebAssembly.Memory({initial:1024,maximum:1024})});
   return initializeCandidate(m,canvas,scene,overlay);
 }
-interface DirectSource {study:number;steps():number;valid():void}
+interface DirectSource {study:number;steps():number;valid():void;diagnostic:boolean;
+  bodyCapacity:number;contactCapacity:number;jointCapacity:number}
 function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawScene,overlay?:Overlay,source?:DirectSource) {
   const vertexCount=scene.meshes.reduce((n,mesh)=>n+mesh.triangles.length/2,0);
   if (!m._sl_render_init(scene.count,vertexCount,scene.batches.length,canvas.width,canvas.height))
@@ -33,30 +36,39 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
     scene.batches.forEach((b,i)=>batches.set([b.first,b.count,offsets[b.mesh],scene.meshes[b.mesh].triangles.length/2,b.color],i*5));
     const view=camera(scene.rect,canvas.width,canvas.height);
     let lines:Float32Array|undefined,markers:Float32Array|undefined,colors:Float32Array|undefined;
-    if(overlay){
-      if(!m._sl_render_overlay_init(overlay.lines.length/5,overlay.markers.length/3))throw new Error('Raylib diagnostic allocation failed');
-      lines=new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_lines(),overlay.lines.length);
-      markers=new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_markers(),overlay.markers.length);
-      colors=new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_colors(),overlay.bodyColors.length);
+    if(overlay||source?.diagnostic){
+      const lineCapacity=overlay?overlay.lines.length/5:4*source!.bodyCapacity+2*source!.contactCapacity+source!.jointCapacity+6;
+      const markerCapacity=overlay?overlay.markers.length/3:2*source!.contactCapacity+2*source!.jointCapacity+2;
+      if(!m._sl_render_overlay_init(lineCapacity,markerCapacity))throw new Error('Raylib diagnostic allocation failed');
+      if(overlay){
+        lines=new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_lines(),overlay.lines.length);
+        markers=new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_markers(),overlay.markers.length);
+        colors=new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_colors(),overlay.bodyColors.length);
+      }
       new Float32Array(m.HEAPF32.buffer,m._sl_render_overlay_mesh(),markerTriangles.length).set(markerTriangles);
       new Uint32Array(m.HEAPU32.buffer,m._sl_render_overlay_palette(),48).set(palette.flatMap(hex=>[1,3,5].map(at=>parseInt(hex.slice(at,at+2),16))));
     }
     let revision=0,overlayRevision=0,disposed=false,lastStep=-1;
     return {
       // CPU-to-WASM pose copies are separate from raylib's internal GPU uploads.
-      poseCopyBytes:0,posePrepareBytes:0,diagnosticCopyBytes:0, uploadBytes:null, gpuBytes:null, drawCalls:null,
+      poseCopyBytes:0,posePrepareBytes:0,diagnosticCopyBytes:0,diagnosticPrepareBytes:0,lineCount:0,markerCount:0,
+      uploadBytes:null, gpuBytes:null, drawCalls:null,
       linearMemoryBytes:m.HEAPF32.buffer.byteLength,
       draw() {
         if (disposed) throw new Error('Disposed raylib candidate');
-        this.poseCopyBytes=0;this.posePrepareBytes=0;
+        this.poseCopyBytes=0;this.posePrepareBytes=0;this.diagnosticCopyBytes=0;this.diagnosticPrepareBytes=0;
         if(source){
           source.valid();const step=source.steps();
           if(lastStep!==step){
             if(!m._sl_render_study_poses(source.study,poses.byteOffset,scene.count))throw new Error('Direct C pose preparation failed');
+            if(source.diagnostic){
+              if(!m._sl_render_overlay_refresh(source.study,view.scale,view.x,view.y))throw new Error('Direct C diagnostic preparation failed');
+              this.lineCount=m._sl_render_overlay_line_count();this.markerCount=m._sl_render_overlay_marker_count();
+              this.diagnosticPrepareBytes=20*this.lineCount+12*this.markerCount+4*scene.count;
+            }
             lastStep=step;this.posePrepareBytes=poses.byteLength;
           }
         }else if (revision!==scene.revision) { poses.set(scene.poses); revision=scene.revision; this.poseCopyBytes=poses.byteLength; }
-        this.diagnosticCopyBytes=0;
         if(overlay&&lines&&markers&&colors&&overlayRevision!==overlay.revision){
           // Active prefixes only, without temporary typed-array views. The
           // co-located C study will remove this prototype boundary copy.
@@ -65,6 +77,7 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
           colors.set(overlay.bodyColors);
           if(!m._sl_render_overlay_counts(overlay.lineCount,overlay.markerCount))throw new Error('Invalid raylib diagnostic commands');
           this.diagnosticCopyBytes=overlay.lineCount*20+overlay.markerCount*12+overlay.bodyColors.byteLength;
+          this.lineCount=overlay.lineCount;this.markerCount=overlay.markerCount;
           overlayRevision=overlay.revision;
         }
         if (!m._sl_render_draw(view.scale,view.x,view.y)) throw new Error('Raylib draw failed');
@@ -75,12 +88,11 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
 }
 
 interface StudyWorld {
-  configuration:{scene:'pyramid'|'rain'|'chains';copies:number};
+  configuration:{scene:'pyramid'|'rain'|'chains';copies:number;bodyCapacity:number;contactCapacity:number;jointCapacity:number};
   snapshot:SnapshotCopy;steps:number;refreshSnapshot(diagnostic?:boolean):boolean;
 }
-/** One fixed memory owns physics and raylib. Geometry crosses JS during setup;
- * live base poses stay in C. Diagnostic direct preparation remains separate
- * work; this entry point currently creates only the base visual profile. */
+/** One fixed memory owns physics and raylib. Geometry/palette cross JS during
+ * setup; live poses and diagnostic commands are prepared directly in C. */
 export async function createRaylibStudyModule(canvas:HTMLCanvasElement,{memoryBytes=64*1024*1024}={}) {
   if(!canvas.id||document.getElementById(canvas.id)!==canvas)throw new Error('Raylib requires an attached canvas with a unique id');
   if(!Number.isInteger(memoryBytes)||memoryBytes<64*1024*1024||memoryBytes>512*1024*1024||memoryBytes%65536)
@@ -88,9 +100,13 @@ export async function createRaylibStudyModule(canvas:HTMLCanvasElement,{memoryBy
   const {default:factory}=await import(new URL('./raylib.mjs',import.meta.url).href);
   const {ownStudyModule}=await import(new URL('./physics/owner.mjs',import.meta.url).href);
   const m:RaylibModule=await factory({canvas,wasmMemory:new WebAssembly.Memory({initial:memoryBytes/65536,maximum:memoryBytes/65536})});
-  return ownStudyModule(m,memoryBytes,(study:number,world:StudyWorld,valid:()=>void)=>{
+  return ownStudyModule(m,memoryBytes,(study:number,world:StudyWorld,valid:()=>void,options:{diagnostic?:boolean})=>{
+    if(!options||typeof options!=='object'||Array.isArray(options)||
+        (options.diagnostic!==undefined&&typeof options.diagnostic!=='boolean'))throw new TypeError('Invalid renderer options');
     if(!world.refreshSnapshot())throw new Error('Raylib geometry snapshot failed');
     const scene=new DrawScene(world.snapshot,world.configuration.scene,undefined,world.configuration.copies);
-    return initializeCandidate(m,canvas,scene,undefined,{study,valid,steps:()=>world.steps});
+    return initializeCandidate(m,canvas,scene,undefined,{study,valid,steps:()=>world.steps,
+      diagnostic:options.diagnostic??false,bodyCapacity:world.configuration.bodyCapacity,
+      contactCapacity:world.configuration.contactCapacity,jointCapacity:world.configuration.jointCapacity});
   });
 }
