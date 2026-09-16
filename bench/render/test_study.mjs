@@ -45,10 +45,21 @@ try {
           assert.equal(actual.bodies.y[at],initial.bodies.y[row]);
         }
         const used=module.memory.allocatorUsedBytes;
+        const counterStats=world.frameCounters.stats,counterWork=world.frameCounters.work;
+        assert.equal(world.frameCounters.valid,false);
         for(let i=0;i<3;++i) {
           assert.ok(world.step());assert.equal(world.snapshot.valid,false);assert.equal(world.diagnostics.valid,false);
           assert.throws(()=>world.snapshot.bodyCount);
           assert.ok(world.refreshSnapshot(true));
+          assert.ok(world.refreshFrameCounters());assert.equal(world.frameCounters.valid,true);
+          assert.equal(world.frameCounters.stats,counterStats);assert.equal(world.frameCounters.work,counterWork);
+          const report=world.report();
+          for(let k=0;k<13;++k)assert.equal(counterStats[k],report.stats[world.frameCounters.statNames[k]]);
+          for(let k=0;k<9;++k)assert.equal(counterStats[13+k],report.last[world.frameCounters.statNames[13+k]]);
+          for(let k=0;k<13;++k){assert.equal(counterWork[k],report.work[world.frameCounters.workNames[k]]);assert.equal(counterWork[13+k],report.cumulative[world.frameCounters.workNames[k]]);}
+          assert.equal(counterStats[23],used);assert.equal(counterStats[24],i+1);assert.equal(counterWork[25],world.drops);
+          counterStats.fill(0xffffffff);counterWork.fill(0xffffffffffffffffn);
+          assert.ok(world.refreshFrameCounters());assert.equal(counterStats[24],i+1);assert.equal(counterWork[25],world.drops);
           assert.ok(reference.prepare()&&reference.mutate()&&reference.step()&&reference.sample()&&reference.refreshSnapshot(true));
           if(copies===1) {
             const a=world.snapshot.copy(), b=reference.snapshot.copy();

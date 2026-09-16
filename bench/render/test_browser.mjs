@@ -16,7 +16,7 @@ const server=http.createServer(async (req,res)=>{
   } catch { res.writeHead(404).end(); }
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-let browser, harnessError=null, primitive=null, raylibValidation=null;
+let browser, harnessError=null, primitive=null, raylibValidation=null,hud=null;
 const results=[];
 const colocated=[];
 try {
@@ -28,6 +28,7 @@ try {
     primitive=await probe.evaluate(()=>window.verifyOverlayPrimitives());
     raylibValidation=await probe.evaluate(()=>window.verifyRaylibValidation());
     assert.equal(raylibValidation.rejected,13);
+    hud=await probe.evaluate(()=>window.verifyStudyHud());assert.equal(hud.updates,4);
     for(const result of primitive){
       assert.deepEqual(result.line,[239,119,119]);assert.deepEqual(result.marker,[255,204,102]);
       assert.deepEqual(result.above,[16,24,32]);assert.deepEqual(result.below,[16,24,32]);assert.deepEqual(result.outside,[16,24,32]);
@@ -76,6 +77,6 @@ try {
   }
 } catch(error) {harnessError=String(error);throw error;}
 finally {
-  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({browser:browser?.version()??null,kind:'correctness-only',harnessError,primitive,raylibValidation,colocated,results},null,2)+'\n');
+  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({browser:browser?.version()??null,kind:'correctness-only',harnessError,primitive,raylibValidation,hud,colocated,results},null,2)+'\n');
   await browser?.close(); await new Promise(resolve=>server.close(resolve));
 }

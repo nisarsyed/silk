@@ -22,6 +22,8 @@ python3 bench/render/build.py
 node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
 node bench/render/test_overlay.mjs
+node bench/render/test_recording.mjs
+node bench/render/test_hud.mjs
 node bench/render/test_browser.mjs
 ```
 
@@ -160,8 +162,39 @@ rejects insufficient worst-case capacities. Its transient arrays live in the
 raylib renderer; preparation allocates nothing and cannot mutate physics.
 `diagnosticPrepareBytes` reports C writes separately from JS boundary copies.
 
-The 4 Hz work/memory HUD and frozen render-only diagnostic replication remain
-unfinished. The current overlay builder explicitly rejects frozen scenes.
+The shared HUD component uses 4 Hz deadlines and skips missed updates without
+catch-up bursts. It displays actual body/constraint/work counters, the fixed
+WASM budget, allocator usage, known world/output payloads and available GPU
+metrics. Text wraps within the mobile width. The renderer measurement loop
+still needs to attach and time it. Frozen render-only diagnostic replication
+also remains unfinished; the overlay builder explicitly rejects frozen scenes.
+
+## Frame recording
+
+`refreshFrameCounters()` copies 25 uint32 statistics and 26 uint64 last-step/
+cumulative work counters into reusable JS arrays (308 bytes per world). The
+statistics include the last contact-drop count, current allocator usage and
+completed steps. These counters are invalidated by stepping, snapshot refresh
+or disposal. Writes to the JS copies cannot mutate physics. The object-based
+`report()` remains an allocation outside timed frames.
+
+`FrameRecorder` allocates all arrays once: 23 float64 clock/duration/renderer
+metrics, 25 uint32 statistics, 26 uint64 work values, an availability mask and a
+completion byte per frame, totaling 497 payload bytes/frame. The duration and
+calibration must determine the actual capacity; its outer bound is 300 seconds
+at 240 submissions/s plus two boundary frames. Full storage fails collection
+without growth or discarding earlier frames. Unknown optional metrics have a
+cleared availability bit and must not be interpreted as measured zero.
+
+Append copies the record; finish captures the recording cost and complete CPU
+end time separately from submission completion. An unfinished record remains
+explicitly pending. Nonblocking GPU query results can fill their original
+completed row later, with duplicate or invalid results rejected. Serialization and nearest-rank distributions allocate only
+after collection, and uint64 values serialize as exact decimal strings.
+Summary cadence uses the frozen missed-slot denominator. These primitives and
+the HUD checks are correctness tooling, not a complete timed-run harness or
+acceptance evidence: scheduling, calibration, finite-state checks, provenance,
+input collection, sustained windows and report qualification remain required.
 
 The native and WASM C suite checks every physics tier with sleep off/on,
 compares every copied descriptor, verifies within-copy joint remapping, and
@@ -205,7 +238,7 @@ cannot affect direct drawing. Native/WASM C tests pin pose bits, command counts,
 query colors, normal length, joint anchors, output bounds and invalid-input
 recovery for the same scene/tier/sleep matrix, plus a settled sleeping world.
 
-Still required for #95: the diagnostic HUD and render-only diagnostic coverage; browser integration
+Still required for #95: HUD integration and render-only diagnostic coverage; browser integration
 of the sustained measurement loop; matched render-only/end-to-end timing and input
 collection; GPU/upload/draw instrumentation; startup, memory and allocation
 records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete
