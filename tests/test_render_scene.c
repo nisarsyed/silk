@@ -2,6 +2,7 @@
 #include "../bench/render/driver.h"
 #include "../bench/render/overlay.h"
 #include "../bench/render/scene.h"
+#include "../src/world_internal.h"
 #include "../wasm/context.h"
 #include "replay.h"
 #include "silk_test.h"
@@ -471,7 +472,54 @@ static void direct_poses(void)
         }
     }
 }
+static void state_validation(void)
+{
+    SL_EXPECT(!sl_render_study_validate(NULL));
+    SL_EXPECT(sl_render_study_failed(NULL));
+    for (uint32_t kind = 0u; kind < 2u; ++kind) {
+        sl_render_study *study = sl_render_study_create(0u, 1u, 0u, 3u);
+        SL_EXPECT(study != NULL);
+        if (study == NULL) {
+            continue;
+        }
+        SL_EXPECT(sl_render_study_validate(study));
+        SL_EXPECT(!sl_render_study_failed(study));
+        sl_world *world = sl_render_study_world(study);
+        float *field = &world->state->velocities[1].x;
+        if (kind == 1u) {
+            SL_EXPECT(sl_render_study_step(study));
+            const uint32_t count = sl_world_contact_count(world);
+            uint32_t row = 0u;
+            while (row < count &&
+                   sl_world_contact_at(world, row)->manifold.point_count ==
+                       0u) {
+                ++row;
+            }
+            SL_EXPECT(row < count);
+            if (row == count) {
+                sl_render_study_destroy(study);
+                continue;
+            }
+            field =
+                &world->state->contacts[row].manifold.points[0].normal_impulse;
+        }
+        // Fault injection between calls only: never step corrupt state.
+        // Restore the value, but the failed-run latch must remain set.
+        const float saved = *field;
+        *field = kind == 0u ? NAN : INFINITY;
+        SL_EXPECT(!sl_render_study_validate(study));
+        *field = saved;
+        SL_EXPECT(sl_render_study_failed(study));
+        SL_EXPECT(!sl_render_study_validate(study));
+        const uint32_t steps = sl_render_study_status(study)[4];
+        SL_EXPECT(!sl_render_study_step(study));
+        SL_EXPECT_INT_EQ(sl_render_study_status(study)[4], steps);
+        sl_render_study_destroy(study);
+    }
+}
 static const sl_test_case k_cases[] = {
+    { "finite-state failures are latched and stop subsequent steps",
+      state_validation },
     { "co-located poses preserve snapshot bits and output bounds",
       direct_poses },
     { "reject unsupported scaling inputs", invalid_arguments },

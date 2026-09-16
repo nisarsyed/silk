@@ -23,6 +23,8 @@ node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
 node bench/render/test_overlay.mjs
 node bench/render/test_recording.mjs
+node bench/render/test_timing.mjs
+node bench/render/test_runner.mjs
 node bench/render/test_hud.mjs
 node bench/render/test_browser.mjs
 ```
@@ -122,6 +124,57 @@ The private JS ownership implementation is shared by standalone physics and
 raylib. A world can attach one renderer; world/module disposal closes graphics
 before freeing physics. A replacement world can reuse the canvas. Neither raw
 WASM pointers nor writable C pose buffers escape that ownership closure.
+`rebuild()` consumes a world and returns its exact initial configuration while
+retaining raylib's warmed graphics resources. It frees the old physics arena
+before allocating its replacement; two arenas never coexist. Failure leaves
+the old world disposed and closes retained graphics. On success the new world
+owns their eventual disposal; disposing the consumed owner again is harmless.
+
+The study checks finite transforms, velocities, proxy bounds, live contact
+floats and joint impulses after each executed C step, including release builds.
+This bounded scan costs O(bodies + contacts + joints), allocates nothing, and
+is included in the measured study step cost. Failure is latched, preserves the
+executed-step/drop counters and rejects later steps. The original step-only
+benchmark and core simulation are unchanged. Tests inject non-finite values
+between calls, restore them, and verify that the failed-run latch remains set.
+
+## Browser collection loop
+
+`runner.mjs` exports `runStudy` for an attached, uniquely identified canvas and
+an optional diagnostic HUD element. It accepts the three candidates, the three
+physics fixtures, all physics tiers, sleep policy and frozen desktop/mobile
+layouts. `sustained` is restricted to mobile rain, one copy, sleep off and base
+visuals. Normal collection uses 60 seconds; sustained collection uses 300.
+`memoryBytes` defaults to the contract's 64 MiB and accepts an explicit aligned
+budget within the module's existing bounds. Larger physics tiers may require
+a larger budget, which is recorded; the loop never grows or retries a budget.
+An explicitly named `correctnessSeconds` option (0.25–5 seconds) exercises the
+loop in CI and labels its output `correctness-only`. Every current output sets
+`acceptanceEligible: false` and lists the missing protocol evidence.
+
+The loop records 240 idle rAF intervals and applies the frozen median/divisor
+calibration and 59–61 Hz gate. It warms a disposable world for 120 steps and
+120 callbacks (60 seconds for sustained runs), then creates the exact initial
+world while retaining cached paths, shaders and GPU buffers within the fixed
+memory budget; allocation failure remains a failed run. Scheduling starts with zero debt, uses the original binary32
+timestep, caps catch-up at eight steps and records discarded time. The clock's
+planned steps must match the authoritative C count. Raw frame storage is bounded
+from duration and calibrated target cadence, with no growth or discarded prefix.
+
+Base and diagnostic frames record CPU stage timings, submission times, work,
+drops and debt; diagnostic HUD updates remain at 4 Hz. Unknown GPU metrics are
+explicitly unavailable. Hidden documents, context loss, display/viewport changes,
+cancellation and numerical/step failures preserve the completed record prefix
+and final world report. Resources and listeners are released after collection.
+Reports use one monotonic clock origin and distinguish actual device DPR from
+the contract's render DPR. Serialize uint64s using the study module's
+`jsonReplacer`; raw frame work counters are already exact decimal strings.
+
+This is a collection primitive, not the complete study controller. It does not
+yet implement render-only runs, real-input trials, optional 120 Hz measurements,
+10-second sustained windows, full provenance, device-condition recording,
+GPU/GC/memory profiling, repeated-run ordering or qualification. Browser tests
+use short runs and injected interruption events; they are correctness evidence.
 
 Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
 point/AABB/ray results. These extra C buffers cost `20*bodyCapacity + 32` bytes;
@@ -238,8 +291,8 @@ cannot affect direct drawing. Native/WASM C tests pin pose bits, command counts,
 query colors, normal length, joint anchors, output bounds and invalid-input
 recovery for the same scene/tier/sleep matrix, plus a settled sleeping world.
 
-Still required for #95: HUD integration and render-only diagnostic coverage; browser integration
-of the sustained measurement loop; matched render-only/end-to-end timing and input
+Still required for #95: render-only diagnostic coverage and collection; complete
+sustained protocol reporting; matched render-only/end-to-end timing and input
 collection; GPU/upload/draw instrumentation; startup, memory and allocation
 records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete
 five-repeat desktop and physical Android protocol; and an evidence-backed

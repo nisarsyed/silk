@@ -81,6 +81,8 @@ jobs:
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_recording.mjs "build/render-study-$mode"
+          node bench/render/test_timing.mjs "build/render-study-$mode"
+          node bench/render/test_runner.mjs "build/render-study-$mode" "build/reports/render-$mode/runner"
           node bench/render/test_hud.mjs "build/render-study-$mode" "build/reports/render-$mode/hud"
           node bench/render/test_browser.mjs "build/render-study-$mode" "build/reports/render-$mode"
       - uses: actions/upload-artifact@v7
