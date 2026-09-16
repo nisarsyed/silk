@@ -5,6 +5,7 @@ import {edgeMask,compare} from './pixels.js';
 import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
 import {createRaylibCandidate,createRaylibStudyModule} from './raylib.js';
+import {StudyHud} from './hud.js';
 
 // Readbacks are correctness-only, outside every measured run. A single callback
 // draws and reads before the non-preserved WebGL buffer can be discarded.
@@ -25,6 +26,30 @@ function capture(canvas, candidate) {
     } catch(error) { reject(error); }
   }));
 }
+window.verifyStudyHud=async()=>{
+  const module=await createStudyModule(),world=module.create('pyramid',{steps:2});
+  const element=document.createElement('pre');element.id='study-hud';element.style.cssText='font:12px/1.5 monospace;margin:8px;max-width:344px;color:#eaf0f3';document.body.append(element);
+  const expect=(condition,message)=>{if(!condition)throw new Error(message);};
+  let hud;
+  try{
+    const memory=world.report().memory;
+    hud=new StudyHud(element,{linearBytes:module.memory.linearMemoryBytes,arenaBytes:memory.arenaBytes,outputBytes:memory.outputBytes});
+    const renderer={gpuBytes:null,uploadBytes:null,drawCalls:null};
+    expect(world.refreshFrameCounters(),'Counters failed');
+    expect(hud.update(1000,world.frameCounters,renderer),'Initial HUD update skipped');
+    const first=element.textContent;
+    expect(first.includes('Bodies 211/211')&&first.includes('GPU payload unavailable')&&first.includes('Contact drops 0'),'HUD data missing');
+    expect(world.step()&&world.refreshFrameCounters(),'Updated counters failed');
+    expect(!hud.update(1249,world.frameCounters,renderer)&&element.textContent===first,'HUD updated before 250ms');
+    expect(hud.update(1250,world.frameCounters,renderer)&&element.textContent.includes('Steps 1'),'HUD missed deadline');
+    expect(hud.update(2100,world.frameCounters,renderer),'Late HUD deadline skipped');
+    expect(!hud.update(2100,world.frameCounters,renderer)&&!hud.update(2249,world.frameCounters,renderer),'HUD replayed missed updates');
+    expect(hud.update(2250,world.frameCounters,renderer)&&hud.updates===4,'HUD cadence drifted');
+    const text=element.textContent;hud.dispose();hud.dispose();expect(element.textContent==='','HUD disposal left text');
+    let rejected=false;try{hud.update(2500,world.frameCounters,renderer);}catch{rejected=true;}expect(rejected,'Disposed HUD accepted update');
+    element.textContent=text;return {updates:4,text,kind:'correctness-only'};
+  }finally{world?.dispose();module.dispose();}
+};
 window.verifyRenderers=async ({scene='rain',steps=120,copies=1,sleep=false,diagnostic=false,instances,width=1280,height=720,images=false}={})=>{
   const module=await createStudyModule({memoryBytes:256*1024*1024});
   const world=module.create(scene,{copies,sleep,steps:steps+1});
