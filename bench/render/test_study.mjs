@@ -39,6 +39,7 @@ try {
         assert.deepEqual([config.cameraLeft,config.cameraBottom,config.cameraRight,config.cameraTop],
           [camera[0]-16*(copies-1),camera[1],camera[2]+16*(copies-1),camera[3]]);
         const initial=reference.snapshot, actual=world.snapshot;
+        const initialCopy=world.snapshot.copy(),initialReport=world.report();
         for(let copy=0;copy<copies;++copy)for(let row=0;row<initial.bodyCount;++row) {
           const at=copy*initial.bodyCount+row, offset=32*(copy-(copies-1)/2);
           assert.equal(actual.bodies.x[at],Math.fround(initial.bodies.x[row]+offset));
@@ -54,6 +55,7 @@ try {
           assert.ok(world.refreshFrameCounters());assert.equal(world.frameCounters.valid,true);
           assert.equal(world.frameCounters.stats,counterStats);assert.equal(world.frameCounters.work,counterWork);
           const report=world.report();
+          assert.equal(report.finiteState,true);
           for(let k=0;k<13;++k)assert.equal(counterStats[k],report.stats[world.frameCounters.statNames[k]]);
           for(let k=0;k<9;++k)assert.equal(counterStats[13+k],report.last[world.frameCounters.statNames[13+k]]);
           for(let k=0;k<13;++k){assert.equal(counterWork[k],report.work[world.frameCounters.workNames[k]]);assert.equal(counterWork[13+k],report.cumulative[world.frameCounters.workNames[k]]);}
@@ -78,6 +80,13 @@ try {
         assert.ok(world.refreshSnapshot(true));
         assert.equal(world.diagnostics.floats[0],bound);assert.equal(world.diagnostics.words[0],flags);
         assert.equal(world.snapshot.bodies.x[0],x);
+        const rebuilt=world.rebuild();assert.ok(rebuilt);
+        try{
+          assert.throws(()=>world.rebuild(),/disposed/);assert.equal(world.frameCounters.valid,false);
+          assert.deepEqual(rebuilt.report(),initialReport);assert.ok(rebuilt.refreshSnapshot(true));
+          assert.deepEqual(rebuilt.snapshot.copy(),initialCopy);
+          assert.equal(module.memory.allocatorUsedBytes,used);assert.ok(rebuilt.step());
+        }finally{rebuilt.dispose();}
       } finally {world.dispose();world.dispose();reference.dispose();}
       assert.throws(()=>world.step(),/disposed/);
     }

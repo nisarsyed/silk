@@ -23,7 +23,8 @@ export async function createRaylibCandidate(canvas:HTMLCanvasElement, scene:Draw
 }
 interface DirectSource {study:number;steps():number;valid():void;diagnostic:boolean;
   bodyCapacity:number;contactCapacity:number;jointCapacity:number}
-function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawScene,overlay?:Overlay,source?:DirectSource) {
+function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawScene,overlay?:Overlay,source?:DirectSource,
+  registerRebind?:(rebind:(next:DirectSource)=>void)=>void) {
   const vertexCount=scene.meshes.reduce((n,mesh)=>n+mesh.triangles.length/2,0);
   if (!m._sl_render_init(scene.count,vertexCount,scene.batches.length,canvas.width,canvas.height))
     throw new Error('Raylib renderer initialization failed');
@@ -49,6 +50,11 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
       new Uint32Array(m.HEAPU32.buffer,m._sl_render_overlay_palette(),48).set(palette.flatMap(hex=>[1,3,5].map(at=>parseInt(hex.slice(at,at+2),16))));
     }
     let revision=0,overlayRevision=0,disposed=false,lastStep=-1;
+    registerRebind?.(next=>{
+      if(disposed||!source||next.diagnostic!==source.diagnostic||next.bodyCapacity!==source.bodyCapacity||
+        next.contactCapacity!==source.contactCapacity||next.jointCapacity!==source.jointCapacity)throw new Error('Incompatible renderer transfer');
+      next.valid();source=next;lastStep=-1;
+    });
     return {
       // CPU-to-WASM pose copies are separate from raylib's internal GPU uploads.
       poseCopyBytes:0,posePrepareBytes:0,diagnosticCopyBytes:0,diagnosticPrepareBytes:0,lineCount:0,markerCount:0,
@@ -100,13 +106,20 @@ export async function createRaylibStudyModule(canvas:HTMLCanvasElement,{memoryBy
   const {default:factory}=await import(new URL('./raylib.mjs',import.meta.url).href);
   const {ownStudyModule}=await import(new URL('./physics/owner.mjs',import.meta.url).href);
   const m:RaylibModule=await factory({canvas,wasmMemory:new WebAssembly.Memory({initial:memoryBytes/65536,maximum:memoryBytes/65536})});
-  return ownStudyModule(m,memoryBytes,(study:number,world:StudyWorld,valid:()=>void,options:{diagnostic?:boolean})=>{
+  const rebinders=new WeakMap<object,{diagnostic:boolean;rebind:(next:DirectSource)=>void}>();
+  return ownStudyModule(m,memoryBytes,(study:number,world:StudyWorld,valid:()=>void,options:{diagnostic?:boolean},previous?:object)=>{
     if(!options||typeof options!=='object'||Array.isArray(options)||
         (options.diagnostic!==undefined&&typeof options.diagnostic!=='boolean'))throw new TypeError('Invalid renderer options');
+    const existing=previous?rebinders.get(previous):undefined;
+    if(previous&&!existing)throw new Error('Renderer belongs to another module');
+    const diagnostic=existing?.diagnostic??options.diagnostic??false;
+    const source={study,valid,steps:()=>world.steps,diagnostic,bodyCapacity:world.configuration.bodyCapacity,
+      contactCapacity:world.configuration.contactCapacity,jointCapacity:world.configuration.jointCapacity};
+    if(existing){existing.rebind(source);return previous;}
     if(!world.refreshSnapshot())throw new Error('Raylib geometry snapshot failed');
     const scene=new DrawScene(world.snapshot,world.configuration.scene,undefined,world.configuration.copies);
-    return initializeCandidate(m,canvas,scene,undefined,{study,valid,steps:()=>world.steps,
-      diagnostic:options.diagnostic??false,bodyCapacity:world.configuration.bodyCapacity,
-      contactCapacity:world.configuration.contactCapacity,jointCapacity:world.configuration.jointCapacity});
+    let rebind!:(next:DirectSource)=>void;
+    const renderer=initializeCandidate(m,canvas,scene,undefined,source,value=>{rebind=value;});
+    rebinders.set(renderer,{diagnostic,rebind});return renderer;
   });
 }

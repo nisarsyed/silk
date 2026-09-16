@@ -17,9 +17,9 @@ function integer(value,low,high,name) {
 // The optional renderer callback receives borrowed pointers only in its closure;
 // disposal closes its graphics resources before freeing the authoritative world.
 export function ownStudyModule(m,memoryBytes,attachRenderer) {
-  const owners=new Set();let disposed=false;
+  const owners=new Set(),rendererTargets=new WeakMap();let disposed=false;
   const live=()=>{if(disposed)throw new Error('Study module is disposed');};
-  return Object.freeze({
+  const moduleOwner=Object.freeze({
     get memory(){live();return {linearMemoryBytes:memoryBytes,stackBytes:1048576,staticEnd:m._sl_wasm_static_end(),
       heapBase:m._sl_wasm_heap_base(),allocatorUsedBytes:m._sl_wasm_allocator_used()};},
     create(scene,{copies=1,sleep=false,steps=stepLimit}={}) {
@@ -59,6 +59,16 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
         const value=Object.freeze({
           ...(attachRenderer?{createRenderer(options={}){valid();if(renderer)throw new Error('Renderer already attached');
             renderer=attachRenderer(ptr,value,valid,options);return renderer;}}:{}),
+          // Consume this world and rebuild its exact initial configuration.
+          // Retain warmed graphics within this synchronous ownership operation,
+          // freeing physics before allocation so two arenas never coexist.
+          // On failure the old world is disposed and retained graphics close.
+          rebuild(){valid();const retained=renderer;renderer=undefined;value.dispose();let next;
+            try{next=moduleOwner.create(scene,{copies,sleep,steps});
+              if(!next){retained?.dispose();return null;}
+              if(retained)rendererTargets.get(next)(retained,configuration);
+              return next;
+            }catch(error){next?.dispose();retained?.dispose();throw error;}},
           configuration,diagnostics,frameCounters,
           get snapshot(){valid();return views.snapshot;},
           get steps(){valid();return status[4];},
@@ -95,16 +105,22 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
             const stats=object(statNames,io.ou),last=object(stepNames,io.ou,13);
             const work=workCopy(views.work),cumulative=workCopy(views.work,13);
             m._sl_wasm_memory_read(adapter);
-            return {configuration,steps:status[4],drops:m._sl_render_study_drops(ptr),stats,last,work,cumulative,
+            return {configuration,steps:status[4],drops:m._sl_render_study_drops(ptr),finiteState:!m._sl_render_study_failed(ptr),stats,last,work,cumulative,
               memory:{...object(memoryNames,io.ou),adapterBytes:m._sl_wasm_adapter_bytes(adapter),
                 contextBytes:m._sl_render_study_bytes(),diagnosticBytes:m._sl_render_study_diagnostic_bytes(ptr),
                 outputBytes:views.outputBytes+diagnosticFloats.byteLength+diagnosticWords.byteLength+frameStats.byteLength+frameWork.byteLength}};
           },
           dispose(){if(ptr){renderer?.dispose();invalidate();m._sl_render_study_destroy(ptr);ptr=0;owners.delete(value);}}
         });
+        rendererTargets.set(value,(previous,configuration)=>{
+          valid();if(renderer)throw new Error('Target already owns a renderer');
+          if(JSON.stringify(configuration)!==JSON.stringify(value.configuration))throw new Error('Renderer transfer requires identical fixtures');
+          renderer=attachRenderer(ptr,value,valid,{},previous);return renderer;
+        });
         owners.add(value);return value;
       }catch(error){m._sl_render_study_destroy(ptr);if(error instanceof RangeError)return null;throw error;}
     },
     dispose(){if(!disposed){for(const owner of owners)owner.dispose();disposed=true;}}
   });
+  return moduleOwner;
 }

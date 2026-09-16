@@ -219,6 +219,17 @@ window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=
       if(frame===0)allocatorUsed=module.memory.allocatorUsedBytes;
       else expect(module.memory.allocatorUsedBytes===allocatorUsed,'Steady-state C allocation changed');
     }
+    const context=canvases[1].getContext('webgl2');
+    const previous=world;world=world.rebuild();expect(world,'Initial-state rebuild failed');
+    rejected=false;try{previous.rebuild();}catch{rejected=true;}expect(rejected,'Consumed world rebuilt twice');
+    previous.dispose();reference.dispose();reference=referenceModule.create(scene,{copies,sleep,steps:steps+1});
+    expect(reference.refreshSnapshot(true)&&world.refreshSnapshot(true),'Rebuilt snapshot failed');
+    equalSnapshot(world.snapshot,reference.snapshot);draw.copyTransforms(reference.snapshot);
+    if(overlay)overlay.refresh(reference.snapshot,reference.diagnostics);
+    const rebuilt=await capture(canvases[1],candidate),rebuiltReference=await capture(canvases[0],canvasCandidate);
+    expect(canvases[1].getContext('webgl2')===context,'Transfer replaced graphics context');
+    results.push(compare(rebuiltReference,rebuilt,width,height,edgeMask(draw,width,height,overlay)));
+    expect(world.steps===0&&candidate.posePrepareBytes===16*draw.count,'Transfer did not rebuild initial poses');
     world.dispose();rejected=false;try{candidate.draw();}catch{rejected=true;}expect(rejected,'Renderer outlived its world');
     // A disposed world releases the sole raylib window; a new owner can attach.
     const recovered=module.create('pyramid',{steps:1});expect(recovered,'Replacement world failed');

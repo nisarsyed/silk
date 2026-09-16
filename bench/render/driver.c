@@ -2,6 +2,7 @@
 #include "../../wasm/context.h"
 #include "../fixtures.h"
 #include "scene.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,6 +13,7 @@ struct sl_render_study {
     float *diagnostic_f32;
     uint32_t *diagnostic_u32;
     uint64_t drops;
+    bool failed;
 };
 sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
                                         uint32_t sleep_enabled,
@@ -85,6 +87,10 @@ sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
     const float half_spread = 16.0f * (float)(copies - 1u);
     study->settings[17] -= half_spread;
     study->settings[19] += half_spread;
+    if (!sl_render_study_validate(study)) {
+        sl_render_study_destroy(study);
+        return NULL;
+    }
     return study;
 }
 void sl_render_study_destroy(sl_render_study *study)
@@ -98,13 +104,74 @@ void sl_render_study_destroy(sl_render_study *study)
 }
 bool sl_render_study_step(sl_render_study *study)
 {
-    if (study == NULL || study->status[4] >= study->status[3]) {
+    if (study == NULL || study->failed ||
+        study->status[4] >= study->status[3]) {
         return false;
     }
     sl_world_step(&study->adapter.world, SL_BENCH_TIMESTEP);
     study->drops += sl_world_contact_drop_count(&study->adapter.world);
     ++study->status[4];
+    return sl_render_study_validate(study);
+}
+static bool state_finite(const sl_world *world)
+{
+    const uint32_t bodies = sl_world_body_count(world);
+    for (uint32_t row = 0u; row < bodies; ++row) {
+        const sl_body_handle body = sl_world_body_at(world, row);
+        const sl_transform t = sl_world_body_get_transform(world, body);
+        if (!sl_vec2_is_finite(t.position) || !isfinite(t.rotation.c) ||
+            !isfinite(t.rotation.s) ||
+            !sl_vec2_is_finite(sl_world_body_get_velocity(world, body)) ||
+            !isfinite(sl_world_body_get_angular_velocity(world, body))) {
+            return false;
+        }
+        sl_aabb bounds;
+        if (sl_world_body_get_proxy_aabb(world, body, &bounds) &&
+            (!sl_vec2_is_finite(bounds.lower) ||
+             !sl_vec2_is_finite(bounds.upper))) {
+            return false;
+        }
+    }
+    const uint32_t contacts = sl_world_contact_count(world);
+    for (uint32_t row = 0u; row < contacts; ++row) {
+        const sl_contact *contact = sl_world_contact_at(world, row);
+        const sl_manifold *m = &contact->manifold;
+        if (!isfinite(contact->friction) || !isfinite(contact->restitution) ||
+            !sl_vec2_is_finite(m->normal) ||
+            m->point_count > SL_MANIFOLD_POINT_COUNT_MAX) {
+            return false;
+        }
+        for (uint32_t i = 0u; i < m->point_count; ++i) {
+            const sl_manifold_point *p = &m->points[i];
+            if (!sl_vec2_is_finite(p->anchor_a) ||
+                !sl_vec2_is_finite(p->anchor_b) ||
+                !sl_vec2_is_finite(p->point) || !isfinite(p->separation) ||
+                !isfinite(p->normal_impulse) || !isfinite(p->tangent_impulse) ||
+                !isfinite(p->normal_velocity)) {
+                return false;
+            }
+        }
+    }
+    const uint32_t joints = sl_world_joint_count(world);
+    for (uint32_t row = 0u; row < joints; ++row) {
+        if (!sl_vec2_is_finite(sl_world_joint_get_linear_impulse(
+                world, sl_world_joint_at(world, row)))) {
+            return false;
+        }
+    }
     return true;
+}
+bool sl_render_study_validate(sl_render_study *study)
+{
+    if (study == NULL || study->failed) {
+        return false;
+    }
+    study->failed = !state_finite(&study->adapter.world);
+    return !study->failed;
+}
+bool sl_render_study_failed(const sl_render_study *study)
+{
+    return study == NULL || study->failed;
 }
 sl_wasm_context *sl_render_study_adapter(sl_render_study *study)
 {

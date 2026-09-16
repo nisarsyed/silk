@@ -21,6 +21,13 @@ void sl_render_study_destroy(sl_render_study *study);
  * after a failed run.
  */
 bool sl_render_study_step(sl_render_study *study);
+/* Check evolving public state: transforms/velocities, proxy bounds, live
+ * contact floats and joint impulses. Failure is latched; later steps reject.
+ * step performs this check after each executed step (inside measured CPU
+ * work), retaining its completed-step/drop counters even on numeric failure.
+ * Initialization/shape/configuration inputs already use engine validation. */
+bool sl_render_study_validate(sl_render_study *study);
+bool sl_render_study_failed(const sl_render_study *study);
 /* Borrowed private ABI: these do not escape the JS study owner. The world is
  * also available to the co-located raylib candidate without a JS pose copy. */
 sl_wasm_context *sl_render_study_adapter(sl_render_study *study);
