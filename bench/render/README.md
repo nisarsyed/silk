@@ -24,10 +24,16 @@ node bench/render/test_geometry.mjs
 node bench/render/test_overlay.mjs
 node bench/render/test_recording.mjs
 node bench/render/test_timing.mjs
+node bench/render/test_gpu.mjs
 node bench/render/test_runner.mjs
 node bench/render/test_hud.mjs
 node bench/render/test_browser.mjs
 ```
+
+To exercise the installed Chrome with its actual graphics context, use
+`SL_RENDER_BROWSER=chrome SL_RENDER_HEADED=1 node bench/render/test_runner.mjs
+build/render-study build/reports/render-runner-chrome`. This opens a temporary
+window, keeps the browser's actual viewport/DPR, and remains correctness-only.
 
 `SL_RENDER_STUDY` is off by default and requires Emscripten. Enabling it fetches
 raylib at the same **6.0** pin as the native sandbox. This web target uses its
@@ -94,8 +100,8 @@ Shared pose payload is 16 bytes/instance, source rows and tile offsets another
 WebGL GPU payload is 16 bytes/instance plus unique triangulated meshes; driver,
 VAO and framebuffer overhead is not included. Canvas internal memory/uploads
 and raylib's internal GPU uploads/draw counts are currently unavailable, not
-zero. Instrumentation and nonblocking GPU timing remain required before the
-measurement study.
+zero. The collection loop now uses optional nonblocking GPU timer queries;
+upload/draw instrumentation and actual-device timing evidence remain required.
 
 ## Shared physics setup and sustained driver
 
@@ -173,7 +179,7 @@ the contract's render DPR. Serialize uint64s using the study module's
 This is a collection primitive, not the complete study controller. It does not
 yet implement render-only runs, real-input trials, optional 120 Hz measurements,
 10-second sustained windows, full provenance, device-condition recording,
-GPU/GC/memory profiling, repeated-run ordering or qualification. Browser tests
+GPU upload/draw and GC/memory profiling, repeated-run ordering or qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
 
 Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
@@ -231,9 +237,9 @@ completed steps. These counters are invalidated by stepping, snapshot refresh
 or disposal. Writes to the JS copies cannot mutate physics. The object-based
 `report()` remains an allocation outside timed frames.
 
-`FrameRecorder` allocates all arrays once: 23 float64 clock/duration/renderer
+`FrameRecorder` allocates all arrays once: 24 float64 clock/duration/renderer
 metrics, 25 uint32 statistics, 26 uint64 work values, an availability mask and a
-completion byte per frame, totaling 497 payload bytes/frame. The duration and
+completion byte per frame, totaling 505 payload bytes/frame. The duration and
 calibration must determine the actual capacity; its outer bound is 300 seconds
 at 240 submissions/s plus two boundary frames. Full storage fails collection
 without growth or discarding earlier frames. Unknown optional metrics have a
@@ -244,10 +250,46 @@ end time separately from submission completion. An unfinished record remains
 explicitly pending. Nonblocking GPU query results can fill their original
 completed row later, with duplicate or invalid results rejected. Serialization and nearest-rank distributions allocate only
 after collection, and uint64 values serialize as exact decimal strings.
-Summary cadence uses the frozen missed-slot denominator. These primitives and
-the HUD checks are correctness tooling, not a complete timed-run harness or
-acceptance evidence: scheduling, calibration, finite-state checks, provenance,
-input collection, sustained windows and report qualification remain required.
+Summary cadence uses the frozen missed-slot denominator. The collection loop
+integrates scheduling, calibration and finite-state checks, but these primitives
+and short browser tests are not acceptance evidence. Provenance, input
+collection, sustained windows and report qualification remain required.
+
+## Optional GPU timing
+
+`GpuTimer` uses WebGL 2's `EXT_disjoint_timer_query_webgl2` when available. It
+preallocates `ceil(100 / targetPeriodMs) + 2` query objects and fixed row/status
+arrays. The capacity derives from the contract's 100 ms gap bound plus two
+boundary frames, with an outer limit of 26 at 240 Hz. A full query pool keeps
+the frame and records its timing as unavailable; it never grows or overwrites
+a pending result. Driver query storage is unavailable; typed storage is exactly
+one status byte per frame plus 20 bytes per query, excluding JS object overhead.
+
+Queries enclose `renderer.draw()`, including its GL command production and any
+producer gaps. This measures elapsed command span, not GPU utilization or actual
+display time. The raylib span also includes its direct C pose/diagnostic
+preparation. CPU draw time includes query begin/end overhead. On a later rAF
+callback, the collector reads only results whose availability is true, then
+checks the disjoint flag before committing them. A disjoint event invalidates
+all pending results. Null/invalid results, insufficient counter bits and a
+counter's possible wrap are explicitly unavailable. Earlier validated samples
+remain intact. Polling cost has its own `gpuPollMs` field and is included in
+the complete CPU critical path; renderers perform no query-status polling.
+
+After the last measured submission, the loop drains without drawing for at
+most the configured query count of additional callbacks. Unresolved tail
+samples are labeled `drain-timeout`; interruptions label pending queries
+`aborted`. This does not extend the recorded measurement interval. No busy wait,
+`glFinish`, readback or per-frame query allocation/deletion is used. Canvas and
+browsers without the extension report unsupported timing. Every attempted frame
+has an explicit sample status, alongside the recorder's availability mask.
+
+Behavior follows the [WebGL 2 timer-query specification](https://registry.khronos.org/webgl/extensions/EXT_disjoint_timer_query_webgl2/)
+and its [disjoint/counter semantics](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_disjoint_timer_query.txt).
+Deterministic fake-driver tests cover pool reuse/exhaustion, delayed and invalid
+results, disjoint events, short-counter wrap and cleanup. Browser collection
+tests exercise the real extension when exposed; headless GPU results remain
+correctness-only and do not establish actual-device performance.
 
 The native and WASM C suite checks every physics tier with sleep off/on,
 compares every copied descriptor, verifies within-copy joint remapping, and

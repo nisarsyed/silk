@@ -7,6 +7,7 @@ import {WebglCandidate} from './webgl.js';
 import {StudyClock,calibrate60} from './timing.js';
 import {FrameRecorder,numberNames,requiredNumbers} from './recording.js';
 import {StudyHud} from './hud.js';
+import {GpuTimer} from './gpu.js';
 
 // Developer collection only. Reports deliberately cannot certify acceptance:
 // device conditions, source/artifact provenance, real input, GPU instrumentation
@@ -31,7 +32,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
   const duration=correctnessSeconds??(sustained?300:60),width=layout==='mobile'?720:1280,height=layout==='mobile'?1280:720;
   const deviceDpr=devicePixelRatio,viewportWidth=innerWidth,viewportHeight=innerHeight;
   const intervals=new Float64Array(240),values=new Float64Array(numberNames.length);
-  let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,phase='initialization',failure=null;
+  let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,gpu,phase='initialization',failure=null;
   let frameId=0,rejectFrames,initial,final,warmup,setupMs=null,measurementStart=null,measurementEnd=null,calibrationCount=0;
   const began=performance.now();
   const setPhase=value=>{phase=value;onPhase?.(value);};
@@ -117,31 +118,43 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     prepare();resetHud();initial=world.report();
     clock=new StudyClock(calibration,world.configuration.timestep);
     recorder=new FrameRecorder(Math.ceil(duration*1000/calibration.targetPeriodMs)+2);
+    gpu=new GpuTimer(candidate==='canvas'?null:canvas.getContext('webgl2'),recorder.capacity,
+      Math.ceil(100/calibration.targetPeriodMs)+2);
     setPhase('measurement');
     await frames((raf,now)=>{
       if(canvas.width!==width||canvas.height!==height)throw new Error('Drawing-buffer size changed');
       if(!clock.tick(raf,now))return false;
       if(measurementStart===null)measurementStart=now;
       values.fill(0);values[0]=raf;values[1]=now;values[2]=clock.targetRafMs;
-      let t=performance.now();step(clock.steps);values[5]=performance.now()-t;
+      let t=performance.now();gpu.poll(recorder,t);values[23]=performance.now()-t;
+      t=performance.now();step(clock.steps);values[5]=performance.now()-t;
       if(world.steps!==clock.totalSteps)throw new Error('Executed steps differ from the fixed-step clock');
       if(drawScene&&clock.steps>0){
         t=performance.now();if(!world.refreshSnapshot(diagnostic))throw new Error('Snapshot failed');values[6]=performance.now()-t;
         t=performance.now();drawScene.copyTransforms(world.snapshot);overlay?.refresh(world.snapshot,world.diagnostics);values[7]=performance.now()-t;
       }
-      t=performance.now();renderer.draw();values[3]=performance.now();values[8]=values[3]-t;
+      t=performance.now();const timed=gpu.begin(recorder.count,t);
+      try{renderer.draw();}finally{if(timed)gpu.end();}
+      values[3]=performance.now();values[8]=values[3]-t;
       t=performance.now();if(!world.refreshFrameCounters())throw new Error('Frame counters failed');values[9]=performance.now()-t;
       t=performance.now();hud?.update(now,world.frameCounters,renderer);values[10]=performance.now()-t;
       values[12]=clock.debtSeconds;values[13]=clock.droppedSeconds;
-      let known=requiredNumbers;
+      let known=requiredNumbers|(1<<23);
       // The optional field names match renderer counters. Missing fields remain
-      // unavailable; GPU duration is supplied only by a future asynchronous query.
-      for(let i=15;i<numberNames.length;++i){const value=renderer[numberNames[i]];
+      // unavailable; GPU duration resolves to this row on a later callback.
+      for(let i=15;i<=22;++i){const value=renderer[numberNames[i]];
         if(value!==undefined&&value!==null){values[i]=value;known|=1<<i;}}
       values[4]=performance.now();recorder.append(values,known,world.frameCounters);recorder.finish(performance.now());
       measurementEnd=recorder.numbers[(recorder.count-1)*numberNames.length+4];
       return clock.elapsedSeconds>=duration;
     });
+    // Tail queries resolve on later browser callbacks without drawing or
+    // extending measured duration. Never wait indefinitely or block the GPU.
+    setPhase('gpu-drain');let drainCallbacks=0;
+    if(gpu.pendingCount)await frames((_raf,now)=>{
+      gpu.poll(recorder,now);return gpu.pendingCount===0||++drainCallbacks===gpu.queryCapacity;
+    });
+    gpu.stop(false);
     setPhase('complete');
   }catch(error){fail(error instanceof Error?error.message:error);}
   finally{
@@ -151,6 +164,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     window.removeEventListener('resize',resized);
     signal?.removeEventListener('abort',aborted);
     try{if(world)final=world.report();}catch(error){fail(`Final report: ${error}`);}
+    gpu?.stop(!!failure);
   }
   // Build the potentially large JSON envelope only after timed collection stops.
   let report;
@@ -165,8 +179,9 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       warmup,rendererRecreatedAfterWarmup:initial?false:null,initial,final,moduleMemory:module?.memory,measurementStart,measurementEnd,
       elapsedSeconds:clock?.elapsedSeconds??0,debtSeconds:clock?.debtSeconds??0,droppedSeconds:clock?.droppedSeconds??0,
       summary:recorder?.summary(calibration.targetPeriodMs),frames:recorder?.report(world.frameCounters),
-      missingEvidence:['provenance','device conditions','real input','GPU instrumentation','memory profiling',
+      gpu:gpu?.report(),
+      missingEvidence:['provenance','device conditions','real input','GPU upload/draw instrumentation','memory profiling',
         'sustained windows','full-quality companion runs','five-repeat protocol']};
-  }finally{try{closeWorld();module?.dispose();}finally{active.delete(canvas);}}
+  }finally{try{gpu?.dispose();closeWorld();module?.dispose();}finally{active.delete(canvas);}}
   return report;
 }
