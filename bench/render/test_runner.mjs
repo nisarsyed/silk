@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import {chromium} from '../../wasm/node_modules/@playwright/test/index.mjs';
 const build=path.resolve(process.argv[2]??'build/render-study');
 const output=path.resolve(process.argv[3]??'build/reports/render-runner');
+const channel=process.env.SL_RENDER_BROWSER,headed=process.env.SL_RENDER_HEADED==='1';
+if(channel!==undefined&&channel!=='chrome')throw new Error('SL_RENDER_BROWSER must be chrome or unset');
+if(process.env.SL_RENDER_HEADED!==undefined&&!['0','1'].includes(process.env.SL_RENDER_HEADED))throw new Error('SL_RENDER_HEADED must be 0 or 1');
 await fs.mkdir(output,{recursive:true});
 const server=http.createServer(async(req,res)=>{
   try{
@@ -17,9 +20,10 @@ const server=http.createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;const results=[];
 try{
-  browser=await chromium.launch({headless:true});
-  const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
+  browser=await chromium.launch({headless:!headed,...(channel?{channel}:{})});
+  const page=await browser.newPage({viewport:headed?null:{width:1280,height:900}}),errors=[];
   page.on('pageerror',error=>errors.push(String(error)));
+  page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon'))errors.push(message.text());});
   await page.goto(`http://127.0.0.1:${server.address().port}/verify.html`);
   for(const candidate of ['canvas','webgl','raylib'])for(const diagnostic of [false,true]){
     const result=await page.evaluate(async({candidate,diagnostic})=>{
@@ -38,15 +42,19 @@ try{
     assert.ok(result.elapsedSeconds>=.25);assert.ok(result.frames.count>=2);assert.equal(result.frames.pendingFrame,false);
     assert.equal(result.summary.completeFrames,result.frames.count);assert.equal(result.calibrationIntervals.length,240);
     const f=result.frames,n=f.numberNames.length,stepIndex=f.statNames.indexOf('completedSteps');
+    assert.equal(result.gpu.pending,0);assert.equal(result.gpu.attempts,f.count);
+    assert.equal(result.gpu.counts.reduce((a,b)=>a+b,0),f.count);
     assert.equal(f.stats[stepIndex],0);assert.equal(f.stats[(f.count-1)*25+stepIndex],result.final.steps);
     for(let row=0;row<f.count;++row){
       assert.equal(f.finished[row],1);assert.ok(f.numbers[row*n+4]>=f.numbers[row*n+3]);
       assert.ok(f.numbers[row*n+12]>=0&&f.numbers[row*n+12]<Math.fround(1/60));
-      assert.equal(f.known[row]&(1<<14),0); // CPU draw cost cannot masquerade as GPU time.
+      assert.equal(f.known[row]&(1<<14),result.gpu.statuses[row]===2?1<<14:0);
+      assert.equal(f.known[row]&(1<<23),1<<23);assert.ok(f.numbers[row*n+23]>=0);
+      if(!result.gpu.supported)assert.equal(result.gpu.statuses[row],6);
     }
     assert.ok(Math.abs(result.final.steps*Math.fround(1/60)+result.debtSeconds+result.droppedSeconds-result.elapsedSeconds)<1e-9);
     if(candidate==='raylib')for(let row=0;row<f.count;++row){assert.equal(f.numbers[row*n+16],0);assert.equal(f.numbers[row*n+18],0);}
-    results.push({candidate,diagnostic,status:result.status,frames:f.count});
+    results.push({candidate,diagnostic,status:result.status,frames:f.count,gpu:result.gpu});
   }
   // Interrupt only after measurement begins, so the failed record must retain
   // its prefix. These are injected correctness events, not device evidence.
@@ -74,6 +82,7 @@ try{
     assert.equal(result.replacement.calibrationIntervals.length,0);assert.equal(result.replacement.setupMs,null);
   }
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({kind:'correctness-only',results},null,2)+'\n');
+  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({kind:'correctness-only',browser:browser.version(),
+    channel:channel??'bundled-chromium',headless:!headed,results},null,2)+'\n');
   console.log('Browser runner: all candidates/profiles, exact rebuild, bounded records, fixed-step accounting, partial failures and disposal PASS');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

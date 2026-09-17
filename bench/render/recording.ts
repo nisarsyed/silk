@@ -6,7 +6,7 @@
 export const numberNames=Object.freeze(['rafMs','callbackMs','targetMs','submissionMs','endMs',
   'stepMs','snapshotMs','prepareMs','drawMs','counterMs','hudMs','recordMs','debtSeconds','droppedSeconds',
   'gpuMs','uploadBytes','poseCopyBytes','posePrepareBytes','diagnosticCopyBytes','diagnosticPrepareBytes',
-  'gpuBytes','drawCalls','submissionCalls']);
+  'gpuBytes','drawCalls','submissionCalls','gpuPollMs']);
 export const requiredNumbers=(1<<14)-1;
 export const allNumbers=(1<<numberNames.length)-1;
 // 300 seconds at up to 240 recorded submissions/s, plus two boundary frames.
@@ -43,7 +43,7 @@ export class FrameRecorder {
         (known&requiredNumbers)!==requiredNumbers||!counters.valid||counters.stats.length!==25||counters.work.length!==26)
       throw new Error('Invalid frame data');
     for(let i=0;i<values.length;++i)if(!Number.isFinite(values[i])||values[i]<0||
-        (i>=15&&!Number.isSafeInteger(values[i]))||(!(known&(1<<i))&&values[i]!==0))
+        (i>=15&&i<=22&&!Number.isSafeInteger(values[i]))||(!(known&(1<<i))&&values[i]!==0))
       throw new Error('Invalid frame metric or availability');
     if(values[3]<values[1]||values[4]<values[3]||values[11]!==0)throw new Error('Invalid frame clock order');
     const row=this.rows;

@@ -7,7 +7,7 @@ const counters={valid:true,stats:new Uint32Array(25),work:new BigUint64Array(26)
   statNames:Array.from({length:25},(_,i)=>String(i)),workNames:Array.from({length:13},(_,i)=>String(i))};
 for(const capacity of [0,-1,1.5,NaN,Infinity,frameCapacityMax+1])assert.throws(()=>new FrameRecorder(capacity));
 const recorder=new FrameRecorder(4),values=new Float64Array(numberNames.length);
-assert.equal(recorder.bytes,4*(23*8+25*4+26*8+4+1));
+assert.equal(recorder.bytes,4*(24*8+25*4+26*8+4+1));
 assert.equal(recorder.summary(1000/60).cpuMs,null);
 assert.equal(recorder.summary(1000/60).missedTargetFraction,null);
 assert.throws(()=>recorder.finish(0));
