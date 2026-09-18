@@ -25,6 +25,8 @@ node bench/render/test_overlay.mjs
 node bench/render/test_recording.mjs
 node bench/render/test_timing.mjs
 node bench/render/test_gpu.mjs
+node bench/render/test_gl_stats.mjs
+node bench/render/test_windows.mjs
 node bench/render/test_runner.mjs
 node bench/render/test_hud.mjs
 node bench/render/test_browser.mjs
@@ -99,9 +101,10 @@ Shared pose payload is 16 bytes/instance, source rows and tile offsets another
 8 bytes/instance, plus cached unique meshes/batches and JS object overhead.
 WebGL GPU payload is 16 bytes/instance plus unique triangulated meshes; driver,
 VAO and framebuffer overhead is not included. Canvas internal memory/uploads
-and raylib's internal GPU uploads/draw counts are currently unavailable, not
-zero. The collection loop now uses optional nonblocking GPU timer queries;
-upload/draw instrumentation and actual-device timing evidence remain required.
+remain unavailable. The collection loop observes submitted WebGL buffer uploads
+and draw calls for both GL candidates, including raylib's actual batch flushes.
+Driver-internal traffic and memory remain unavailable. Optional nonblocking GPU
+timer queries are integrated; actual-device performance evidence remains required.
 
 ## Shared physics setup and sustained driver
 
@@ -178,8 +181,8 @@ the contract's render DPR. Serialize uint64s using the study module's
 
 This is a collection primitive, not the complete study controller. It does not
 yet implement render-only runs, real-input trials, optional 120 Hz measurements,
-10-second sustained windows, full provenance, device-condition recording,
-GPU upload/draw and GC/memory profiling, repeated-run ordering or qualification. Browser tests
+full provenance, device-condition recording,
+GC/memory profiling, repeated-run ordering or qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
 
 Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
@@ -253,7 +256,19 @@ after collection, and uint64 values serialize as exact decimal strings.
 Summary cadence uses the frozen missed-slot denominator. The collection loop
 integrates scheduling, calibration and finite-state checks, but these primitives
 and short browser tests are not acceptance evidence. Provenance, input
-collection, sustained windows and report qualification remain required.
+collection and report qualification remain required.
+
+Every collected run also has fixed 10-second summaries (30 for the full
+300-second sustained profile). Frames are assigned by callback entry; each
+incoming submission gap belongs to its arriving frame's window, so a stall
+crossing a boundary is counted exactly once. The final boundary/overshoot frame
+remains in the last window with its actual time exposed. Summaries retain
+nearest-rank CPU/GPU and submission-gap distributions, missing GPU sample counts,
+missed slots, executed-step/drop deltas, final debt and peak observed allocator
+usage. Contact-drop deltas remain exact decimal uint64 strings. Empty or
+unfinished windows expose missing coverage rather than zero-valued timing.
+This post-run analysis does not alter frame collection or evaluate acceptance;
+full report validation and input/device evidence remain necessary.
 
 ## Optional GPU timing
 
@@ -290,6 +305,36 @@ Deterministic fake-driver tests cover pool reuse/exhaustion, delayed and invalid
 results, disjoint events, short-counter wrap and cleanup. Browser collection
 tests exercise the real extension when exposed; headless GPU results remain
 correctness-only and do not establish actual-device performance.
+
+## Submitted GL calls
+
+`GlStats` observes seven core WebGL methods on the candidate's own context:
+buffer data/subdata and the array, indexed, instanced and range draw variants.
+It is installed before warm-up, retains the original functions/descriptors,
+forwards the original buffer argument arity and source identity, and restores
+the context on disposal. A context cannot have two observers. Fixed wrappers
+perform no GL status queries and allocate no argument arrays or typed-array
+views per call. Both WebGL candidates incur the same observation work per API
+call, included in measured draw and complete CPU time. The raylib pin and its
+batching implementation are unchanged.
+
+Collection records actual submitted draw calls and host buffer bytes requested
+through `bufferData`/`bufferSubData`. Numeric buffer allocation has no host
+payload; typed-array offsets/lengths use elements, DataView uses bytes, and zero
+length means the remaining view, following the [WebGL 2 buffer specification](https://registry.khronos.org/webgl/specs/latest/2.0/).
+Uniforms, textures, framebuffer writes, extension multi-draw and driver-internal
+traffic are outside this metric. The opaque study candidates use core draws
+and buffer uploads during drawing. Canvas internal GL work remains unavailable.
+Call counting does not assert that the driver accepted a command; separate
+correctness checks retain GL/console error checks.
+
+Warm-up totals are reset before measured draws. Each recorded frame and the
+diagnostic HUD use the observed counts, while the report retains their totals
+and explicit scope. Invalid byte accounting fails collection. Correctness
+captures compare the WebGL candidate's own counters with observed calls, and
+retain the existing pixel oracle while observing both GL candidates. Unit
+tests pin buffer overload forwarding, element/byte ranges, all draw variants,
+counter scopes, and exact descriptor restoration.
 
 The native and WASM C suite checks every physics tier with sleep off/on,
 compares every copied descriptor, verifies within-copy joint remapping, and

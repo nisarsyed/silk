@@ -41,9 +41,21 @@ try{
     assert.equal(result.initial.steps,0);assert.equal(result.initial.drops,'0');assert.equal(result.final.finiteState,true);
     assert.ok(result.elapsedSeconds>=.25);assert.ok(result.frames.count>=2);assert.equal(result.frames.pendingFrame,false);
     assert.equal(result.summary.completeFrames,result.frames.count);assert.equal(result.calibrationIntervals.length,240);
+    assert.equal(result.windows.length,1);assert.equal(result.windows[0].coverageReached,true);
+    assert.equal(result.windows[0].completeFrames,result.frames.count);assert.equal(result.windows[0].executedSteps,result.final.steps);
+    assert.equal(result.windows[0].contactDrops,result.final.drops);assert.equal(result.windows[0].endDebtSeconds,result.debtSeconds);
     const f=result.frames,n=f.numberNames.length,stepIndex=f.statNames.indexOf('completedSteps');
     assert.equal(result.gpu.pending,0);assert.equal(result.gpu.attempts,f.count);
     assert.equal(result.gpu.counts.reduce((a,b)=>a+b,0),f.count);
+    if(candidate==='canvas')assert.equal(result.glCalls,null);
+    else{
+      assert.equal(result.glCalls.valid,true);assert.equal(result.glCalls.sections,f.count);
+      let uploads=0,draws=0;
+      for(let row=0;row<f.count;++row){uploads+=f.numbers[row*n+15];draws+=f.numbers[row*n+21];
+        assert.equal(f.known[row]&(1<<15),1<<15);assert.equal(f.known[row]&(1<<21),1<<21);assert.ok(f.numbers[row*n+21]>0);}
+      assert.equal(result.glCalls.totalUploadBytes,uploads);assert.equal(result.glCalls.totalDrawCalls,draws);
+      if(candidate==='raylib')assert.ok(uploads>0);
+    }
     assert.equal(f.stats[stepIndex],0);assert.equal(f.stats[(f.count-1)*25+stepIndex],result.final.steps);
     for(let row=0;row<f.count;++row){
       assert.equal(f.finished[row],1);assert.ok(f.numbers[row*n+4]>=f.numbers[row*n+3]);
