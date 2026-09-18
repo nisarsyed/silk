@@ -36,4 +36,22 @@ for(let i=0;i<12000;++i){
   }
 }
 assert.ok(jittered.frameCount>=5999&&jittered.frameCount<=6001);
-console.log('Study clock: frozen calibration, high-refresh pacing, binary32 dt, 8-step cap, exposed drops, jitter and invalid clocks PASS');
+// A delayed first callback must not replay overdue submission slots. Exercise
+// queued timestamps followed by normal callbacks, including the short-run
+// storage bound which exposed this startup bug in real browser collection.
+for(const hz of [60,120,180,240])for(const lag of [0,5,8,10,41.7,42,100,999])for(const duration of [.25,1,5]){
+  const c=calibration(hz),clock=new StudyClock(c,dt),capacity=Math.ceil(duration*1000/c.targetPeriodMs)+2;
+  for(let i=0;i<2400;++i){
+    const raf=i*1000/hz,now=Math.max(lag,raf+1);
+    if(clock.tick(raf,now)){
+      assert.ok(clock.frameCount<=capacity,`startup overflow: ${hz} Hz / ${lag} ms / ${duration} s`);
+      assert.ok(Math.abs(clock.totalSteps*dt+clock.debtSeconds+clock.droppedSeconds-clock.elapsedSeconds)<1e-9);
+      if(clock.elapsedSeconds>=duration)break;
+    }
+  }
+  assert.ok(clock.elapsedSeconds>=duration);assert.equal(clock.droppedSeconds,0);
+}
+const delayed=new StudyClock(calibration(60),dt);
+assert.ok(delayed.tick(0,42));assert.equal(delayed.totalSteps,0);assert.equal(delayed.debtSeconds,0);
+assert.equal(delayed.tick(1000/60,43),false);assert.equal(delayed.tick(2000/60,44),false);
+console.log('Study clock: frozen calibration, high-refresh pacing, binary32 dt, 8-step cap, exposed drops, jitter, delayed startup and invalid clocks PASS');

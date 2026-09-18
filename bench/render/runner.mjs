@@ -132,6 +132,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       Math.ceil(100/calibration.targetPeriodMs)+2);
     setPhase('measurement');
     await frames((raf,now)=>{
+      if(recorder.count===recorder.capacity)throw new Error('Frame recording capacity exhausted');
       if(canvas.width!==width||canvas.height!==height)throw new Error('Drawing-buffer size changed');
       if(!clock.tick(raf,now))return false;
       if(measurementStart===null)measurementStart=now;
