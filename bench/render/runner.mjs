@@ -9,9 +9,10 @@ import {FrameRecorder,numberNames,requiredNumbers} from './recording.js';
 import {StudyHud} from './hud.js';
 import {GpuTimer} from './gpu.js';
 import {GlStats} from './gl_stats.js';
+import {provenanceJson} from './provenance.mjs';
 
 // Developer collection only. Reports deliberately cannot certify acceptance:
-// device conditions, source/artifact provenance, real input, GPU instrumentation
+// device conditions, real input, memory profiling
 // and the complete repeated protocol must be supplied by the study controller.
 // Only one run may own a canvas at a time, including asynchronous initialization.
 const active=new WeakSet();
@@ -186,13 +187,14 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
         width,height,cssWidth:layout==='mobile'?360:width,cssHeight:layout==='mobile'?640:height,
         renderDpr:layout==='mobile'?2:1,deviceDpr,viewportWidth,viewportHeight,worker:false},
       clock:{timeOrigin:performance.timeOrigin,unit:'milliseconds',source:'performance.now and requestAnimationFrame'},
-      browser:{userAgent:navigator.userAgent},setupMs,calibration,calibrationIntervals:Array.from(intervals.subarray(0,calibrationCount)),
+      browser:{userAgent:navigator.userAgent},provenance:JSON.parse(provenanceJson),
+      setupMs,calibration,calibrationIntervals:Array.from(intervals.subarray(0,calibrationCount)),
       warmup,rendererRecreatedAfterWarmup:initial?false:null,initial,final,moduleMemory:module?.memory,measurementStart,measurementEnd,
       elapsedSeconds:clock?.elapsedSeconds??0,debtSeconds:clock?.debtSeconds??0,droppedSeconds:clock?.droppedSeconds??0,
       summary:recorder?.summary(calibration.targetPeriodMs),frames:recorder?.report(world.frameCounters),
       windows:recorder?.windows(calibration.targetPeriodMs,duration),
       gpu:gpu?.report(),glCalls:glCalls?.report()??null,
-      missingEvidence:['provenance','device conditions','real input','memory profiling',
+      missingEvidence:['device conditions','real input','memory profiling',
         'full-quality companion runs','five-repeat protocol']};
   }finally{try{gpu?.dispose();glCalls?.dispose();closeWorld();module?.dispose();}finally{active.delete(canvas);}}
   return report;

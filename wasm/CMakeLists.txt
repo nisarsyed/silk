@@ -63,6 +63,12 @@ if(EMSCRIPTEN)
     configure_file(views.mjs "${CMAKE_BINARY_DIR}/render-physics/views.mjs" COPYONLY)
     configure_file(../bench/render/study.mjs "${CMAKE_BINARY_DIR}/render-physics/driver.mjs" COPYONLY)
     configure_file(../bench/render/study_owner.mjs "${CMAKE_BINARY_DIR}/render-physics/owner.mjs" COPYONLY)
+    add_custom_target(silk_wasm_study_metadata ALL
+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/bench/render/metadata.py"
+            --root "${PROJECT_SOURCE_DIR}" --build "${CMAKE_BINARY_DIR}"
+            --compiler "${CMAKE_C_COMPILER}" --mode "$<CONFIG>" --kind physics
+        DEPENDS silk_wasm_study
+        VERBATIM)
     foreach(SL_WASM_TARGET silk_wasm silk_wasm_bench silk_wasm_study)
         target_link_libraries(${SL_WASM_TARGET} PRIVATE silk silk_warnings)
         target_link_options(${SL_WASM_TARGET} PRIVATE

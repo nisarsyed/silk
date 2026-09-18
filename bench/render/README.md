@@ -14,11 +14,14 @@ Use the pinned Emscripten 6.0.9 environment and build the benchmark module first
 cmake --preset wasm-release
 cmake --build --preset wasm-release
 emcmake cmake -S . -B build/wasm-render -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DSL_BUILD_TESTS=OFF -DSL_INSTALL=OFF -DSL_RENDER_STUDY=ON
 cmake --build build/wasm-render
 npm --prefix wasm ci --ignore-scripts --no-audit --no-fund
 PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install chromium
 python3 bench/render/build.py
+python3 bench/render/test_metadata.py
+node bench/render/test_provenance.mjs
 node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
 node bench/render/test_overlay.mjs
@@ -169,6 +172,11 @@ memory budget; allocation failure remains a failed run. Scheduling starts with z
 timestep, caps catch-up at eight steps and records discarded time. The clock's
 planned steps must match the authoritative C count. Raw frame storage is bounded
 from duration and calibrated target cadence, with no growth or discarded prefix.
+If the first rAF timestamp is stale, its deadline advances on the calibrated
+grid to the target nearest callback entry. Simulation still starts at zero debt
+at that entry. This prevents queued startup timestamps from producing a burst
+of overdue submissions. A full frame buffer fails before executing another
+simulation step or attempting GPU timing; all existing limits remain unchanged.
 
 Base and diagnostic frames record CPU stage timings, submission times, work,
 drops and debt; diagnostic HUD updates remain at 4 Hz. Unknown GPU metrics are
@@ -181,7 +189,7 @@ the contract's render DPR. Serialize uint64s using the study module's
 
 This is a collection primitive, not the complete study controller. It does not
 yet implement render-only runs, real-input trials, optional 120 Hz measurements,
-full provenance, device-condition recording,
+device-condition recording,
 GC/memory profiling, repeated-run ordering or qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
 
@@ -227,9 +235,13 @@ raylib renderer; preparation allocates nothing and cannot mutate physics.
 The shared HUD component uses 4 Hz deadlines and skips missed updates without
 catch-up bursts. It displays actual body/constraint/work counters, the fixed
 WASM budget, allocator usage, known world/output payloads and available GPU
-metrics. Text wraps within the mobile width. The renderer measurement loop
-still needs to attach and time it. Frozen render-only diagnostic replication
+metrics. Text wraps within the mobile width. Collection includes the HUD update
+cost. Frozen render-only diagnostic replication
 also remains unfinished; the overlay builder explicitly rejects frozen scenes.
+For that remaining implementation, the clarified contact rule is to retain
+each frozen contact involving any displayed dynamic body, including contacts
+against omitted static shapes or trimmed bodies. Shared contacts appear once
+per tile. This rule is common to all candidates and does not change physics.
 
 ## Frame recording
 
@@ -344,6 +356,32 @@ must allocate and refresh its bounded snapshot. A 10,001-step run demonstrates
 that this independent owner crosses the original benchmark limit, then rejects
 the next call without changing state or its fixed storage.
 
+## Build provenance
+
+The CMake study targets generate `build.json` after building their dependencies.
+They record full Git revision and dirty state, a SHA-256 inventory of current
+first-party sources and the frozen contract, actual compiler/version and SDK
+commit, build mode, selected compilation commands and the configured link
+command. Module/glue/wrapper hashes identify the built inputs. Raylib records
+the requested 6.0 tag and hashes of its actual source tree, including local
+FetchContent overrides. These generated records stay in ignored build output.
+
+Assembly rejects changed artifacts, stale source inventories, mixed build modes
+or mismatched compilers/SDKs. Rebuild both CMake trees after editing study
+sources, then rerun `build.py`. The resulting `provenance.json` adds the assembly
+revision/dirty state, TypeScript version, contract revision/last commit/hash,
+both module build records and hashes/sizes of delivered files. The companion
+benchmark retains its separate build record. Hashes exclude the two generated
+provenance envelopes themselves to avoid recursive checksums.
+
+Every collected or failed run includes its own copy of this record, parsed
+after collection. This is assembly-time provenance, not a fresh browser hash
+of served resources, a hermetic-build attestation or proof that the contract
+has merged. It does not collect a personal device inventory. Full startup,
+device conditions and profiler evidence remain separate requirements. Tests
+reject changed binaries, stale source hashes and incomplete inventories, and
+cover untracked edits, deletions and ignored report output.
+
 ## Correctness scope
 
 The geometry test checks C snapshot row order, changing transforms, all nine
@@ -380,8 +418,8 @@ recovery for the same scene/tier/sleep matrix, plus a settled sleeping world.
 
 Still required for #95: render-only diagnostic coverage and collection; complete
 sustained protocol reporting; matched render-only/end-to-end timing and input
-collection; GPU/upload/draw instrumentation; startup, memory and allocation
-records; context-loss/lifecycle recovery; source/toolchain/artifact provenance; report validators; the complete
+collection; startup, memory and allocation
+records; context-loss/lifecycle recovery; report validators; the complete
 five-repeat desktop and physical Android protocol; and an evidence-backed
 renderer decision. These prototypes and CI-style screenshots cannot satisfy
 those acceptance gates or authorize a production renderer choice.
