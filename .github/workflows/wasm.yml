@@ -78,6 +78,8 @@ jobs:
           cmake --build "build/wasm-render-$mode" --parallel 2
           python3 bench/render/build.py --benchmark "build/wasm-$mode/benchmark" \
             --raylib "build/wasm-render-$mode/render-study" --output "build/render-study-$mode"
+          python3 bench/render/test_metadata.py
+          node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_recording.mjs "build/render-study-$mode"
@@ -104,6 +106,9 @@ jobs:
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_bench.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_study.dir/link.txt
             build/wasm-${{ matrix.mode }}/benchmark/build.json
+            build/wasm-${{ matrix.mode }}/render-physics/build.json
+            build/wasm-render-${{ matrix.mode }}/render-study/build.json
+            build/render-study-${{ matrix.mode }}/provenance.json
             build/wasm-${{ matrix.mode }}/benchmark-reports/
             build/wasm-${{ matrix.mode }}/Testing/Temporary/
           retention-days: 14

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {chromium} from '../../wasm/node_modules/@playwright/test/index.mjs';
 const build=path.resolve(process.argv[2]??'build/render-study');
 const output=path.resolve(process.argv[3]??'build/reports/render-runner');
+const provenance=JSON.parse(await fs.readFile(path.join(build,'provenance.json'),'utf8'));
 const channel=process.env.SL_RENDER_BROWSER,headed=process.env.SL_RENDER_HEADED==='1';
 if(channel!==undefined&&channel!=='chrome')throw new Error('SL_RENDER_BROWSER must be chrome or unset');
 if(process.env.SL_RENDER_HEADED!==undefined&&!['0','1'].includes(process.env.SL_RENDER_HEADED))throw new Error('SL_RENDER_HEADED must be 0 or 1');
@@ -38,6 +39,7 @@ try{
     assert.equal(result.status,'collected',JSON.stringify(result.failure));assert.equal(result.kind,'correctness-only');
     assert.equal(result.acceptanceEligible,false);assert.equal(result.warmup.callbacks,120);assert.equal(result.warmup.world.steps,120);
     assert.equal(result.rendererRecreatedAfterWarmup,false);
+    assert.deepEqual(result.provenance,provenance);
     assert.equal(result.initial.steps,0);assert.equal(result.initial.drops,'0');assert.equal(result.final.finiteState,true);
     assert.ok(result.elapsedSeconds>=.25);assert.ok(result.frames.count>=2);assert.equal(result.frames.pendingFrame,false);
     assert.equal(result.summary.completeFrames,result.frames.count);assert.equal(result.calibrationIntervals.length,240);
@@ -88,6 +90,7 @@ try{
     },reason);
     await fs.writeFile(path.join(output,`interrupted-${reason}.json`),JSON.stringify(result)+'\n');
     assert.equal(result.report.status,'failed');assert.equal(result.report.failure.phase,'measurement');
+    assert.deepEqual(result.report.provenance,provenance);assert.deepEqual(result.replacement.provenance,provenance);
     assert.match(result.report.failure.reason,reason==='abort'?/aborted/:reason==='context'?/context lost/:/hidden/);
     assert.ok(result.report.frames.count>0);assert.ok(result.report.final);
     assert.equal(result.replacement.status,'failed');assert.match(result.replacement.failure.reason,/aborted/);

@@ -57,3 +57,10 @@ add_custom_command(TARGET silk_render_raylib POST_BUILD
     VERBATIM)
 
 configure_file("${raylib_SOURCE_DIR}/LICENSE" "${CMAKE_BINARY_DIR}/render-study/licenses/raylib.txt" COPYONLY)
+add_custom_target(silk_render_raylib_metadata ALL
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/bench/render/metadata.py"
+        --root "${PROJECT_SOURCE_DIR}" --build "${CMAKE_BINARY_DIR}"
+        --compiler "${CMAKE_C_COMPILER}" --mode "$<CONFIG>" --kind raylib
+        --raylib-source "${raylib_SOURCE_DIR}"
+    DEPENDS silk_render_raylib
+    VERBATIM)
