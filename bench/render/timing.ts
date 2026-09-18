@@ -40,7 +40,12 @@ export class StudyClock {
     // high refresh it still selects only one callback per integer target slot.
     const horizon=rafMs+this.refreshPeriodMs*.5;
     if(horizon<deadline){this.previousRaf=rafMs;this.previousNow=nowMs;return false;}
-    const skipped=Math.floor((horizon-deadline)/this.targetPeriodMs);
+    // A first callback can arrive several refreshes after its rAF timestamp
+    // (for example, driver initialization finished late). Start on the target
+    // nearest its actual entry, not on that stale timestamp's overdue slot.
+    // Keep the original calibrated phase; no warm-up time enters simulation.
+    const skipped=first?Math.max(0,Math.round((nowMs-rafMs)/this.targetPeriodMs)):
+      Math.floor((horizon-deadline)/this.targetPeriodMs);
     const target=deadline+skipped*this.targetPeriodMs,next=target+this.targetPeriodMs;
     const origin=first?nowMs:this.origin,previous=first?nowMs:this.renderedNow;
     const accumulated=this.debtSeconds+(nowMs-previous)/1000;
