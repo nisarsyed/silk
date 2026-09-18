@@ -88,6 +88,50 @@ export class FrameRecorder {
       missedTargetSlots:missing,submittedIntervals:gaps.length,
       missedTargetFraction:gaps.length+missing?missing/(gaps.length+missing):null};
   }
+  /** Fixed ten-second windows, allocated only after collection. A frame and
+   * its incoming submission gap belong to the window containing its callback
+   * entry. Thus a boundary-crossing stall is retained exactly once. The final
+   * boundary/overshoot frame stays in the final window. Empty/unfinished
+   * windows never fabricate zero-valued distributions or complete coverage.
+   */
+  windows(targetPeriodMs:number,durationSeconds:number){
+    if(!Number.isFinite(targetPeriodMs)||targetPeriodMs<=0||!Number.isFinite(durationSeconds)||
+      durationSeconds<=0||durationSeconds>300)throw new RangeError('Invalid window configuration');
+    const count=Math.ceil(durationSeconds/10),origin=this.rows?this.numbers[1]:0;
+    const windows=Array.from({length:count},()=>({cpu:[] as number[],gaps:[] as number[],gpu:[] as number[],
+      missing:0,firstRow:null as number|null,lastRow:null as number|null,pending:false,
+      steps:0,dropped:0,contacts:0n,endDebt:null as number|null,allocatorMax:null as number|null}));
+    let previousSubmission:number|undefined,previousSteps=0,previousDropped=0,previousContacts=0n,lastElapsed=-1;
+    for(let row=0;row<this.rows;++row){
+      const at=row*numberNames.length,elapsed=(this.numbers[at+1]-origin)/1000;
+      const w=windows[Math.min(count-1,Math.floor(elapsed/10))];
+      if(!w||!Number.isFinite(elapsed)||elapsed<lastElapsed)throw new Error('Invalid window clock');
+      if(!this.finished[row]){w.pending=true;continue;}
+      const submission=this.numbers[at+3],steps=this.stats[row*25+24],dropped=this.numbers[at+13],contacts=this.work[row*26+25];
+      if(steps<previousSteps||dropped<previousDropped||contacts<previousContacts)throw new Error('Cumulative window counters moved backwards');
+      if(w.firstRow===null)w.firstRow=row;w.lastRow=row;lastElapsed=elapsed;
+      w.cpu.push(this.numbers[at+4]-this.numbers[at+1]);
+      if(this.known[row]&(1<<14))w.gpu.push(this.numbers[at+14]);
+      if(previousSubmission!==undefined){
+        const gap=submission-previousSubmission,missing=Math.max(0,Math.round(gap/targetPeriodMs)-1);
+        if(!Number.isSafeInteger(missing)||!Number.isSafeInteger(w.missing+missing))throw new RangeError('Window cadence exceeds safe integer range');
+        w.gaps.push(gap);w.missing+=missing;
+      }
+      w.steps+=steps-previousSteps;w.dropped+=dropped-previousDropped;w.contacts+=contacts-previousContacts;
+      w.endDebt=this.numbers[at+12];w.allocatorMax=Math.max(w.allocatorMax??0,this.stats[row*25+23]);
+      previousSubmission=submission;previousSteps=steps;previousDropped=dropped;previousContacts=contacts;
+    }
+    return windows.map((w,index)=>({index,startSeconds:10*index,endSeconds:Math.min(durationSeconds,10*(index+1)),
+      coverageReached:w.cpu.length>0&&!w.pending&&lastElapsed>=Math.min(durationSeconds,10*(index+1)),pendingFrame:w.pending,
+      firstRow:w.firstRow,lastRow:w.lastRow,completeFrames:w.cpu.length,
+      observedFirstSeconds:w.firstRow===null?null:(this.numbers[w.firstRow*numberNames.length+1]-origin)/1000,
+      observedLastSeconds:w.lastRow===null?null:(this.numbers[w.lastRow*numberNames.length+1]-origin)/1000,
+      cpuMs:distribution(w.cpu),gpuMs:distribution(w.gpu),gpuUnavailableFrames:w.cpu.length-w.gpu.length,
+      submissionGapMs:distribution(w.gaps),missedTargetSlots:w.missing,submittedIntervals:w.gaps.length,
+      missedTargetFraction:w.gaps.length+w.missing?w.missing/(w.gaps.length+w.missing):null,
+      executedSteps:w.steps,droppedSeconds:w.dropped,contactDrops:String(w.contacts),endDebtSeconds:w.endDebt,
+      allocatorBytesMax:w.allocatorMax}));
+  }
   report(counters:FrameCounters){
     if(counters.statNames.length!==25||counters.workNames.length!==13)throw new Error('Invalid counter schema');
     // Explicit raw row-major schema. uint64 values remain decimal strings.

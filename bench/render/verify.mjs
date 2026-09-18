@@ -6,14 +6,22 @@ import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
 import {createRaylibCandidate,createRaylibStudyModule} from './raylib.js';
 import {StudyHud} from './hud.js';
+import {GlStats} from './gl_stats.js';
 
 // Readbacks are correctness-only, outside every measured run. A single callback
 // draws and reads before the non-preserved WebGL buffer can be discarded.
 function capture(canvas, candidate) {
   return new Promise((resolve,reject)=>requestAnimationFrame(()=>{
+    let observer;
     try {
-      candidate.draw();
       const gl=canvas.getContext('webgl2');
+      if(gl)observer=new GlStats(gl);
+      observer?.begin();candidate.draw();observer?.end();
+      if(observer){
+        if(!observer.valid||observer.drawCalls<1)throw new Error('GL draw observation failed');
+        if(candidate.uploadBytes!==null&&candidate.uploadBytes!==observer.uploadBytes)throw new Error('Reported GL upload bytes differ from observed calls');
+        if(candidate.drawCalls!==null&&candidate.drawCalls!==observer.drawCalls)throw new Error('Reported GL draws differ from observed calls');
+      }
       if (!gl) resolve(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data);
       else {
         const bytes=new Uint8Array(canvas.width*canvas.height*4), flipped=new Uint8Array(bytes.length);
@@ -23,7 +31,7 @@ function capture(canvas, candidate) {
         for (let y=0; y<canvas.height; ++y) flipped.set(bytes.subarray(y*stride,(y+1)*stride),(canvas.height-1-y)*stride);
         resolve(flipped);
       }
-    } catch(error) { reject(error); }
+    } catch(error) { reject(error); } finally {observer?.dispose();}
   }));
 }
 window.verifyStudyHud=async()=>{

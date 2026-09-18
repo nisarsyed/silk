@@ -8,6 +8,7 @@ import {StudyClock,calibrate60} from './timing.js';
 import {FrameRecorder,numberNames,requiredNumbers} from './recording.js';
 import {StudyHud} from './hud.js';
 import {GpuTimer} from './gpu.js';
+import {GlStats} from './gl_stats.js';
 
 // Developer collection only. Reports deliberately cannot certify acceptance:
 // device conditions, source/artifact provenance, real input, GPU instrumentation
@@ -32,7 +33,8 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
   const duration=correctnessSeconds??(sustained?300:60),width=layout==='mobile'?720:1280,height=layout==='mobile'?1280:720;
   const deviceDpr=devicePixelRatio,viewportWidth=innerWidth,viewportHeight=innerHeight;
   const intervals=new Float64Array(240),values=new Float64Array(numberNames.length);
-  let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,gpu,phase='initialization',failure=null;
+  let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,gpu,glCalls,phase='initialization',failure=null;
+  const rendererMetrics={gpuBytes:null,uploadBytes:null,drawCalls:null};
   let frameId=0,rejectFrames,initial,final,warmup,setupMs=null,measurementStart=null,measurementEnd=null,calibrationCount=0;
   const began=performance.now();
   const setPhase=value=>{phase=value;onPhase?.(value);};
@@ -83,7 +85,15 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene,overlay):new WebglCandidate(canvas,drawScene,overlay);
     }
     if(canvas.width!==width||canvas.height!==height)throw new Error('Renderer changed drawing-buffer size');
+    if(candidate!=='canvas')glCalls=new GlStats(canvas.getContext('webgl2'));
     resetHud();
+  };
+  const draw=()=>{
+    glCalls?.begin();try{renderer.draw();}finally{glCalls?.end();}
+    if(glCalls&&!glCalls.valid)throw new Error('GL call metrics are invalid');
+    rendererMetrics.gpuBytes=renderer.gpuBytes;
+    rendererMetrics.uploadBytes=glCalls?.uploadBytes??renderer.uploadBytes;
+    rendererMetrics.drawCalls=glCalls?.drawCalls??renderer.drawCalls;
   };
   const step=count=>{for(let i=0;i<count;++i)if(!world.step())throw new Error('Study step failed (numeric state or step bound)');};
   const prepare=()=>{if(drawScene){if(!world.refreshSnapshot(diagnostic))throw new Error('Snapshot failed');
@@ -103,9 +113,9 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     const warmStart=performance.now();
     await frames((raf,now)=>{
       if(warmClock&&!warmClock.tick(raf,now))return false;
-      step(warmClock?warmClock.steps:1);prepare();renderer.draw();
+      step(warmClock?warmClock.steps:1);prepare();draw();
       if(!world.refreshFrameCounters())throw new Error('Warm-up counters failed');
-      hud?.update(now,world.frameCounters,renderer);++callbacks;
+      hud?.update(now,world.frameCounters,rendererMetrics);++callbacks;
       return warmClock?warmClock.elapsedSeconds>=60:callbacks===120;
     });
     warmup={callbacks,elapsedMs:performance.now()-warmStart,world:world.report(),
@@ -115,7 +125,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     setPhase('rebuild');
     world=world.rebuild();
     if(!world)throw new Error('Fixed allocation failed while rebuilding initial state');
-    prepare();resetHud();initial=world.report();
+    prepare();resetHud();initial=world.report();glCalls?.resetTotals();
     clock=new StudyClock(calibration,world.configuration.timestep);
     recorder=new FrameRecorder(Math.ceil(duration*1000/calibration.targetPeriodMs)+2);
     gpu=new GpuTimer(candidate==='canvas'?null:canvas.getContext('webgl2'),recorder.capacity,
@@ -134,15 +144,15 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
         t=performance.now();drawScene.copyTransforms(world.snapshot);overlay?.refresh(world.snapshot,world.diagnostics);values[7]=performance.now()-t;
       }
       t=performance.now();const timed=gpu.begin(recorder.count,t);
-      try{renderer.draw();}finally{if(timed)gpu.end();}
+      try{draw();}finally{if(timed)gpu.end();}
       values[3]=performance.now();values[8]=values[3]-t;
       t=performance.now();if(!world.refreshFrameCounters())throw new Error('Frame counters failed');values[9]=performance.now()-t;
-      t=performance.now();hud?.update(now,world.frameCounters,renderer);values[10]=performance.now()-t;
+      t=performance.now();hud?.update(now,world.frameCounters,rendererMetrics);values[10]=performance.now()-t;
       values[12]=clock.debtSeconds;values[13]=clock.droppedSeconds;
       let known=requiredNumbers|(1<<23);
       // The optional field names match renderer counters. Missing fields remain
       // unavailable; GPU duration resolves to this row on a later callback.
-      for(let i=15;i<=22;++i){const value=renderer[numberNames[i]];
+      for(let i=15;i<=22;++i){const value=(i===15||i===21)?rendererMetrics[numberNames[i]]:renderer[numberNames[i]];
         if(value!==undefined&&value!==null){values[i]=value;known|=1<<i;}}
       values[4]=performance.now();recorder.append(values,known,world.frameCounters);recorder.finish(performance.now());
       measurementEnd=recorder.numbers[(recorder.count-1)*numberNames.length+4];
@@ -179,9 +189,10 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       warmup,rendererRecreatedAfterWarmup:initial?false:null,initial,final,moduleMemory:module?.memory,measurementStart,measurementEnd,
       elapsedSeconds:clock?.elapsedSeconds??0,debtSeconds:clock?.debtSeconds??0,droppedSeconds:clock?.droppedSeconds??0,
       summary:recorder?.summary(calibration.targetPeriodMs),frames:recorder?.report(world.frameCounters),
-      gpu:gpu?.report(),
-      missingEvidence:['provenance','device conditions','real input','GPU upload/draw instrumentation','memory profiling',
-        'sustained windows','full-quality companion runs','five-repeat protocol']};
-  }finally{try{gpu?.dispose();closeWorld();module?.dispose();}finally{active.delete(canvas);}}
+      windows:recorder?.windows(calibration.targetPeriodMs,duration),
+      gpu:gpu?.report(),glCalls:glCalls?.report()??null,
+      missingEvidence:['provenance','device conditions','real input','memory profiling',
+        'full-quality companion runs','five-repeat protocol']};
+  }finally{try{gpu?.dispose();glCalls?.dispose();closeWorld();module?.dispose();}finally{active.delete(canvas);}}
   return report;
 }
