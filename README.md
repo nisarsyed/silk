@@ -82,6 +82,7 @@ Available CMake options:
 | `SL_BUILD_EXAMPLE` | `OFF` | Build the public headless example |
 | `SL_INSTALL` | top-level only | Install the static library, headers and CMake package |
 | `SL_BUILD_BENCH` | `OFF` | Build `sl_bench`, separate from CTest |
+| `SL_BUILD_WASM_ADAPTER` | `OFF`; enabled by WASM presets | Build the separate adapter and its native tests; emit JS/WASM when cross-compiling |
 
 ## Interactive sandbox
 
