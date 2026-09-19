@@ -5,7 +5,7 @@ commitments. Engineering principles and contribution policy live in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Status:** Phase 4 · 2D engine maturity complete (0.4.0).
-Phase 5 · WebAssembly is next.
+Phase 5 · WebAssembly is in planning and contract definition.
 
 ## Baseline
 
@@ -106,6 +106,37 @@ serialization, and WASM implementation remain outside Phase 4's committed
 scope. SIMD investigation and threading feasibility are in scope under the
 decision gates above; neither is a required production backend for 0.4.0.
 
+## Milestone 5 — WebAssembly
+
+Phase 5 targets 0.5.0: the existing rigid-body engine as a reusable
+JavaScript/TypeScript package, a performant browser sandbox on GitHub Pages,
+and an installable package archive. The
+[Phase 5 milestone](https://github.com/nisarsyed/silk/milestone/3) and
+[execution tracker #88](https://github.com/nisarsyed/silk/issues/88) define
+dependencies, acceptance gates, and short gh-stack chains. Nisar handles
+merging; completion requires delivery on `main`.
+
+- [ ] Contract: define browser support, workloads, visual settings, performance gates, and API ownership; keep device choices in GitHub tracking ([#89](https://github.com/nisarsyed/silk/issues/89); [browser contract](docs/browser-contract.md))
+- [ ] Foundation: pinned Emscripten wasm32 debug/release builds and full C tests; reusable native/WASM benchmark fixtures and reports ([#90](https://github.com/nisarsyed/silk/issues/90), [#94](https://github.com/nisarsyed/silk/issues/94))
+- [ ] Bindings: world/body lifecycle, shapes, forces, joints, queries, diagnostics, bounded bulk snapshots, and independently tested typed package consumption ([#91](https://github.com/nisarsyed/silk/issues/91), [#92](https://github.com/nisarsyed/silk/issues/92), [#93](https://github.com/nisarsyed/silk/issues/93))
+- [ ] Browser: compare Canvas 2D, batched WebGL 2, and raylib web before selecting a renderer; evaluate worker placement; deliver desktop/touch interaction and diagnostics ([#95](https://github.com/nisarsyed/silk/issues/95), [#96](https://github.com/nisarsyed/silk/issues/96), [#97](https://github.com/nisarsyed/silk/issues/97))
+- [ ] Verification and optimization: browser/package CI, measured WASM/browser improvements or rejection decisions, and sustained real-device validation ([#98](https://github.com/nisarsyed/silk/issues/98), [#99](https://github.com/nisarsyed/silk/issues/99), [#101](https://github.com/nisarsyed/silk/issues/101))
+- [ ] Distribution and wrap: tested GitHub Pages deployment, downloadable package artifacts, version 0.5.0, documentation, and final release verification ([#100](https://github.com/nisarsyed/silk/issues/100), [#102](https://github.com/nisarsyed/silk/issues/102))
+
+Required default demos target smooth 60 Hz with unchanged fixed-step physics
+on desktop and the Android reference device. Report sustainable workload
+tiers and 120 Hz rendering headroom separately. Renderer and worker choices
+are measured decisions; no browser performance is claimed before evidence.
+Physical iOS validation is deferred until hardware is available; WebKit CI
+does not establish real-device iOS support. Device inventories and installed
+versions stay in GitHub tracking and test artifacts.
+
+The portable scalar core remains supported. Compiler-generated WASM SIMD is
+an evidence-gated investigation; worker placement does not add a parallel
+solver. New simulation modules, CCD, sensors/events, advanced joints,
+serialization, GPU/WebGPU physics, and npm registry publishing remain outside
+this phase. The future prototype opportunities below are not Phase 5 promises.
+
 ## Phase Progression
 
 Condensed from the technical specification. Near-term phases stay itemized; later ones remain coarse until they become near-term.
@@ -116,7 +147,7 @@ Condensed from the technical specification. Near-term phases stay itemized; late
 | 2 | Basic simulation *(complete)* | Particle system; forces & integration; 2D shapes & geometry; basic simulation loop |
 | 3 | 2D rigid-body physics *(complete)* | Collision detection & resolution; friction & restitution; broad-phase & spatial acceleration; constraints & joints |
 | 4 | 2D engine maturity *(complete)* | Correctness & determinism; public API cleanup & queries; islands/sleeping; diagnostics; benchmarks followed by a measured optimization round |
-| 5 | WebAssembly *(next)* | WASM build target; C ↔ JavaScript API boundary; browser demos & debug visualization; measure and optimize the actual WASM/browser build |
+| 5 | WebAssembly *(planning)* | Milestone 5 above: typed WASM package, measured browser rendering/runtime, real desktop/mobile validation, and GitHub Pages distribution |
 | 6 | GPU foundation | Select a concrete particle-based simulation workload; build and optimize GPU memory/compute infrastructure for its demonstrated requirements |
 | 7 | WebGPU | WebGPU execution and browser demonstrations of the selected workload; optimize suitable GPU workloads; broad-phase/constraint experiments stay outside the portable core |
 | 8 | 3D foundation | 3D math & quaternions; rigid bodies, orientation & angular dynamics; shapes, collision & CCD; joints; spatial acceleration |
