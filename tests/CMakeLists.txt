@@ -36,3 +36,7 @@ add_test(NAME all COMMAND sl_tests)
 add_library(sl_consumer OBJECT test_consumer.c)
 target_link_libraries(sl_consumer PRIVATE silk silk_warnings)
 target_sources(sl_tests PRIVATE $<TARGET_OBJECTS:sl_consumer>)
+
+if(EMSCRIPTEN)
+    sl_wasm_executable(sl_tests)
+endif()
