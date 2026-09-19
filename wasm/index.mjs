@@ -8,10 +8,15 @@ const handles = new WeakMap();
 const shapes = new WeakMap();
 const steppers = new WeakMap();
 const worldKey = Symbol('world');
-const bodyTypes = Object.freeze({ dynamic: 0, kinematic: 1, static: 2 });
+export const bodyTypes = Object.freeze({ dynamic: 0, kinematic: 1, static: 2 });
 export const queryMasks = Object.freeze({ dynamic: 1, kinematic: 2, static: 4, all: 7 });
+export const shapeKinds = Object.freeze({ none: 0, circle: 1, polygon: 2 });
+export const jointKinds = Object.freeze({ distance: 0, revolute: 1 });
+export const constants = Object.freeze({ pi: Math.fround(Math.PI), epsilon: Math.fround(1e-6),
+  vec2LengthEpsilonSq: Math.fround(Math.fround(1e-6) ** 2), linearSlop: Math.fround(0.005),
+  speculativeDistance: Math.fround(4 * Math.fround(0.005)), aabbMargin: Math.fround(0.1) });
 export const limits = Object.freeze({ bodies: 65536, contacts: 262144, joints: 65536,
-  polygonVertices: 8, substeps: 8, position: 8192, shapeExtent: 1024 });
+  polygonVertices: 8, substeps: 8, steps: 8, position: 8192, shapeExtent: 1024, rayCoordinate: 9216, manifoldPoints: 2, rotationPerStep: Math.fround(0.25 * constants.pi) });
 
 function record(value, name) {
   if (value === null || typeof value !== 'object' || Array.isArray(value) ||
@@ -84,6 +89,8 @@ const configFloats = ['linearDrag', 'angularDrag', 'linearSpeedMax', 'contactHer
   'contactDampingRatio', 'contactPushVelocityMax', 'restitutionThreshold',
   'jointHertz', 'jointDampingRatio', 'sleepSpeedMax', 'sleepAngularSpeedMax', 'sleepTimeMin'];
 const configDefaults = [0, 0, 400, 30, 10, 3, 1, 60, 2, 0.02, 0.01, 0.5];
+export const defaults = Object.freeze({ gravity: Object.freeze(vector(0, 0)), substepCount: 4, sleepEnabled: false,
+  ...Object.fromEntries(configFloats.map((name, i) => [name, Math.fround(configDefaults[i])])) });
 function configParse(input) {
   fields(input, ['bodyCapacity', 'contactCapacity', 'jointCapacity', 'substepCount',
     'sleepEnabled', 'gravity', ...configFloats], 'configuration');
@@ -95,7 +102,7 @@ function configParse(input) {
     boolean(defaultValue(input.sleepEnabled, false), 'sleepEnabled') ? 1 : 0];
   const floats = [...gravity, ...configFloats.map(name => f32(defaultValue(input[name], 0), name))];
   const resolved = { bodyCapacity: words[0], contactCapacity: words[1] || 4*words[0],
-    jointCapacity: words[2], substepCount: words[3] || 4, sleepEnabled: words[4] === 1,
+    jointCapacity: words[2], substepCount: words[3] || defaults.substepCount, sleepEnabled: words[4] === 1,
     gravity: Object.freeze(vector(...gravity)) };
   configFloats.forEach((name, i) => { resolved[name] = floats[i+2] || Math.fround(configDefaults[i]); });
   return { words, floats, resolved: Object.freeze(resolved) };
