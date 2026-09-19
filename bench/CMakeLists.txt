@@ -19,7 +19,7 @@ if(SL_BENCH_REVISION STREQUAL "")
         endif()
     endif()
 endif()
-add_executable(sl_bench main.c quality.c)
+add_executable(sl_bench main.c fixtures.c quality.c)
 target_link_libraries(sl_bench PRIVATE silk silk_warnings)
 
 # Preserve exactly the build and host metadata CMake used. file(GENERATE)

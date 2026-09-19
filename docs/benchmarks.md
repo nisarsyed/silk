@@ -24,10 +24,13 @@ or one fixture below.
 The runner preserves raw stdout/stderr when validation fails. Use
 `python3 bench/report.py --help` for validation and comparison subcommands.
 
+The [WASM harness](wasm-benchmarks.md) runs these same C fixtures in Node and
+browsers, retaining this native schema inside its measurement envelope.
+
 ## Choose a fixture
 
 Every fixture uses dt = binary32(1/60), four substeps and zero
-drag. [Fixture builders](../bench/main.c) define geometry, seeds, materials and
+drag. [Fixture builders](../bench/fixtures.c) define geometry, seeds, materials and
 capacities; each report's `settings` records the resolved workload.
 
 | Scene | Workload |

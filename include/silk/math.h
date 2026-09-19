@@ -84,9 +84,13 @@ static inline sl_vec2 sl_vec2_neg(sl_vec2 v)
     return sl_vec2_make(-v.x, -v.y);
 }
 
+/* Round the second product to float, then fuse the first product and sum.
+ * Explicit fmaf retains cancellation precision on targets without implicit
+ * contraction, including scalar WASM. It may use a software implementation;
+ * do not replace it with an unfused multiply/add or require fast-math. */
 static inline float sl_vec2_dot(sl_vec2 a, sl_vec2 b)
 {
-    return a.x * b.x + a.y * b.y;
+    return fmaf(a.x, b.x, a.y * b.y);
 }
 
 /* Scalar (z-component) of the 3D cross product a x b.

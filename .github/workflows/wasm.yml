@@ -19,6 +19,9 @@ jobs:
         mode: [debug, release]
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
       - name: Install pinned SDK
         shell: bash
         run: |
@@ -46,6 +49,23 @@ jobs:
           npm ci --prefix wasm --ignore-scripts --no-audit --no-fund
           PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium
           node wasm/test_package.mjs build/wasm-${{ matrix.mode }}/package | tee build/wasm-${{ matrix.mode }}/package-consumers.txt
+      - name: Verify benchmark phases and Node/browser smoke replay
+        shell: bash
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          node bench/wasm/test_driver.mjs build/wasm-${{ matrix.mode }}/benchmark/driver.mjs
+          for sleep in off on; do
+            for host in node browser; do
+              browser_args=()
+              if [[ "$host" == browser ]]; then browser_args=(--browser); fi
+              output="build/wasm-${{ matrix.mode }}/benchmark-reports/$host-$sleep"
+              node bench/wasm/cli.mjs --build build/wasm-${{ matrix.mode }}/benchmark \
+                --output "$output" --smoke --repeat 2 --sleep "$sleep" "${browser_args[@]}"
+              python3 bench/wasm/validate.py validate "$output/run-1.json"
+              python3 bench/wasm/validate.py compare "$output/run-1.json" "$output/run-2.json" > "$output/replay.json"
+            done
+          done
+          python3 bench/wasm/test_report.py --report build/wasm-${{ matrix.mode }}/benchmark-reports/node-off/run-1.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -56,6 +76,9 @@ jobs:
             build/wasm-${{ matrix.mode }}/compile_commands.json
             build/wasm-${{ matrix.mode }}/tests/CMakeFiles/sl_tests.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm.dir/link.txt
+            build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_bench.dir/link.txt
+            build/wasm-${{ matrix.mode }}/benchmark/build.json
+            build/wasm-${{ matrix.mode }}/benchmark-reports/
             build/wasm-${{ matrix.mode }}/Testing/Temporary/
           retention-days: 14
           if-no-files-found: warn
