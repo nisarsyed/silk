@@ -68,6 +68,10 @@ ctest --preset windows
 Executables are written to `build/<preset>/bin`. The test binary can also be
 run directly as `./build/debug/bin/sl_tests`.
 
+The opt-in `wasm-debug` and `wasm-release` presets build and run the C suite
+under Node with Emscripten 6.0.9. See [WebAssembly setup](docs/wasm.md) for the
+pinned SDK and commands. Native builds do not require this toolchain.
+
 Available CMake options:
 
 | Option | Default | Purpose |
