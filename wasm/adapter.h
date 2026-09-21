@@ -24,6 +24,10 @@ bool sl_wasm_world_init(sl_wasm_context *context);
 void sl_wasm_world_reset(sl_wasm_context *context);
 void sl_wasm_world_dispose(sl_wasm_context *context);
 bool sl_wasm_world_step(sl_wasm_context *context, float dt);
+bool sl_wasm_timestep_valid(const sl_wasm_context *context, float dt);
+bool sl_wasm_world_advance(sl_wasm_context *context, float dt, float remainder,
+                           float frame_time);
+double sl_wasm_dropped_time(const sl_wasm_context *context);
 uint32_t sl_wasm_body_count(const sl_wasm_context *context);
 bool sl_wasm_body_valid(const sl_wasm_context *context, uint32_t index,
                         uint32_t generation);
@@ -70,5 +74,39 @@ void sl_wasm_shape_mass(sl_wasm_context *context);
 bool sl_wasm_shape_aabb(sl_wasm_context *context);
 bool sl_wasm_shape_contains(sl_wasm_context *context);
 bool sl_wasm_shape_ray(sl_wasm_context *context);
+
+/* Bulk columns are adapter-owned, fixed at world initialization. */
+size_t sl_wasm_adapter_bytes(const sl_wasm_context *context);
+const float *sl_wasm_snapshot_f32(const sl_wasm_context *context);
+const uint32_t *sl_wasm_snapshot_u32(const sl_wasm_context *context);
+const float *sl_wasm_geometry_f32(const sl_wasm_context *context);
+const uint32_t *sl_wasm_geometry_u32(const sl_wasm_context *context);
+const float *sl_wasm_contacts_f32(const sl_wasm_context *context);
+const uint32_t *sl_wasm_contacts_u32(const sl_wasm_context *context);
+const float *sl_wasm_joints_f32(const sl_wasm_context *context);
+const uint32_t *sl_wasm_joints_u32(const sl_wasm_context *context);
+const uint32_t *sl_wasm_query_u32(const sl_wasm_context *context);
+const uint64_t *sl_wasm_work_data(const sl_wasm_context *context);
+bool sl_wasm_snapshot_refresh(sl_wasm_context *context, uint32_t diagnostics);
+bool sl_wasm_joint_valid(const sl_wasm_context *context, uint32_t index,
+                         uint32_t generation);
+bool sl_wasm_joint_create(sl_wasm_context *context);
+bool sl_wasm_joint_at(sl_wasm_context *context, uint32_t row);
+bool sl_wasm_joint_read(sl_wasm_context *context, uint32_t index,
+                        uint32_t generation);
+bool sl_wasm_joint_destroy(sl_wasm_context *context, uint32_t index,
+                           uint32_t generation);
+uint32_t sl_wasm_joint_count(const sl_wasm_context *context);
+bool sl_wasm_contact_read(sl_wasm_context *context, uint32_t row);
+uint32_t sl_wasm_contact_count(const sl_wasm_context *context);
+bool sl_wasm_query_point(sl_wasm_context *context, uint32_t mask,
+                         uint32_t capacity);
+bool sl_wasm_query_aabb(sl_wasm_context *context, uint32_t mask,
+                        uint32_t capacity);
+bool sl_wasm_query_ray(sl_wasm_context *context, uint32_t mask);
+bool sl_wasm_island_read(sl_wasm_context *context, uint32_t index,
+                         uint32_t generation);
+bool sl_wasm_stats_read(sl_wasm_context *context);
+bool sl_wasm_memory_read(sl_wasm_context *context);
 
 #endif

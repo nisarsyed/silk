@@ -1,18 +1,9 @@
-#include "adapter.h"
+#include "context.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 #include <silk/step.h>
-
-struct sl_wasm_context {
-    sl_world world;
-    sl_shape shape;
-    float input_f32[32];
-    uint32_t input_u32[16];
-    float output_f32[64];
-    uint32_t output_u32[32];
-};
 
 sl_wasm_context *sl_wasm_context_create(void)
 {
@@ -21,7 +12,7 @@ sl_wasm_context *sl_wasm_context_create(void)
 void sl_wasm_context_destroy(sl_wasm_context *context)
 {
     if (context != NULL) {
-        sl_world_destroy(&context->world);
+        sl_wasm_world_dispose(context);
         free(context);
     }
 }
@@ -84,21 +75,34 @@ bool sl_wasm_world_init(sl_wasm_context *context)
         return false;
     }
     const sl_world_config config = config_read(context);
-    return sl_world_init(&context->world, &config);
+    if (!sl_world_init(&context->world, &config)) {
+        return false;
+    }
+    context->config = config;
+    context->config.contact_capacity =
+        sl_world_contact_capacity(&context->world);
+    if (!sl_wasm_storage_init(context)) {
+        sl_world_destroy(&context->world);
+        return false;
+    }
+    return true;
 }
 void sl_wasm_world_reset(sl_wasm_context *context)
 {
     if (context != NULL && context->world.state != NULL) {
         sl_world_reset(&context->world);
+        memset(context->geometry_generation, 0,
+               (size_t)context->config.body_capacity * sizeof(uint32_t));
     }
 }
 void sl_wasm_world_dispose(sl_wasm_context *context)
 {
     if (context != NULL) {
+        sl_wasm_storage_dispose(context);
         sl_world_destroy(&context->world);
     }
 }
-bool sl_wasm_world_step(sl_wasm_context *context, float dt)
+bool sl_wasm_timestep_valid(const sl_wasm_context *context, float dt)
 {
     if (context == NULL || context->world.state == NULL || !sl_is_finite(dt) ||
         dt <= 0.0f) {
@@ -115,9 +119,46 @@ bool sl_wasm_world_step(sl_wasm_context *context, float dt)
         !sl_is_finite(inverse_h) || inverse_h <= 0.0f) {
         return false;
     }
-    sl_world_step(&context->world, dt);
     return true;
 }
+bool sl_wasm_world_step(sl_wasm_context *c, float dt)
+{
+    if (!sl_wasm_timestep_valid(c, dt)) {
+        return false;
+    }
+    sl_world_step(&c->world, dt);
+    return true;
+}
+bool sl_wasm_world_advance(sl_wasm_context *c, float dt, float remainder,
+                           float frame_time)
+{
+    if (!sl_wasm_timestep_valid(c, dt) || !sl_is_finite(remainder) ||
+        remainder < 0.0f || remainder >= dt || !sl_is_finite(frame_time)) {
+        return false;
+    }
+    sl_stepper stepper;
+    if (!sl_stepper_init(&stepper, dt)) {
+        return false;
+    }
+    stepper.remainder = remainder;
+    const uint32_t steps = sl_world_advance(&c->world, &stepper, frame_time);
+    /* Use double solely for host debt accounting, never simulation state.
+     * Two finite binary32 inputs cannot overflow this reporting accumulator. */
+    const double available =
+        (double)remainder + (frame_time > 0.0f ? (double)frame_time : 0.0);
+    const double dropped =
+        available - (double)steps * (double)dt - (double)stepper.remainder;
+    c->dropped_time =
+        steps == SL_STEP_COUNT_MAX && dropped > 0.0 ? dropped : 0.0;
+    c->output_u32[0] = steps;
+    c->output_f32[0] = stepper.remainder;
+    return true;
+}
+double sl_wasm_dropped_time(const sl_wasm_context *c)
+{
+    return c->dropped_time;
+}
+
 uint32_t sl_wasm_body_count(const sl_wasm_context *context)
 {
     return context != NULL && context->world.state != NULL
@@ -244,15 +285,21 @@ bool sl_wasm_body_destroy(sl_wasm_context *c, uint32_t index,
         return false;
     }
     sl_world_body_destroy(&c->world, (sl_body_handle){ index, generation });
+    c->geometry_generation[index] = 0u;
     return true;
 }
 bool sl_wasm_body_set_shape(sl_wasm_context *c, uint32_t index,
                             uint32_t generation)
 {
-    return sl_wasm_body_valid(c, index, generation) &&
-           sl_world_body_set_shape(
-               &c->world, (sl_body_handle){ index, generation }, &c->shape);
+    if (!sl_wasm_body_valid(c, index, generation) ||
+        !sl_world_body_set_shape(
+            &c->world, (sl_body_handle){ index, generation }, &c->shape)) {
+        return false;
+    }
+    c->geometry_generation[index] = 0u;
+    return true;
 }
+
 #define BODY_VECTOR(name)                                                      \
     bool sl_wasm_body_##name(sl_wasm_context *c, uint32_t index,               \
                              uint32_t generation, float x, float y)            \
@@ -410,4 +457,18 @@ bool sl_wasm_shape_ray(sl_wasm_context *c)
     c->output_f32[3] = hit.normal.x;
     c->output_f32[4] = hit.normal.y;
     return true;
+}
+
+size_t sl_wasm_adapter_bytes(const sl_wasm_context *c)
+{
+    if (c == NULL) {
+        return 0u;
+    }
+    if (c->world.state != NULL) {
+        return sizeof(*c) + c->buffer_bytes;
+    }
+    const sl_world_config config = config_read(c);
+    const size_t bytes =
+        sl_wasm_world_bytes(c) != 0u ? sl_wasm_storage_bytes(&config) : 0u;
+    return bytes != 0u ? sizeof(*c) + bytes : 0u;
 }
