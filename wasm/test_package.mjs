@@ -25,7 +25,7 @@ function run(command, args, cwd = consumer) {
 }
 const packed = JSON.parse(run(npm,['pack','--json','--pack-destination',consumer],packageDir))[0];
 const expected = ['package.json','index.mjs','views.mjs','silk.mjs','silk.wasm','index.d.ts','README.md','LICENSE',
-  'licenses/README.md','licenses/emscripten.txt','licenses/musl.txt','licenses/compiler-rt.txt'].sort();
+  'licenses/README.md','licenses/emscripten.txt','licenses/musl.txt','licenses/compiler-rt.txt','licenses/fmaf.txt'].sort();
 assert.deepEqual(packed.files.map(file=>file.path).sort(),expected,'Archive allowlist');
 assert(packed.files.find(file=>file.path==='silk.wasm').size > 10000,'Archive contains compiled binary');
 await writeFile(join(consumer,'package.json'),JSON.stringify({private:true,type:'module'}));
