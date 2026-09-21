@@ -13,3 +13,6 @@ compile_commands.json
 
 # Package / dependency artifacts
 .cache/
+
+# Python developer-tool caches
+__pycache__/

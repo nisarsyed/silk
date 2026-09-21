@@ -6,6 +6,10 @@ int main(void)
 {
     int failures = 0;
 
+#ifdef SL_TEST_WASM_ADAPTER
+    failures += sl_wasm_suite();
+#endif
+
     failures += sl_replay_suite();
     failures += sl_sleep_suite();
     failures += sl_island_suite();
