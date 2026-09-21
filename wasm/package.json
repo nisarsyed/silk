@@ -1,0 +1,13 @@
+{
+  "name": "silk-wasm-development",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:package": "node test_package.mjs"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "@playwright/test": "1.63.0"
+  }
+}

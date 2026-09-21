@@ -16,3 +16,7 @@ compile_commands.json
 
 # Python developer-tool caches
 __pycache__/
+
+# WASM package development
+node_modules/
+*.tgz

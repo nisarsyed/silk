@@ -106,8 +106,8 @@ world/body/shape operations, distance/revolute joints, point/AABB/closest-ray
 queries, contacts, activation/island diagnostics, exact counters, memory
 breakdowns, fixed stepping, and bounded advance. The inventory's intentional
 omissions remain: standalone math helpers, private storage/allocators, and
-nonexistent engine features. Declarations and independent archive consumers
-are subsequent package work; these files are not yet the completed package.
+nonexistent engine features. The build also emits maintained declarations, package metadata, an independent
+API guide, and license notices. Archive consumers are verified separately below.
 
 ```js
 import { createSilk } from './build/wasm-release/package/index.mjs';
@@ -228,3 +228,40 @@ payload sizes, traversal work, and copy bandwidth. Native replay tests compare
 otherwise identical worlds with and without read-only queries/snapshots; JS
 tests verify output identities, allocator occupancy, retained copies, cache
 invalidation, public-getter agreement, and values beyond 2^53.
+
+## Build and verify a package archive
+
+After building either WASM preset, `npm pack` in its `package/` directory emits
+`nisarsyed-silk-<engine-version>.tgz`. This does not publish to the registry.
+The generated package version derives from CMake's engine version. The archive
+includes the compiled binary, wrapper/glue, declarations, README, and Silk/SDK
+notices, with an explicit file allowlist and no runtime npm dependencies.
+
+```sh
+npm ci --prefix wasm --ignore-scripts --no-audit --no-fund
+PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install chromium
+node wasm/test_package.mjs build/wasm-debug/package
+node wasm/test_package.mjs build/wasm-release/package
+```
+
+On Linux CI install Chromium with `--with-deps`. The development lockfile pins
+TypeScript, Vite, Playwright, and transitive tools. The verifier creates a fresh
+temporary consumer outside the checkout, packs and inspects the archive,
+installs it with npm, removes SDK/compiler environment search paths, and checks
+TypeScript positive/negative examples against installed declarations. It also
+compares declared public exports and all world/module member names to runtime.
+
+The installed consumer executes Node, an HTTP-served browser page, an actual
+dedicated module worker, and a production Vite bundle under `/nested/demo/`.
+It tests relative default asset discovery, absolute/relocated overrides,
+missing/corrupt responses, independent instances, ownership, reset/disposal,
+queries/snapshots, and exact counters. Failures propagate to the command's exit
+status. The temporary consumer path is printed and retained for inspection;
+these machine-specific artifacts are never checked in. Integration checks are
+not substitutes for sustained physical-device or native-browser performance
+validation in the later milestone issues.
+
+See [the package API guide](../wasm/README.md) for loading examples, all lifetime
+and memory contracts, bundler and worker details, and intentional C omissions.
+`wasm/consumer/` contains minimal consumers using only public package exports.
+CI runs archive checks for both debug and release outputs.
