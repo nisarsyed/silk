@@ -211,7 +211,7 @@ the contract's render DPR. Serialize uint64s using the study module's
 `jsonReplacer`; raw frame work counters are already exact decimal strings.
 
 This is a collection primitive, not the complete study controller. It does not
-yet implement render-only runs, real-input trials, optional 120 Hz measurements,
+yet implement real-input trials, optional 120 Hz measurements,
 device-condition recording,
 GC/memory profiling, repeated-run ordering or qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
@@ -263,6 +263,31 @@ cost. Frozen render-only diagnostics use the separate immutable command builder
 and label the displayed instance count separately from source-world counters.
 Canvas caches preserve primitive/color order in paths bounded to 8,192 edges
 (256 circles or 2,048 line quads), avoiding a single giant path during setup.
+
+## Offline timing audit
+
+`python3 bench/render/validate.py <completed-report.json>` independently checks
+completed collection records, using Python arithmetic rather than the browser's
+summary implementation. It checks raw dimensions, exact uint64 counters,
+calibration, fixed-step accounting, unavailable GPU metrics, observed GL totals,
+nearest-rank tails and every 10-second window. Corrupt, failed and partial records
+are rejected; retain their originals for investigation. Timing recomputation
+permits only floating-point arithmetic rounding, while budget comparisons use
+the unchanged exact inclusive thresholds.
+
+The audit reports each continuity/CPU/cadence budget separately, including empty
+windows. Diagnostic budgets are marked inapplicable and short correctness runs
+remain identified. A structurally valid report may still fail numeric budgets.
+Every audit remains `acceptanceEligible: false`: provenance authenticity, real
+input, device conditions, startup/cache protocol, allocation/GC, presentation,
+companion quality runs and the repeated cross-device decision still require
+separate evidence. This is a raw timing audit, not complete study qualification.
+
+`python3 bench/render/test_validate.py <runner-report-directory> <assembled-build>`
+checks real short browser reports for all 12 candidate/profile combinations,
+rejects deliberately corrupted copies and failed-run prefixes, and pins exact
+budget boundaries. A synthetic stalled timeline from the actual JS producer
+checks boundary gaps, empty windows, frozen preparation baselines and overshoot.
 
 ## Frame recording
 
