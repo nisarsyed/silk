@@ -25,6 +25,8 @@ node bench/render/test_provenance.mjs
 node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
 node bench/render/test_overlay.mjs
+node bench/render/test_frozen.mjs
+node bench/render/test_canvas_frozen.mjs
 node bench/render/test_recording.mjs
 node bench/render/test_timing.mjs
 node bench/render/test_gpu.mjs
@@ -74,6 +76,23 @@ horizontal tiles after 120 steps, omit static bodies, and trim the last tile.
 Their camera is the union of the translated rain rectangles. All source shapes
 and transforms are prepared before drawing; a frozen tier cannot refresh its
 transforms. The original seven native workloads and their limits are unchanged.
+
+Frozen diagnostics retain each contact involving any displayed dynamic body,
+including contacts against omitted static shapes or trimmed bodies, once per
+tile. Proxy bounds and source island colors are copied in draw order. A
+setup-only C helper evaluates the global central queries over the actual
+displayed instances using public shape predicates, with the same results as
+public world queries. It allocates `20*instances + 32` column bytes plus its
+small owner record, copies the results into independent JS columns, then frees
+the native temporary storage. No additional simulated world or per-frame query
+allocation is introduced. The source remains unchanged at step 120.
+
+`FrozenOverlay` builds the shared immutable command arrays once. It reserves
+the existing bounded capacities for contacts which actually have points;
+zero-point contacts have no glyphs. Every eligible point is retained. Canvas
+caches contiguous-color body, line and marker paths during setup; WebGL and
+raylib reuse their unchanged command payloads on repeated frames. The contact
+rule follows the user clarification recorded in contract revision 2.
 
 - Canvas caches local `Path2D` objects for moving scenes. Frozen scenes merge
   paths during setup, preserving contiguous geometry/color batches. Paths and
@@ -155,7 +174,11 @@ between calls, restore them, and verify that the failed-run latch remains set.
 `runner.mjs` exports `runStudy` for an attached, uniquely identified canvas and
 an optional diagnostic HUD element. It accepts the three candidates, the three
 physics fixtures, all physics tiers, sleep policy and frozen desktop/mobile
-layouts. `sustained` is restricted to mobile rain, one copy, sleep off and base
+layouts. Render-only collection accepts the nine `instances` tiers with rain,
+one copy and sleep off. It prepares the source at step 120, warms immutable
+draws, then rebuilds the same source before measurement. Recorded simulation
+steps, debt and drops during measurement remain zero; cumulative source
+counters retain their 120-step preparation baseline. `sustained` is restricted to mobile rain, one copy, sleep off and base
 visuals. Normal collection uses 60 seconds; sustained collection uses 300.
 `memoryBytes` defaults to the contract's 64 MiB and accepts an explicit aligned
 budget within the module's existing bounds. Larger physics tiers may require
@@ -236,12 +259,10 @@ The shared HUD component uses 4 Hz deadlines and skips missed updates without
 catch-up bursts. It displays actual body/constraint/work counters, the fixed
 WASM budget, allocator usage, known world/output payloads and available GPU
 metrics. Text wraps within the mobile width. Collection includes the HUD update
-cost. Frozen render-only diagnostic replication
-also remains unfinished; the overlay builder explicitly rejects frozen scenes.
-For that remaining implementation, the clarified contact rule is to retain
-each frozen contact involving any displayed dynamic body, including contacts
-against omitted static shapes or trimmed bodies. Shared contacts appear once
-per tile. This rule is common to all candidates and does not change physics.
+cost. Frozen render-only diagnostics use the separate immutable command builder
+and label the displayed instance count separately from source-world counters.
+Canvas caches preserve primitive/color order in paths bounded to 8,192 edges
+(256 circles or 2,048 line quads), avoiding a single giant path during setup.
 
 ## Frame recording
 
@@ -388,8 +409,8 @@ The geometry test checks C snapshot row order, changing transforms, all nine
 render-only tiers, circle vertices, and both camera profiles. Browser checks
 compare every pixel for the three default scenes before and after stepping,
 including a further transform update and 16-copy physics tiers, plus the
-smallest/largest frozen render-only tiers, and diagnostic default scenes with
-sleep off/on, at 1280×720 and 720×1280 (34 profiles per build). They also check zero repeated pose uploads, exact
+smallest/largest frozen render-only tiers in base and diagnostic modes, and diagnostic default scenes with
+sleep off/on, at 1280×720 and 720×1280 (38 profiles per build). They also check zero repeated pose uploads, exact
 changed-pose byte counts, idempotent disposal, disposed-call rejection and
 console errors. Pixel readbacks run only in this correctness harness.
 
@@ -406,8 +427,9 @@ and adjacent background pixels for every candidate. Command tests check
 counts, frames, colors, buffer reuse and overflow at one and sixteen copies.
 Browser checks also exercise thirteen private raylib validation failures and
 successful drawing after repairing the caller-owned buffers.
-An additional 48 base/diagnostic profiles compare co-located raylib against Canvas at one
-and sixteen physics copies, sleep off/on and both buffer sizes. They check
+An additional 56 base/diagnostic profiles compare co-located raylib against Canvas at one
+and sixteen physics copies, sleep off/on and both buffer sizes, plus the
+smallest/largest frozen tiers in both modes and sizes. They check
 initial and updated images, zero JS pose copies, reuse on repeated draws,
 unchanged allocator usage, owner disposal and replacement. Poisoned JS snapshot
 copies cannot affect direct drawing, and snapshots match the separately stepped
@@ -416,7 +438,7 @@ cannot affect direct drawing. Native/WASM C tests pin pose bits, command counts,
 query colors, normal length, joint anchors, output bounds and invalid-input
 recovery for the same scene/tier/sleep matrix, plus a settled sleeping world.
 
-Still required for #95: render-only diagnostic coverage and collection; complete
+Still required for #95: complete
 sustained protocol reporting; matched render-only/end-to-end timing and input
 collection; startup, memory and allocation
 records; context-loss/lifecycle recovery; report validators; the complete

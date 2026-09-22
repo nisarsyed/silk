@@ -10,6 +10,7 @@ int main(void)
     failures += sl_wasm_suite();
     failures += sl_wasm_bench_suite();
     failures += sl_render_scene_suite();
+    failures += sl_render_frozen_suite();
 #endif
 
     failures += sl_replay_suite();

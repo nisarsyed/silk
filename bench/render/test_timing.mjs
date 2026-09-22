@@ -54,4 +54,9 @@ for(const hz of [60,120,180,240])for(const lag of [0,5,8,10,41.7,42,100,999])for
 const delayed=new StudyClock(calibration(60),dt);
 assert.ok(delayed.tick(0,42));assert.equal(delayed.totalSteps,0);assert.equal(delayed.debtSeconds,0);
 assert.equal(delayed.tick(1000/60,43),false);assert.equal(delayed.tick(2000/60,44),false);
+const frozen=new StudyClock(calibration(60),dt,true);
+assert.ok(frozen.tick(0,0));assert.ok(frozen.tick(1000,1000));
+assert.equal(frozen.elapsedSeconds,1);assert.equal(frozen.frameCount,2);
+assert.equal(frozen.steps,0);assert.equal(frozen.totalSteps,0);assert.equal(frozen.debtSeconds,0);assert.equal(frozen.droppedSeconds,0);
+assert.throws(()=>new StudyClock(calibration(60),dt,1));
 console.log('Study clock: frozen calibration, high-refresh pacing, binary32 dt, 8-step cap, exposed drops, jitter, delayed startup and invalid clocks PASS');

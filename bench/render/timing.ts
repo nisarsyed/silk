@@ -24,11 +24,11 @@ export class StudyClock {
   readonly refreshPeriodMs:number;readonly targetPeriodMs:number;
   private previousRaf=-1;private previousNow=-1;private renderedNow=0;private origin=0;private deadline=0;
   frameCount=0;steps=0;totalSteps=0;debtSeconds=0;droppedSeconds=0;elapsedSeconds=0;targetRafMs=0;
-  constructor(calibration:Calibration60,readonly timestepSeconds:number){
+  constructor(calibration:Calibration60,readonly timestepSeconds:number,readonly renderOnly=false){
     if(!calibration.supports60Hz||!Number.isFinite(calibration.refreshPeriodMs)||calibration.refreshPeriodMs<=0||
         !Number.isFinite(calibration.targetPeriodMs)||calibration.targetPeriodMs<calibration.refreshPeriodMs||
         1000/calibration.targetPeriodMs<59||1000/calibration.targetPeriodMs>61||
-        timestepSeconds!==Math.fround(1/60))throw new RangeError('Unsupported study clock configuration');
+        timestepSeconds!==Math.fround(1/60)||typeof renderOnly!=='boolean')throw new RangeError('Unsupported study clock configuration');
     this.refreshPeriodMs=calibration.refreshPeriodMs;this.targetPeriodMs=calibration.targetPeriodMs;
   }
   tick(rafMs:number,nowMs:number):boolean {
@@ -48,7 +48,9 @@ export class StudyClock {
       Math.floor((horizon-deadline)/this.targetPeriodMs);
     const target=deadline+skipped*this.targetPeriodMs,next=target+this.targetPeriodMs;
     const origin=first?nowMs:this.origin,previous=first?nowMs:this.renderedNow;
-    const accumulated=this.debtSeconds+(nowMs-previous)/1000;
+    // Frozen render-only runs keep presentation deadlines and elapsed time but
+    // execute no simulation. Their source's 120 preparation steps are separate.
+    const accumulated=this.renderOnly?0:this.debtSeconds+(nowMs-previous)/1000;
     let possible=Math.floor(accumulated/this.timestepSeconds);
     if(!Number.isSafeInteger(skipped)||!Number.isFinite(next)||!Number.isSafeInteger(possible))throw new RangeError('Clock range exhausted');
     // Correct only a division rounding across an exact step boundary. No

@@ -45,4 +45,16 @@ const skipped=new FrameRecorder(2);
 for(const t of [0,20000]){const v=new Float64Array(numberNames.length);v[0]=v[1]=v[2]=v[3]=v[4]=t;
   skipped.append(v,requiredNumbers,counters);skipped.finish(t);}
 assert.equal(skipped.windows(100,30)[1].coverageReached,false);assert.equal(skipped.windows(100,30)[1].cpuMs,null);
+// Frozen preparation happened before measurement. Its 120 steps and exact
+// cumulative counters must not become measured work in the first window.
+const frozen=new FrameRecorder(3),baseline=9007199254740993n;
+counters.stats[24]=120;counters.work[25]=baseline;
+for(const t of [0,10000,20000]){const v=new Float64Array(numberNames.length);v[0]=v[1]=v[2]=v[3]=v[4]=t;
+  frozen.append(v,requiredNumbers,counters);frozen.finish(t);}
+const frozenWindows=frozen.windows(1000/60,20,120,baseline);
+assert.deepEqual(frozenWindows.map(w=>w.executedSteps),[0,0]);assert.deepEqual(frozenWindows.map(w=>w.contactDrops),['0','0']);
+frozen.work[2*26+25]=baseline+2n;assert.equal(frozen.windows(1000/60,20,120,baseline)[1].contactDrops,'2');
+assert.throws(()=>frozen.windows(1000/60,20,121,baseline),/backwards/);
+for(const steps of [-1,1.5,NaN,0x100000000])assert.throws(()=>frozen.windows(1000/60,20,steps,baseline));
+for(const drops of [-1n,1,0x10000000000000000n])assert.throws(()=>frozen.windows(1000/60,20,120,drops));
 console.log('Ten-second windows: boundary stalls, overshoot, exact drops, missing GPU samples, partial coverage and unchanged nearest-rank cadence PASS');

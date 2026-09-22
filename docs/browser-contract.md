@@ -1,6 +1,6 @@
 # Phase 5 browser and performance contract
 
-Contract revision 1, prepared for [issue #89](https://github.com/nisarsyed/silk/issues/89).
+Contract revision 2, originating in [issue #89](https://github.com/nisarsyed/silk/issues/89).
 The [Phase 5 tracker](https://github.com/nisarsyed/silk/issues/88) and
 [milestone](https://github.com/nisarsyed/silk/milestone/3) own delivery toward
 0.5.0. This document specifies acceptance; it does not claim that a WASM build,
@@ -14,6 +14,13 @@ a candidate fail. Reference hardware, installed versions, access arrangements,
 and collection status live in GitHub issues and run artifacts, not this
 repository. Changing the test environment requires a new matched baseline,
 not an edit to a checked-in device inventory.
+
+Revision 2 clarifies frozen render-only diagnostics before their matched
+baselines: retain a contact when any dynamic endpoint is displayed, even if
+the other endpoint's shape is omitted, and draw shared contacts once per tile.
+The instance query and repeated source colors/proxies are specified below.
+Workloads, capacities, timing budgets, quality limits and Phase 5 scope are
+unchanged; collect matched results for this clarified diagnostic profile.
 
 ## Delivery and support
 
@@ -119,6 +126,17 @@ and trim the final tile to the requested count. All candidates consume the
 same copied snapshot after 120 fixed steps with sleep off. Rendering this
 frozen state isolates submission/fill cost; it is not a physics throughput or
 dynamic-upload claim. The end-to-end profiles below cover changing transforms.
+
+For frozen diagnostics, repeat the source proxy bounds and sleeping/island
+colors with each displayed dynamic row; island IDs/colors remain literal
+copies of the source snapshot. Within each tile, retain each source contact
+with at least one displayed dynamic endpoint, including contacts against
+omitted static shapes or bodies trimmed from the final tile. Draw it once,
+with its original point order and translated points/normals. Contacts with no
+points produce no glyphs. Run the single central point/AABB/ray query over the
+displayed instances using the union camera rectangle, all body types and full
+instance output capacity. Equal-fraction ray hits choose the first instance
+in draw order. The frozen source world is not stepped during rendering.
 
 | Profile | Nominal CSS frame | Fixed drawing buffer | Nominal render DPR |
 | --- | --- | --- | --- |

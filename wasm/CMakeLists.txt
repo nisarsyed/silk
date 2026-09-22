@@ -8,7 +8,7 @@ target_link_libraries(silk_wasm_bench_adapter PUBLIC silk_wasm_adapter PRIVATE s
 
 # Browser study setup reuses the existing fixture object code; it does not
 # alter the native/WASM step-only benchmark target or distributed package.
-add_library(silk_render_scene STATIC ../bench/render/scene.c ../bench/render/driver.c ../bench/render/overlay.c)
+add_library(silk_render_scene STATIC ../bench/render/scene.c ../bench/render/driver.c ../bench/render/overlay.c ../bench/render/frozen.c)
 target_link_libraries(silk_render_scene PUBLIC silk_wasm_bench_adapter PRIVATE silk_warnings)
 
 if(EMSCRIPTEN)
@@ -47,7 +47,7 @@ if(EMSCRIPTEN)
         OUTPUT_NAME silk SUFFIX .mjs
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/package")
     add_executable(silk_wasm_study adapter.c snapshot.c operations.c runtime.c
-        ../bench/render/driver.c ../bench/render/scene.c ../bench/fixtures.c ../bench/quality.c)
+        ../bench/render/driver.c ../bench/render/scene.c ../bench/render/frozen.c ../bench/fixtures.c ../bench/quality.c)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ../bench/render/driver.h)
     file(READ "${PROJECT_SOURCE_DIR}/bench/render/driver.h" SL_STUDY_HEADER)
     string(REGEX MATCHALL "sl_render_[a-z_0-9]+\\(" SL_STUDY_NAMES "${SL_STUDY_HEADER}")

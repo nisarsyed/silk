@@ -74,6 +74,22 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
           get steps(){valid();return status[4];},
           get drops(){valid();return m._sl_render_study_drops(ptr);},
           step(){valid();invalidate();return !!m._sl_render_study_step(ptr);},
+          // Setup-only, independent copied columns for displayed frozen
+          // instances. Native temporary storage is released before returning;
+          // the result remains usable after this source world is disposed.
+          frozenDiagnostics(instances){
+            valid();integer(instances,256,65536,'render tier');
+            if((instances&(instances-1))!==0)throw new RangeError('Invalid render tier');
+            const frozen=m._sl_render_frozen_create(ptr,instances);
+            if(!frozen)return null;
+            try{
+              if(m._sl_render_frozen_count(frozen)!==instances)throw new Error('Frozen instance count mismatch');
+              return Object.freeze({valid:true,instances,
+                floats:new Float32Array(new Float32Array(buffer,m._sl_render_frozen_f32(frozen),4*instances+5)),
+                words:new Uint32Array(new Uint32Array(buffer,m._sl_render_frozen_u32(frozen),instances+3)),
+                temporaryNativeBytes:m._sl_render_frozen_bytes(frozen)});
+            }finally{m._sl_render_frozen_destroy(frozen);}
+          },
           // Fixed 308-byte copied output: 25 uint32 stats and 26 uint64 work
           // counters. No per-frame objects or temporary subarray views.
           refreshFrameCounters(){

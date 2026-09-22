@@ -56,4 +56,23 @@ bool sl_render_study_diagnostics(sl_render_study *study);
 const float *sl_render_study_diagnostic_f32(const sl_render_study *study);
 const uint32_t *sl_render_study_diagnostic_u32(const sl_render_study *study);
 size_t sl_render_study_diagnostic_bytes(const sl_render_study *study);
+
+/* Setup-only render tiers: the original one-copy awake rain at exactly 120
+ * steps, repeated in dynamic-row order into 256..65536 power-of-two instances.
+ * Queries use public C shape predicates on translated instances, all types,
+ * with one output slot per instance. Static/trimmed shapes are not queried.
+ * Proxy bounds are the translated frozen source bounds. Ray ties retain the
+ * first instance in draw order. The independent copied result owns no world
+ * pointers and remains valid until destroy; creation never steps/mutates it.
+ * Float/word layouts match the diagnostic columns above, keyed by instance.
+ * Temporary creation memory and O(instances) query work belong to setup.
+ */
+typedef struct sl_render_frozen sl_render_frozen;
+sl_render_frozen *sl_render_frozen_create(sl_render_study *study,
+                                          uint32_t instances);
+void sl_render_frozen_destroy(sl_render_frozen *frozen);
+uint32_t sl_render_frozen_count(const sl_render_frozen *frozen);
+const float *sl_render_frozen_f32(const sl_render_frozen *frozen);
+const uint32_t *sl_render_frozen_u32(const sl_render_frozen *frozen);
+size_t sl_render_frozen_bytes(const sl_render_frozen *frozen);
 #endif

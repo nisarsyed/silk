@@ -94,14 +94,16 @@ export class FrameRecorder {
    * boundary/overshoot frame stays in the final window. Empty/unfinished
    * windows never fabricate zero-valued distributions or complete coverage.
    */
-  windows(targetPeriodMs:number,durationSeconds:number){
+  windows(targetPeriodMs:number,durationSeconds:number,initialSteps=0,initialContactDrops=0n){
     if(!Number.isFinite(targetPeriodMs)||targetPeriodMs<=0||!Number.isFinite(durationSeconds)||
-      durationSeconds<=0||durationSeconds>300)throw new RangeError('Invalid window configuration');
+      durationSeconds<=0||durationSeconds>300||!Number.isInteger(initialSteps)||initialSteps<0||initialSteps>0xffffffff||
+      typeof initialContactDrops!=='bigint'||initialContactDrops<0n||initialContactDrops>0xffffffffffffffffn)
+      throw new RangeError('Invalid window configuration');
     const count=Math.ceil(durationSeconds/10),origin=this.rows?this.numbers[1]:0;
     const windows=Array.from({length:count},()=>({cpu:[] as number[],gaps:[] as number[],gpu:[] as number[],
       missing:0,firstRow:null as number|null,lastRow:null as number|null,pending:false,
       steps:0,dropped:0,contacts:0n,endDebt:null as number|null,allocatorMax:null as number|null}));
-    let previousSubmission:number|undefined,previousSteps=0,previousDropped=0,previousContacts=0n,lastElapsed=-1;
+    let previousSubmission:number|undefined,previousSteps=initialSteps,previousDropped=0,previousContacts=initialContactDrops,lastElapsed=-1;
     for(let row=0;row<this.rows;++row){
       const at=row*numberNames.length,elapsed=(this.numbers[at+1]-origin)/1000;
       const w=windows[Math.min(count-1,Math.floor(elapsed/10))];

@@ -1,7 +1,8 @@
 import {createStudyModule} from './physics/driver.mjs';
 import {createRaylibStudyModule} from './raylib.js';
-import {DrawScene} from './geometry.js';
+import {DrawScene,renderTiers} from './geometry.js';
 import {Overlay} from './overlay.js';
+import {FrozenOverlay} from './frozen.js';
 import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
 import {StudyClock,calibrate60} from './timing.js';
@@ -17,7 +18,7 @@ import {provenanceJson} from './provenance.mjs';
 // Only one run may own a canvas at a time, including asynchronous initialization.
 const active=new WeakSet();
 export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copies=1,sleep=false,
-  diagnostic=false,layout='desktop',sustained=false,memoryBytes=64*1024*1024,correctnessSeconds,signal,onPhase}={}) {
+  diagnostic=false,layout='desktop',sustained=false,instances,memoryBytes=64*1024*1024,correctnessSeconds,signal,onPhase}={}) {
   if(!(canvas instanceof HTMLCanvasElement)||!canvas.isConnected||!canvas.id||document.getElementById(canvas.id)!==canvas||
       !['canvas','webgl','raylib'].includes(candidate)||!['pyramid','rain','chains'].includes(scene)||
       ![1,2,4,8,16].includes(copies)||typeof sleep!=='boolean'||typeof diagnostic!=='boolean'||
@@ -26,6 +27,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       memoryBytes>512*1024*1024||memoryBytes%65536!==0||
       (signal!==undefined&&!(signal instanceof AbortSignal))||(onPhase!==undefined&&typeof onPhase!=='function')||
       (diagnostic&&!(hudElement instanceof HTMLElement))||
+      (instances!==undefined&&(!renderTiers.includes(instances)||scene!=='rain'||copies!==1||sleep||sustained))||
       (sustained&&(scene!=='rain'||sleep||diagnostic||copies!==1||layout!=='mobile'))||
       (correctnessSeconds!==undefined&&(!Number.isFinite(correctnessSeconds)||correctnessSeconds<.25||correctnessSeconds>5)))
     throw new TypeError('Invalid study run configuration');
@@ -36,7 +38,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
   const intervals=new Float64Array(240),values=new Float64Array(numberNames.length);
   let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,gpu,glCalls,phase='initialization',failure=null;
   const rendererMetrics={gpuBytes:null,uploadBytes:null,drawCalls:null};
-  let frameId=0,rejectFrames,initial,final,warmup,setupMs=null,measurementStart=null,measurementEnd=null,calibrationCount=0;
+  let frameId=0,rejectFrames,initial,final,warmup,setupMs=null,worldSetupMs=null,measurementStart=null,measurementEnd=null,calibrationCount=0;
   const began=performance.now();
   const setPhase=value=>{phase=value;onPhase?.(value);};
   const fail=reason=>{
@@ -71,23 +73,28 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     world?.dispose();world=undefined;drawScene=undefined;overlay=undefined;};
   const resetHud=()=>{
     if(diagnostic){hud?.dispose();const memory=world.report().memory;
-      hud=new StudyHud(hudElement,{linearBytes:module.memory.linearMemoryBytes,arenaBytes:memory.arenaBytes,outputBytes:memory.outputBytes});}
+      hud=new StudyHud(hudElement,{linearBytes:module.memory.linearMemoryBytes,arenaBytes:memory.arenaBytes,outputBytes:memory.outputBytes},instances);}
   };
   const openWorld=()=>{
+    const started=performance.now();
     world=module.create(scene,{copies,sleep,steps:21600});
     if(!world)throw new Error('Fixed study allocation failed');
-    if(candidate==='raylib')renderer=world.createRenderer({diagnostic});
+    if(instances!==undefined)step(120);
+    if(candidate==='raylib')renderer=world.createRenderer({diagnostic,instances});
     else{
       if(!world.refreshSnapshot(diagnostic))throw new Error('Initial snapshot failed');
-      drawScene=new DrawScene(world.snapshot,scene,undefined,copies);
+      drawScene=new DrawScene(world.snapshot,scene,instances,copies);
       const c=world.configuration;
-      overlay=diagnostic?new Overlay(drawScene,c.bodyCapacity,c.contactCapacity,c.jointCapacity,width,height):undefined;
-      overlay?.refresh(world.snapshot,world.diagnostics);
+      overlay=diagnostic?(drawScene.frozen?
+        new FrozenOverlay(drawScene,world.snapshot,world.frozenDiagnostics(instances),width,height):
+        new Overlay(drawScene,c.bodyCapacity,c.contactCapacity,c.jointCapacity,width,height)):undefined;
+      if(overlay&&!drawScene.frozen)overlay.refresh(world.snapshot,world.diagnostics);
       renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene,overlay):new WebglCandidate(canvas,drawScene,overlay);
     }
     if(canvas.width!==width||canvas.height!==height)throw new Error('Renderer changed drawing-buffer size');
     if(candidate!=='canvas')glCalls=new GlStats(canvas.getContext('webgl2'));
     resetHud();
+    worldSetupMs=performance.now()-started;
   };
   const draw=()=>{
     glCalls?.begin();try{renderer.draw();}finally{glCalls?.end();}
@@ -97,7 +104,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     rendererMetrics.drawCalls=glCalls?.drawCalls??renderer.drawCalls;
   };
   const step=count=>{for(let i=0;i<count;++i)if(!world.step())throw new Error('Study step failed (numeric state or step bound)');};
-  const prepare=()=>{if(drawScene){if(!world.refreshSnapshot(diagnostic))throw new Error('Snapshot failed');
+  const prepare=()=>{if(drawScene&&!drawScene.frozen){if(!world.refreshSnapshot(diagnostic))throw new Error('Snapshot failed');
     drawScene.copyTransforms(world.snapshot);overlay?.refresh(world.snapshot,world.diagnostics);}};
   try{
     check();canvas.width=width;canvas.height=height;
@@ -114,20 +121,21 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     const warmStart=performance.now();
     await frames((raf,now)=>{
       if(warmClock&&!warmClock.tick(raf,now))return false;
-      step(warmClock?warmClock.steps:1);prepare();draw();
+      step(warmClock?warmClock.steps:instances===undefined?1:0);prepare();draw();
       if(!world.refreshFrameCounters())throw new Error('Warm-up counters failed');
       hud?.update(now,world.frameCounters,rendererMetrics);++callbacks;
       return warmClock?warmClock.elapsedSeconds>=60:callbacks===120;
     });
-    warmup={callbacks,elapsedMs:performance.now()-warmStart,world:world.report(),
+    warmup={callbacks,preparationSteps:instances===undefined?0:120,elapsedMs:performance.now()-warmStart,world:world.report(),
       droppedSeconds:warmClock?.droppedSeconds??0};
     // Retain warmed paths, shaders and buffers while replacing the exact C
     // initial state. The consumed world's physics arena is freed first.
     setPhase('rebuild');
     world=world.rebuild();
     if(!world)throw new Error('Fixed allocation failed while rebuilding initial state');
+    if(instances!==undefined)step(120);
     prepare();resetHud();initial=world.report();glCalls?.resetTotals();
-    clock=new StudyClock(calibration,world.configuration.timestep);
+    clock=new StudyClock(calibration,world.configuration.timestep,instances!==undefined);
     recorder=new FrameRecorder(Math.ceil(duration*1000/calibration.targetPeriodMs)+2);
     gpu=new GpuTimer(candidate==='canvas'?null:canvas.getContext('webgl2'),recorder.capacity,
       Math.ceil(100/calibration.targetPeriodMs)+2);
@@ -140,7 +148,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       values.fill(0);values[0]=raf;values[1]=now;values[2]=clock.targetRafMs;
       let t=performance.now();gpu.poll(recorder,t);values[23]=performance.now()-t;
       t=performance.now();step(clock.steps);values[5]=performance.now()-t;
-      if(world.steps!==clock.totalSteps)throw new Error('Executed steps differ from the fixed-step clock');
+      if(world.steps!==initial.steps+clock.totalSteps)throw new Error('Executed steps differ from the study clock');
       if(drawScene&&clock.steps>0){
         t=performance.now();if(!world.refreshSnapshot(diagnostic))throw new Error('Snapshot failed');values[6]=performance.now()-t;
         t=performance.now();drawScene.copyTransforms(world.snapshot);overlay?.refresh(world.snapshot,world.diagnostics);values[7]=performance.now()-t;
@@ -183,16 +191,17 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
   try{
     report={schema:1,kind:correctnessSeconds===undefined?'study-collection':'correctness-only',acceptanceEligible:false,
       status:failure?'failed':'collected',failure,phase,
-      configuration:{candidate,scene,copies,sleep,diagnostic,layout,sustained,memoryBytes,durationSeconds:duration,
+      configuration:{candidate,scene,copies,sleep,diagnostic,layout,sustained,instances:instances??null,
+        profile:instances===undefined?'end-to-end':'render-only',memoryBytes,durationSeconds:duration,
         width,height,cssWidth:layout==='mobile'?360:width,cssHeight:layout==='mobile'?640:height,
         renderDpr:layout==='mobile'?2:1,deviceDpr,viewportWidth,viewportHeight,worker:false},
-      clock:{timeOrigin:performance.timeOrigin,unit:'milliseconds',source:'performance.now and requestAnimationFrame'},
+      clock:{timeOrigin:performance.timeOrigin,unit:'milliseconds',source:'performance.now and requestAnimationFrame',simulationEnabled:instances===undefined},
       browser:{userAgent:navigator.userAgent},provenance:JSON.parse(provenanceJson),
-      setupMs,calibration,calibrationIntervals:Array.from(intervals.subarray(0,calibrationCount)),
+      setupMs,worldSetupMs,calibration,calibrationIntervals:Array.from(intervals.subarray(0,calibrationCount)),
       warmup,rendererRecreatedAfterWarmup:initial?false:null,initial,final,moduleMemory:module?.memory,measurementStart,measurementEnd,
       elapsedSeconds:clock?.elapsedSeconds??0,debtSeconds:clock?.debtSeconds??0,droppedSeconds:clock?.droppedSeconds??0,
       summary:recorder?.summary(calibration.targetPeriodMs),frames:recorder?.report(world.frameCounters),
-      windows:recorder?.windows(calibration.targetPeriodMs,duration),
+      windows:recorder?.windows(calibration.targetPeriodMs,duration,initial.steps,initial.drops),
       gpu:gpu?.report(),glCalls:glCalls?.report()??null,
       missingEvidence:['device conditions','real input','memory profiling',
         'full-quality companion runs','five-repeat protocol']};

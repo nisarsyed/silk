@@ -25,7 +25,6 @@ export class Overlay {
   lineCount=0;markerCount=0;revision=0;
   constructor(readonly scene:DrawScene,readonly bodyCapacity:number,readonly contactCapacity:number,
       readonly jointCapacity:number,width:number,height:number) {
-    if(scene.frozen)throw new Error('Render-only overlay replication is not implemented');
     if(!Number.isInteger(bodyCapacity)||bodyCapacity<scene.count||bodyCapacity>65536||
         !Number.isInteger(contactCapacity)||contactCapacity<1||contactCapacity>262144||
         !Number.isInteger(jointCapacity)||jointCapacity<0||jointCapacity>65536)throw new RangeError('Invalid diagnostic capacity');
@@ -33,7 +32,7 @@ export class Overlay {
     this.markers=new Float32Array(3*(2*contactCapacity+2*jointCapacity+2));
     this.rows=new Uint32Array(bodyCapacity);this.bodyColors=new Float32Array(scene.count);this.view=camera(scene.rect,width,height);
   }
-  private line(ax:number,ay:number,bx:number,by:number,color:number):void {
+  protected line(ax:number,ay:number,bx:number,by:number,color:number):void {
     const at=this.lineCount*5;
     if(at+5>this.lines.length)throw new Error('Diagnostic line capacity exceeded');
     const v=this.view,l=this.lines;
@@ -42,13 +41,13 @@ export class Overlay {
     if(!Number.isFinite(Math.fround(Math.fround(dx*dx)+Math.fround(dy*dy))))throw new Error('Diagnostic line overflows GPU arithmetic');
     ++this.lineCount;
   }
-  private marker(x:number,y:number,color:number):void {
+  protected marker(x:number,y:number,color:number):void {
     const at=this.markerCount*3;
     if(at+3>this.markers.length)throw new Error('Diagnostic marker capacity exceeded');
     this.markers[at]=this.view.x+x*this.view.scale;this.markers[at+1]=this.view.y-y*this.view.scale;this.markers[at+2]=color;
     ++this.markerCount;
   }
-  private normal(x:number,y:number,nx:number,ny:number,color:number):void {
+  protected normal(x:number,y:number,nx:number,ny:number,color:number):void {
     // Normalize only the display direction. Raw C normal components remain
     // available in the snapshot/report; glyph length is always 12 pixels.
     const length=Math.hypot(nx,ny);
@@ -57,6 +56,7 @@ export class Overlay {
     this.line(x,y,x+nx*scale,y+ny*scale,color);
   }
   refresh(snapshot:SnapshotCopy,diagnostics:DiagnosticColumns):void {
+    if(this.scene.frozen)throw new Error('Use FrozenOverlay for render-only diagnostics');
     if(!diagnostics.valid||diagnostics.floats.length!==4*this.bodyCapacity+5||diagnostics.words.length!==this.bodyCapacity+3||
         snapshot.bodyCount>this.bodyCapacity||snapshot.contactCount>this.contactCapacity||snapshot.jointCount>this.jointCapacity)
       throw new Error('Invalid diagnostic snapshot');
@@ -91,6 +91,10 @@ export class Overlay {
       const by=b.y[z]+b.sin[z]*j.anchorBX[row]+b.cos[z]*j.anchorBY[row];
       this.line(ax,ay,bx,by,14);this.marker(ax,ay,14);this.marker(bx,by,14);
     }
+    this.queries(diagnostics);this.complete();
+  }
+  protected queries(diagnostics:DiagnosticColumns):void {
+    const d=diagnostics.floats,w=diagnostics.words,n=this.bodyCapacity;
     const rect=this.scene.rect,x=(rect[0]+rect[2])/2,y=(rect[1]+rect[3])/2;
     this.line(x-1,y-1,x+1,y-1,15);this.line(x+1,y-1,x+1,y+1,15);
     this.line(x+1,y+1,x-1,y+1,15);this.line(x-1,y+1,x-1,y-1,15);
@@ -100,6 +104,8 @@ export class Overlay {
       this.marker(d[at+1],d[at+2],15);
       this.normal(d[at+1],d[at+2],d[at+3],d[at+4],15);
     }
+  }
+  protected complete():void {
     for(let i=0;i<this.lineCount*5;++i)if(!Number.isFinite(this.lines[i]))throw new Error('Non-finite diagnostic line');
     for(let i=0;i<this.markerCount*3;++i)if(!Number.isFinite(this.markers[i]))throw new Error('Non-finite diagnostic marker');
     ++this.revision;

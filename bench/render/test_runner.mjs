@@ -26,25 +26,28 @@ try{
   page.on('pageerror',error=>errors.push(String(error)));
   page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon'))errors.push(message.text());});
   await page.goto(`http://127.0.0.1:${server.address().port}/verify.html`);
-  for(const candidate of ['canvas','webgl','raylib'])for(const diagnostic of [false,true]){
-    const result=await page.evaluate(async({candidate,diagnostic})=>{
+  for(const frozen of [false,true])for(const candidate of ['canvas','webgl','raylib'])for(const diagnostic of [false,true]){
+    const result=await page.evaluate(async({candidate,diagnostic,frozen})=>{
       const {runStudy}=await import('./runner.mjs');
       const canvas=document.createElement('canvas'),hudElement=document.createElement('pre');
       canvas.id='runner-test';document.body.append(canvas,hudElement);const phases=[];
       try{return JSON.parse(JSON.stringify(await runStudy({canvas,hudElement,candidate,diagnostic,correctnessSeconds:.25,
+        ...(frozen?{scene:'rain',instances:256}:{}),
         layout:diagnostic?'mobile':'desktop',onPhase:value=>phases.push(value)}),(_key,value)=>typeof value==='bigint'?String(value):value));}
       finally{canvas.remove();hudElement.remove();}
-    },{candidate,diagnostic});
-    await fs.writeFile(path.join(output,`${candidate}-${diagnostic?'diagnostic':'base'}.json`),JSON.stringify(result)+'\n');
+    },{candidate,diagnostic,frozen});
+    await fs.writeFile(path.join(output,`${frozen?'frozen-':''}${candidate}-${diagnostic?'diagnostic':'base'}.json`),JSON.stringify(result)+'\n');
     assert.equal(result.status,'collected',JSON.stringify(result.failure));assert.equal(result.kind,'correctness-only');
     assert.equal(result.acceptanceEligible,false);assert.equal(result.warmup.callbacks,120);assert.equal(result.warmup.world.steps,120);
     assert.equal(result.rendererRecreatedAfterWarmup,false);
     assert.deepEqual(result.provenance,provenance);
-    assert.equal(result.initial.steps,0);assert.equal(result.initial.drops,'0');assert.equal(result.final.finiteState,true);
+    assert.equal(result.initial.steps,frozen?120:0);assert.equal(result.initial.drops,'0');assert.equal(result.final.finiteState,true);
+    assert.equal(result.configuration.profile,frozen?'render-only':'end-to-end');assert.equal(result.configuration.instances,frozen?256:null);
+    assert.equal(result.clock.simulationEnabled,!frozen);assert.equal(result.warmup.preparationSteps,frozen?120:0);
     assert.ok(result.elapsedSeconds>=.25);assert.ok(result.frames.count>=2);assert.equal(result.frames.pendingFrame,false);
     assert.equal(result.summary.completeFrames,result.frames.count);assert.equal(result.calibrationIntervals.length,240);
     assert.equal(result.windows.length,1);assert.equal(result.windows[0].coverageReached,true);
-    assert.equal(result.windows[0].completeFrames,result.frames.count);assert.equal(result.windows[0].executedSteps,result.final.steps);
+    assert.equal(result.windows[0].completeFrames,result.frames.count);assert.equal(result.windows[0].executedSteps,result.final.steps-result.initial.steps);
     assert.equal(result.windows[0].contactDrops,result.final.drops);assert.equal(result.windows[0].endDebtSeconds,result.debtSeconds);
     const f=result.frames,n=f.numberNames.length,stepIndex=f.statNames.indexOf('completedSteps');
     assert.equal(result.gpu.pending,0);assert.equal(result.gpu.attempts,f.count);
@@ -58,7 +61,7 @@ try{
       assert.equal(result.glCalls.totalUploadBytes,uploads);assert.equal(result.glCalls.totalDrawCalls,draws);
       if(candidate==='raylib')assert.ok(uploads>0);
     }
-    assert.equal(f.stats[stepIndex],0);assert.equal(f.stats[(f.count-1)*25+stepIndex],result.final.steps);
+    assert.equal(f.stats[stepIndex],result.initial.steps);assert.equal(f.stats[(f.count-1)*25+stepIndex],result.final.steps);
     for(let row=0;row<f.count;++row){
       assert.equal(f.finished[row],1);assert.ok(f.numbers[row*n+4]>=f.numbers[row*n+3]);
       assert.ok(f.numbers[row*n+12]>=0&&f.numbers[row*n+12]<Math.fround(1/60));
@@ -66,9 +69,15 @@ try{
       assert.equal(f.known[row]&(1<<23),1<<23);assert.ok(f.numbers[row*n+23]>=0);
       if(!result.gpu.supported)assert.equal(result.gpu.statuses[row],6);
     }
-    assert.ok(Math.abs(result.final.steps*Math.fround(1/60)+result.debtSeconds+result.droppedSeconds-result.elapsedSeconds)<1e-9);
+    if(frozen){
+      assert.equal(result.final.steps,120);assert.equal(result.debtSeconds,0);assert.equal(result.droppedSeconds,0);
+      for(let row=0;row<f.count;++row){
+        assert.equal(f.stats[row*25+stepIndex],120);assert.equal(f.numbers[row*n+6],0);assert.equal(f.numbers[row*n+7],0);
+        if(candidate==='webgl')assert.equal(f.numbers[row*n+15],0);
+      }
+    }else assert.ok(Math.abs(result.final.steps*Math.fround(1/60)+result.debtSeconds+result.droppedSeconds-result.elapsedSeconds)<1e-9);
     if(candidate==='raylib')for(let row=0;row<f.count;++row){assert.equal(f.numbers[row*n+16],0);assert.equal(f.numbers[row*n+18],0);}
-    results.push({candidate,diagnostic,status:result.status,frames:f.count,gpu:result.gpu});
+    results.push({candidate,diagnostic,frozen,status:result.status,frames:f.count,gpu:result.gpu});
   }
   // Interrupt only after measurement begins, so the failed record must retain
   // its prefix. These are injected correctness events, not device evidence.

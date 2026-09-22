@@ -1,6 +1,7 @@
 import {createStudyModule} from './physics/driver.mjs';
 import {DrawScene} from './geometry.js';
 import {Overlay} from './overlay.js';
+import {FrozenOverlay} from './frozen.js';
 import {edgeMask,compare} from './pixels.js';
 import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
@@ -55,7 +56,10 @@ window.verifyStudyHud=async()=>{
     expect(hud.update(2250,world.frameCounters,renderer)&&hud.updates===4,'HUD cadence drifted');
     const text=element.textContent;hud.dispose();hud.dispose();expect(element.textContent==='','HUD disposal left text');
     let rejected=false;try{hud.update(2500,world.frameCounters,renderer);}catch{rejected=true;}expect(rejected,'Disposed HUD accepted update');
-    element.textContent=text;return {updates:4,text,kind:'correctness-only'};
+    hud=new StudyHud(element,{linearBytes:module.memory.linearMemoryBytes,arenaBytes:memory.arenaBytes,outputBytes:memory.outputBytes},65536);
+    expect(hud.update(0,world.frameCounters,renderer)&&element.textContent.startsWith('Frozen render: 65536 instances\nSource world counters:\nBodies 211/211'),'Frozen HUD confuses instances and source bodies');
+    const frozenText=element.textContent;hud.dispose();
+    element.textContent=frozenText;return {updates:4,text,frozenText,kind:'correctness-only'};
   }finally{world?.dispose();module.dispose();}
 };
 window.verifyRenderers=async ({scene='rain',steps=120,copies=1,sleep=false,diagnostic=false,instances,width=1280,height=720,images=false}={})=>{
@@ -70,8 +74,10 @@ window.verifyRenderers=async ({scene='rain',steps=120,copies=1,sleep=false,diagn
     if (!world.refreshSnapshot(diagnostic)) throw new Error('Snapshot failed');
     const drawScene=new DrawScene(world.snapshot,scene,instances,copies), pixels=[];
     const config=world.configuration;
-    const overlay=diagnostic?new Overlay(drawScene,config.bodyCapacity,config.contactCapacity,config.jointCapacity,width,height):undefined;
-    if(overlay)overlay.refresh(world.snapshot,world.diagnostics);
+    const overlay=diagnostic?(drawScene.frozen?
+      new FrozenOverlay(drawScene,world.snapshot,world.frozenDiagnostics(instances),width,height):
+      new Overlay(drawScene,config.bodyCapacity,config.contactCapacity,config.jointCapacity,width,height)):undefined;
+    if(overlay&&!drawScene.frozen)overlay.refresh(world.snapshot,world.diagnostics);
     const edges=edgeMask(drawScene,width,height,overlay);
     for (const name of ['canvas','webgl','raylib']) {
       const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;canvas.dataset.candidate=name;canvas.id=`silk-study-${name}`;
@@ -246,6 +252,52 @@ window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=
     return {scene,copies,sleep,diagnostic,width,height,results,poseCopyBytes:0,diagnosticCopyBytes:0,linearMemoryBytes:256*1024*1024};
   }finally{
     for(const candidate of candidates)candidate.dispose();world?.dispose();reference?.dispose();module?.dispose();referenceModule?.dispose();
+    for(const canvas of canvases)canvas.remove();
+  }
+};
+
+window.verifyColocatedFrozen=async({instances,diagnostic=false,width=1280,height=720})=>{
+  const canvases=[],candidates=[];let module,world;
+  const expect=(condition,message)=>{if(!condition)throw new Error(message);};
+  try{
+    for(const id of ['reference','raylib']){
+      const canvas=document.createElement('canvas');canvas.id=`silk-frozen-${id}`;canvas.width=width;canvas.height=height;
+      document.body.append(canvas);canvases.push(canvas);
+    }
+    module=await createRaylibStudyModule(canvases[1]);world=module.create('rain',{steps:121});
+    expect(world,'Frozen co-located fixture allocation failed');
+    for(let i=0;i<120;++i)expect(world.step(),'Frozen source preparation failed');
+    expect(world.refreshSnapshot(true),'Frozen source snapshot failed');const source=world.snapshot.copy();
+    const scene=new DrawScene(source,'rain',instances),columns=diagnostic?world.frozenDiagnostics(instances):null;
+    const overlay=diagnostic?new FrozenOverlay(scene,source,columns,width,height):undefined;
+    const reference=new CanvasCandidate(canvases[0],scene,overlay),renderer=world.createRenderer({diagnostic,instances});
+    candidates.push(reference,renderer);
+    const expected=await capture(canvases[0],reference),edges=edgeMask(scene,width,height,overlay),results=[];
+    results.push(compare(expected,await capture(canvases[1],renderer),width,height,edges));
+    expect(renderer.poseCopyBytes===16*instances,'Frozen setup pose copy missing');
+    expect(renderer.diagnosticCopyBytes===(overlay?20*overlay.lineCount+12*overlay.markerCount+4*instances:0),'Frozen setup diagnostic copy differs');
+    renderer.draw();expect(renderer.poseCopyBytes===0&&renderer.diagnosticCopyBytes===0,'Frozen commands recopied');
+    const memory=module.memory.allocatorUsedBytes,context=canvases[1].getContext('webgl2');
+    const previous=world;world=world.rebuild();expect(world,'Frozen rebuild allocation failed');previous.dispose();
+    let rejected=false;try{renderer.draw();}catch(error){rejected=/step 120/.test(String(error));}
+    expect(rejected,'Renderer accepted unprepared replacement source');
+    for(let i=0;i<120;++i)expect(world.step(),'Rebuilt frozen preparation failed');
+    expect(world.refreshSnapshot(true),'Rebuilt frozen snapshot failed');
+    const rebuilt=world.snapshot.copy();
+    for(const name of ['bodyCount','contactCount','jointCount'])expect(source[name]===world.snapshot[name],`Rebuilt ${name} differs`);
+    for(const group of ['bodies','geometry','contacts','joints'])for(const key of Object.keys(source[group])){
+      const a=source[group][key],b=rebuilt[group][key];expect(a.length===b.length,'Rebuilt snapshot capacity differs');
+      for(let i=0;i<a.length;++i)expect(Object.is(a[i],b[i]),`Rebuilt frozen ${group}.${key}[${i}] differs`);
+    }
+    results.push(compare(expected,await capture(canvases[1],renderer),width,height,edges));
+    expect(renderer.poseCopyBytes===0&&renderer.diagnosticCopyBytes===0,'Rebuild discarded warmed frozen commands');
+    expect(canvases[1].getContext('webgl2')===context,'Rebuild replaced frozen graphics context');
+    expect(module.memory.allocatorUsedBytes===memory,'Frozen rebuild changed native allocation usage');
+    expect(world.step(),'Post-freeze guard test could not advance');rejected=false;
+    try{renderer.draw();}catch(error){rejected=/step 120/.test(String(error));}expect(rejected,'Frozen renderer accepted changed simulation');
+    return {instances,diagnostic,width,height,results,linearMemoryBytes:module.memory.linearMemoryBytes};
+  }finally{
+    for(const candidate of candidates)candidate.dispose();world?.dispose();module?.dispose();
     for(const canvas of canvases)canvas.remove();
   }
 };

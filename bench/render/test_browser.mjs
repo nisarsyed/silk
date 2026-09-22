@@ -49,11 +49,24 @@ try {
     finally{await page.close();}
   }
   for (const [width,height] of [[1280,720],[720,1280]]) {
+    for(const instances of [256,65536])for(const diagnostic of [false,true]){
+      const page=await browser.newPage({viewport:{width:width===720?360:width,height:height===1280?640:height},deviceScaleFactor:width===720?2:1}),errors=[],entry={frozen:true,instances,diagnostic,width,height,status:'running'};colocated.push(entry);
+      page.on('pageerror',error=>errors.push(String(error)));
+      page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon'))errors.push(message.text());});
+      try{
+        await page.goto(`http://127.0.0.1:${server.address().port}/verify.html`);
+        await page.waitForFunction(()=>typeof window.verifyColocatedFrozen==='function');
+        Object.assign(entry,await page.evaluate(profile=>window.verifyColocatedFrozen(profile),{instances,diagnostic,width,height}));
+        assert.deepEqual(errors,[]);for(const result of entry.results)assert.equal(result.interiorMismatch,0);
+        assert.equal(entry.linearMemoryBytes,64*1024*1024);entry.status='passed';console.log(JSON.stringify({colocated:entry}));
+      }catch(error){entry.status='failed';entry.error=String(error);throw error;}
+      finally{await page.close();}
+    }
     const profiles=[];
     for (const scene of ['pyramid','rain','chains']) for (const steps of [0,120]) profiles.push({scene,steps,width,height});
     for(const scene of ['pyramid','rain','chains']) for(const sleep of [false,true]) profiles.push({scene,steps:120,diagnostic:true,sleep,width,height});
     for(const scene of ['pyramid','rain','chains']) profiles.push({scene,steps:3,copies:16,width,height});
-    for (const instances of [256,65536]) profiles.push({scene:'rain',steps:120,instances,width,height});
+    for (const instances of [256,65536])for(const diagnostic of [false,true])profiles.push({scene:'rain',steps:120,instances,diagnostic,width,height});
     for (const profile of profiles) {
       const page=await browser.newPage({viewport:{width:width===720?360:width,height:height===1280?640:height},deviceScaleFactor:width===720?2:1}), errors=[];
       const entry={profile,status:'running'};results.push(entry);

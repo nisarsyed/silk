@@ -82,6 +82,8 @@ jobs:
           node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
+          node bench/render/test_frozen.mjs "build/render-study-$mode"
+          node bench/render/test_canvas_frozen.mjs "build/render-study-$mode"
           node bench/render/test_recording.mjs "build/render-study-$mode"
           node bench/render/test_timing.mjs "build/render-study-$mode"
           node bench/render/test_gpu.mjs "build/render-study-$mode"

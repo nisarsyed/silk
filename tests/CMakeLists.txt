@@ -46,6 +46,6 @@ if(EMSCRIPTEN)
 endif()
 
 if(SL_BUILD_WASM_ADAPTER)
-    target_sources(sl_tests PRIVATE test_wasm.c test_wasm_bench.c test_render_scene.c)
+    target_sources(sl_tests PRIVATE test_wasm.c test_wasm_bench.c test_render_scene.c test_render_frozen.c)
     target_compile_definitions(sl_tests PRIVATE SL_TEST_WASM_ADAPTER=1)
 endif()

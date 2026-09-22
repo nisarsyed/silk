@@ -1,5 +1,6 @@
 import {DrawScene, camera} from './geometry.js';
 import {Overlay,palette,markerTriangles} from './overlay.js';
+import {FrozenOverlay,type FrozenDiagnostics} from './frozen.js';
 import type {SnapshotCopy} from '../../wasm/index.js';
 interface RaylibModule {
   HEAPF32: Float32Array; HEAPU32: Uint32Array;
@@ -65,7 +66,8 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
         this.poseCopyBytes=0;this.posePrepareBytes=0;this.diagnosticCopyBytes=0;this.diagnosticPrepareBytes=0;
         if(source){
           source.valid();const step=source.steps();
-          if(lastStep!==step){
+          if(scene.frozen&&step!==120)throw new Error('Frozen source must remain at step 120');
+          if(!scene.frozen&&lastStep!==step){
             if(!m._sl_render_study_poses(source.study,poses.byteOffset,scene.count))throw new Error('Direct C pose preparation failed');
             if(source.diagnostic){
               if(!m._sl_render_overlay_refresh(source.study,view.scale,view.x,view.y))throw new Error('Direct C diagnostic preparation failed');
@@ -74,7 +76,8 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
             }
             lastStep=step;this.posePrepareBytes=poses.byteLength;
           }
-        }else if (revision!==scene.revision) { poses.set(scene.poses); revision=scene.revision; this.poseCopyBytes=poses.byteLength; }
+        }
+        if((!source||scene.frozen)&&revision!==scene.revision){poses.set(scene.poses);revision=scene.revision;this.poseCopyBytes=poses.byteLength;}
         if(overlay&&lines&&markers&&colors&&overlayRevision!==overlay.revision){
           // Active prefixes only, without temporary typed-array views. The
           // co-located C study will remove this prototype boundary copy.
@@ -94,8 +97,9 @@ function initializeCandidate(m:RaylibModule,canvas:HTMLCanvasElement,scene:DrawS
 }
 
 interface StudyWorld {
-  configuration:{scene:'pyramid'|'rain'|'chains';copies:number;bodyCapacity:number;contactCapacity:number;jointCapacity:number};
+  configuration:{scene:'pyramid'|'rain'|'chains';copies:number;sleepEnabled:boolean;bodyCapacity:number;contactCapacity:number;jointCapacity:number};
   snapshot:SnapshotCopy;steps:number;refreshSnapshot(diagnostic?:boolean):boolean;
+  frozenDiagnostics(instances:number):FrozenDiagnostics|null;
 }
 /** One fixed memory owns physics and raylib. Geometry/palette cross JS during
  * setup; live poses and diagnostic commands are prepared directly in C. */
@@ -106,20 +110,28 @@ export async function createRaylibStudyModule(canvas:HTMLCanvasElement,{memoryBy
   const {default:factory}=await import(new URL('./raylib.mjs',import.meta.url).href);
   const {ownStudyModule}=await import(new URL('./physics/owner.mjs',import.meta.url).href);
   const m:RaylibModule=await factory({canvas,wasmMemory:new WebAssembly.Memory({initial:memoryBytes/65536,maximum:memoryBytes/65536})});
-  const rebinders=new WeakMap<object,{diagnostic:boolean;rebind:(next:DirectSource)=>void}>();
-  return ownStudyModule(m,memoryBytes,(study:number,world:StudyWorld,valid:()=>void,options:{diagnostic?:boolean},previous?:object)=>{
+  const rebinders=new WeakMap<object,{diagnostic:boolean;instances?:number;rebind:(next:DirectSource)=>void}>();
+  return ownStudyModule(m,memoryBytes,(study:number,world:StudyWorld,valid:()=>void,options:{diagnostic?:boolean;instances?:number},previous?:object)=>{
     if(!options||typeof options!=='object'||Array.isArray(options)||
         (options.diagnostic!==undefined&&typeof options.diagnostic!=='boolean'))throw new TypeError('Invalid renderer options');
     const existing=previous?rebinders.get(previous):undefined;
     if(previous&&!existing)throw new Error('Renderer belongs to another module');
     const diagnostic=existing?.diagnostic??options.diagnostic??false;
+    const instances=existing?.instances??options.instances;
     const source={study,valid,steps:()=>world.steps,diagnostic,bodyCapacity:world.configuration.bodyCapacity,
       contactCapacity:world.configuration.contactCapacity,jointCapacity:world.configuration.jointCapacity};
     if(existing){existing.rebind(source);return previous;}
-    if(!world.refreshSnapshot())throw new Error('Raylib geometry snapshot failed');
-    const scene=new DrawScene(world.snapshot,world.configuration.scene,undefined,world.configuration.copies);
+    if(instances!==undefined&&(world.configuration.scene!=='rain'||world.configuration.copies!==1||
+      world.configuration.sleepEnabled||world.steps!==120))throw new Error('Frozen rendering requires the original awake rain at step 120');
+    if(!world.refreshSnapshot(diagnostic&&instances!==undefined))throw new Error('Raylib geometry snapshot failed');
+    const scene=new DrawScene(world.snapshot,world.configuration.scene,instances,world.configuration.copies);
+    let overlay:FrozenOverlay|undefined;
+    if(scene.frozen&&diagnostic){
+      const columns=world.frozenDiagnostics(scene.count);if(!columns)throw new Error('Frozen query preparation failed');
+      overlay=new FrozenOverlay(scene,world.snapshot,columns,canvas.width,canvas.height);
+    }
     let rebind!:(next:DirectSource)=>void;
-    const renderer=initializeCandidate(m,canvas,scene,undefined,source,value=>{rebind=value;});
-    rebinders.set(renderer,{diagnostic,rebind});return renderer;
+    const renderer=initializeCandidate(m,canvas,scene,overlay,source,value=>{rebind=value;});
+    rebinders.set(renderer,{diagnostic,instances,rebind});return renderer;
   });
 }
