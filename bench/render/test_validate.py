@@ -45,6 +45,7 @@ def main():
                     lambda r: r['frames'].update(bytes=1),
                     lambda r: r['frames']['numberNames'].reverse(),
                     lambda r: r['frames']['numbers'].__setitem__(0, float('nan')),
+                    lambda r: r['frames']['numbers'].__setitem__(0, r['frames']['numbers'][1]+1),
                     lambda r: r['frames']['numbers'].__setitem__(1, r['frames']['numbers'][3]+1),
                     lambda r: r['frames']['numbers'].__setitem__(12, audit.DT),
                     lambda r: r['frames']['numbers'].__setitem__(8, 123456),
@@ -67,6 +68,9 @@ def main():
                     rejects(report, lambda r: r['glCalls'].update(totalUploadBytes=r['glCalls']['totalUploadBytes']+1))
                 if frozen:
                     rejects(report, lambda r: r['frames']['numbers'].__setitem__(6, 1))
+                rounded = copy.deepcopy(report)
+                rounded['frames']['numbers'][0] = rounded['frames']['numbers'][1] + 5e-10
+                assert audit.validate(rounded) == result
                 checked += 1
     # A synthetic resolved sample exercises optional GPU distributions even on
     # CI hosts without timer support. This is never saved as device evidence.

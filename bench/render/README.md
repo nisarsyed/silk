@@ -273,7 +273,10 @@ calibration, fixed-step accounting, unavailable GPU metrics, observed GL totals,
 nearest-rank tails and every 10-second window. Corrupt, failed and partial records
 are rejected; retain their originals for investigation. Timing recomputation
 permits only floating-point arithmetic rounding, while budget comparisons use
-the unchanged exact inclusive thresholds.
+the unchanged exact inclusive thresholds. The cross-API rAF/callback ordering
+check uses the same 1e-9 ms arithmetic allowance: CI observed `6091.7` from rAF
+and `6091.6999999999825` from `performance.now()` for the same instant. Ordering
+among `performance.now()` samples stays exact, and raw samples are never changed.
 
 The audit reports each continuity/CPU/cadence budget separately, including empty
 windows. Diagnostic budgets are marked inapplicable and short correctness runs

@@ -180,7 +180,13 @@ def validate(report):
             require(known & (1 << j) or value == 0, 'unavailable metric contains a value')
         for value in s:
             number(value, 0, 2**32-1, True)
-        require(n[0] <= n[1] <= n[3] <= n[4] and n[11] <= n[4]-n[1], 'invalid frame clocks')
+        # rAF and performance.now expose separately converted timestamps. CI
+        # recorded 6091.7 versus 6091.6999999999825 for the same instant.
+        # Apply only the existing 1e-9 ms arithmetic allowance to that cross-
+        # API ordering check. All performance.now ordering and budget gates
+        # remain exact; this never alters samples or measured durations.
+        require((n[0] <= n[1] or math.isclose(n[0], n[1], rel_tol=0, abs_tol=1e-9)) and
+                n[1] <= n[3] <= n[4] and n[11] <= n[4]-n[1], 'invalid frame clocks')
         require(sum(n[5:12]) + n[23] <= n[4]-n[1]+1e-9, 'stage timings exceed the critical path')
         require(s[24] >= prior_steps and s[24]-prior_steps <= 8 and n[13] >= prior_drops and
                 w[25] >= prior_contact and all(w[13+j] >= prior_work[j] for j in range(13)), 'counters moved backwards or step cap exceeded')
