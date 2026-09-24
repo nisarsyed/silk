@@ -91,13 +91,14 @@ jobs:
           node bench/render/test_gl_stats.mjs "build/render-study-$mode"
           node bench/render/test_windows.mjs "build/render-study-$mode"
           SL_RENDER_TEST_CLOCK=synthetic node bench/render/test_runner.mjs "build/render-study-$mode" "build/reports/render-$mode/runner"
-          python3 bench/render/test_validate.py "build/reports/render-$mode/runner" "build/render-study-$mode"
           mkdir -p "build/reports/render-$mode/runner/audits"
           for report in build/reports/render-"$mode"/runner/*-base.json build/reports/render-"$mode"/runner/*-diagnostic.json; do
             python3 bench/render/validate.py "$report" > "build/reports/render-$mode/runner/audits/$(basename "$report")"
           done
           node bench/render/test_hud.mjs "build/render-study-$mode" "build/reports/render-$mode/hud"
           node bench/render/test_pointer_browser.mjs "build/render-study-$mode" "build/reports/render-$mode/pointer"
+          node bench/render/test_input_browser.mjs "build/render-study-$mode" "build/reports/render-$mode/input"
+          python3 bench/render/test_validate.py "build/reports/render-$mode/runner" "build/render-study-$mode" "build/reports/render-$mode/input"
           node bench/render/test_browser.mjs "build/render-study-$mode" "build/reports/render-$mode"
       - uses: actions/upload-artifact@v7
         if: always()

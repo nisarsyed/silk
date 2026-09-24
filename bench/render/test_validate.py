@@ -98,6 +98,25 @@ def main():
     for reason in ('abort', 'context', 'hidden'):
         report = audit.load(root / f'interrupted-{reason}.json')['report']
         rejects(report, lambda r: None)
+    input_root = Path(sys.argv[3]) if len(sys.argv) > 3 else None
+    if input_root is not None:
+        for candidate in ('canvas', 'webgl', 'raylib'):
+            report = audit.load(input_root / f'{candidate}.json')
+            assert audit.validate(report)['rawTimingIntegrity'] == 'passed'
+            assert report['input']['trustedSubmittedMoves'] > 0
+            def sample(value):
+                return next(event for event in value['input']['events'] if event['status'] == 'submitted')
+            for mutate in (
+                lambda r: r['configuration'].update(interaction=False),
+                lambda r: r['input'].update(latencyGateEvaluable=True),
+                lambda r: r['input'].update(trustedSubmittedMoves=0),
+                lambda r: r['input'].update(count=0),
+                lambda r: sample(r).update(appliedStep=0),
+                lambda r: sample(r).update(submittedFrame=r['frames']['count']+1),
+                lambda r: sample(r).update(submittedMs=0),
+                lambda r: sample(r).update(latencyMs=123456),
+            ):
+                rejects(report, mutate)
     # Exercise the real JS producer across window boundaries, missing windows
     # and final overshoot. The auditor independently checks its output.
     build = sys.argv[2] if len(sys.argv) > 2 else 'build/render-study'
@@ -129,6 +148,9 @@ def main():
         assert not all(audit.budgets(changed, 20, 0, 0, 0).values())
     for drops, contacts, debt in [(1e-30, 0, 0), (0, 1, 0), (0, 0, audit.DT)]:
         assert not audit.budgets(summary, 20, drops, contacts, debt)['continuity']
+    assert audit.raf_before_callback(8236.9, 8236.89999961853, True)
+    assert not audit.raf_before_callback(8236.9, 8236.89999961853, False)
+    assert not audit.raf_before_callback(8236.9, 8236.84, True)
     summary['missedTargetFraction'] = .0100000001
     assert not audit.budgets(summary, 20, 0, 0, 0)['missedSlots']
     assert audit.distribution([4, 1, 2, 3]) == dict(count=4, p50=2, p95=4, p99=4, max=4)

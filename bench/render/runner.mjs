@@ -1,6 +1,7 @@
 import {createStudyModule} from './physics/driver.mjs';
 import {createRaylibStudyModule} from './raylib.js';
-import {DrawScene,renderTiers} from './geometry.js';
+import {DrawScene,renderTiers,sceneRects} from './geometry.js';
+import {StudyInput} from './input.js';
 import {Overlay} from './overlay.js';
 import {FrozenOverlay} from './frozen.js';
 import {CanvasCandidate} from './canvas.js';
@@ -18,17 +19,18 @@ import {provenanceJson} from './provenance.mjs';
 // Only one run may own a canvas at a time, including asynchronous initialization.
 const active=new WeakSet();
 export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copies=1,sleep=false,
-  diagnostic=false,layout='desktop',sustained=false,instances,memoryBytes=64*1024*1024,correctnessSeconds,signal,onPhase}={}) {
+  diagnostic=false,layout='desktop',sustained=false,interaction=false,instances,memoryBytes=64*1024*1024,correctnessSeconds,signal,onPhase}={}) {
   if(!(canvas instanceof HTMLCanvasElement)||!canvas.isConnected||!canvas.id||document.getElementById(canvas.id)!==canvas||
       !['canvas','webgl','raylib'].includes(candidate)||!['pyramid','rain','chains'].includes(scene)||
       ![1,2,4,8,16].includes(copies)||typeof sleep!=='boolean'||typeof diagnostic!=='boolean'||
-      !['desktop','mobile'].includes(layout)||typeof sustained!=='boolean'||
+      !['desktop','mobile'].includes(layout)||typeof sustained!=='boolean'||typeof interaction!=='boolean'||
       !Number.isInteger(memoryBytes)||memoryBytes<(candidate==='raylib'?64:2)*1024*1024||
       memoryBytes>512*1024*1024||memoryBytes%65536!==0||
       (signal!==undefined&&!(signal instanceof AbortSignal))||(onPhase!==undefined&&typeof onPhase!=='function')||
       (diagnostic&&!(hudElement instanceof HTMLElement))||
       (instances!==undefined&&(!renderTiers.includes(instances)||scene!=='rain'||copies!==1||sleep||sustained))||
       (sustained&&(scene!=='rain'||sleep||diagnostic||copies!==1||layout!=='mobile'))||
+      (interaction&&(copies!==1||diagnostic||sustained||instances!==undefined))||
       (correctnessSeconds!==undefined&&(!Number.isFinite(correctnessSeconds)||correctnessSeconds<.25||correctnessSeconds>5)))
     throw new TypeError('Invalid study run configuration');
   if(active.has(canvas))throw new Error('Canvas already has an active study');
@@ -36,7 +38,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
   const duration=correctnessSeconds??(sustained?300:60),width=layout==='mobile'?720:1280,height=layout==='mobile'?1280:720;
   const deviceDpr=devicePixelRatio,viewportWidth=innerWidth,viewportHeight=innerHeight;
   const intervals=new Float64Array(240),values=new Float64Array(numberNames.length);
-  let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,gpu,glCalls,phase='initialization',failure=null;
+  let module,world,renderer,drawScene,overlay,hud,recorder,clock,calibration,gpu,glCalls,input,phase='initialization',failure=null;
   const rendererMetrics={gpuBytes:null,uploadBytes:null,drawCalls:null};
   let frameId=0,rejectFrames,initial,final,warmup,setupMs=null,worldSetupMs=null,measurementStart=null,measurementEnd=null,calibrationCount=0;
   const began=performance.now();
@@ -103,7 +105,10 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     rendererMetrics.uploadBytes=glCalls?.uploadBytes??renderer.uploadBytes;
     rendererMetrics.drawCalls=glCalls?.drawCalls??renderer.drawCalls;
   };
-  const step=count=>{for(let i=0;i<count;++i)if(!world.step())throw new Error('Study step failed (numeric state or step bound)');};
+  const step=count=>{for(let i=0;i<count;++i){
+    if(!world.step())throw new Error('Study step failed (numeric state or step bound)');
+    input?.stepped(world.steps);
+  }};
   const prepare=()=>{if(drawScene&&!drawScene.frozen){if(!world.refreshSnapshot(diagnostic))throw new Error('Snapshot failed');
     drawScene.copyTransforms(world.snapshot);overlay?.refresh(world.snapshot,world.diagnostics);}};
   try{
@@ -139,6 +144,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     recorder=new FrameRecorder(Math.ceil(duration*1000/calibration.targetPeriodMs)+2);
     gpu=new GpuTimer(candidate==='canvas'?null:canvas.getContext('webgl2'),recorder.capacity,
       Math.ceil(100/calibration.targetPeriodMs)+2);
+    if(interaction){input=new StudyInput(canvas,world,sceneRects[scene],fail);input.start();}
     setPhase('measurement');
     await frames((raf,now)=>{
       if(recorder.count===recorder.capacity)throw new Error('Frame recording capacity exhausted');
@@ -156,6 +162,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       t=performance.now();const timed=gpu.begin(recorder.count,t);
       try{draw();}finally{if(timed)gpu.end();}
       values[3]=performance.now();values[8]=values[3]-t;
+      input?.submitted(recorder.count+1,values[3]);
       t=performance.now();if(!world.refreshFrameCounters())throw new Error('Frame counters failed');values[9]=performance.now()-t;
       t=performance.now();hud?.update(now,world.frameCounters,rendererMetrics);values[10]=performance.now()-t;
       values[12]=clock.debtSeconds;values[13]=clock.droppedSeconds;
@@ -168,6 +175,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       measurementEnd=recorder.numbers[(recorder.count-1)*numberNames.length+4];
       return clock.elapsedSeconds>=duration;
     });
+    input?.stop();
     // Tail queries resolve on later browser callbacks without drawing or
     // extending measured duration. Never wait indefinitely or block the GPU.
     setPhase('gpu-drain');let drainCallbacks=0;
@@ -183,6 +191,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('contextlost',contextLost);
     window.removeEventListener('resize',resized);
     signal?.removeEventListener('abort',aborted);
+    input?.stop();
     try{if(world)final=world.report();}catch(error){fail(`Final report: ${error}`);}
     gpu?.stop(!!failure);
   }
@@ -191,7 +200,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
   try{
     report={schema:1,kind:correctnessSeconds===undefined?'study-collection':'correctness-only',acceptanceEligible:false,
       status:failure?'failed':'collected',failure,phase,
-      configuration:{candidate,scene,copies,sleep,diagnostic,layout,sustained,instances:instances??null,
+      configuration:{candidate,scene,copies,sleep,diagnostic,layout,sustained,interaction,instances:instances??null,
         profile:instances===undefined?'end-to-end':'render-only',memoryBytes,durationSeconds:duration,
         width,height,cssWidth:layout==='mobile'?360:width,cssHeight:layout==='mobile'?640:height,
         renderDpr:layout==='mobile'?2:1,deviceDpr,viewportWidth,viewportHeight,worker:false},
@@ -203,7 +212,8 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       summary:recorder?.summary(calibration.targetPeriodMs),frames:recorder?.report(world.frameCounters),
       windows:recorder?.windows(calibration.targetPeriodMs,duration,initial.steps,initial.drops),
       gpu:gpu?.report(),glCalls:glCalls?.report()??null,
-      missingEvidence:['device conditions','real input','memory profiling',
+      input:input?.report()??null,
+      missingEvidence:['device conditions',interaction?'input timestamp precision and qualification':'real input','memory profiling',
         'full-quality companion runs','five-repeat protocol']};
   }finally{try{gpu?.dispose();glCalls?.dispose();closeWorld();module?.dispose();}finally{active.delete(canvas);}}
   return report;

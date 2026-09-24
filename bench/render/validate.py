@@ -91,6 +91,81 @@ def budgets(summary, period, dropped, contacts, debt):
                 missedSlots=summary['missedTargetFraction'] is not None and summary['missedTargetFraction'] <= .01)
 
 
+def raf_before_callback(raf, callback, quantized_tenth):
+    if raf <= callback or math.isclose(raf, callback, rel_tol=0, abs_tol=1e-9):
+        return True
+    # A real Chromium trace reported rAF=8236.9 and performance.now()=
+    # 8236.89999961853. Its 240 calibration intervals were all on a 0.1 ms
+    # grid, so these readings have the same rounded rAF time. This does not
+    # change CPU/cadence budgets or forgive two distinct rAF ticks.
+    return quantized_tenth and raf == math.floor(callback*10+0.5)/10
+
+
+def validate_input(record, frames, body_capacity, time_origin):
+    """Check input-to-C-step-to-submission links, never qualify latency here."""
+    require(type(record) is dict and record['source'] == 'canvas PointerEvent', 'invalid input source')
+    require(record['capacity'] == 65536 and record['typedBytes'] == 95*65536 and
+            type(record['events']) is list, 'invalid input capacity')
+    count = number(record['count'], 0, 65536, True)
+    require(len(record['events']) == count and record['latencyGateEvaluable'] is False and
+            record['timestampPrecisionMs'] is None and
+            record['timestampPrecisionStatus'] == 'unverified', 'input precision claim or count differs')
+    equal(record['timeOrigin'], time_origin, 'input time origin')
+    kinds = ('down', 'move', 'up', 'cancel', 'lost-capture')
+    statuses = ('ignored', 'accepted', 'queued', 'submitted', 'superseded', 'miss',
+                'released-before-step', 'cancelled-before-step', 'not-stepped',
+                'applied-no-frame', 'rejected')
+    gestures = submitted = valid_timestamps = 0
+    trusted_gestures = set()
+    for event in record['events']:
+        require(type(event) is dict and event['kind'] in kinds and event['status'] in statuses,
+                'invalid input event')
+        require(type(event['trusted']) is bool and type(event['primary']) is bool,
+                'invalid input trust flags')
+        number(event['pointerId'], -2**31, 2**31-1, True)
+        number(event['button'], -32768, 32767, True)
+        number(event['buttons'], 0, 65535, True)
+        number(event['coalescedCount'], 0, 65535, True)
+        gesture = number(event['gesture'], 0, 2**32-1, True)
+        gestures = max(gestures, gesture)
+        if event['bodyIndex'] is not None:
+            number(event['bodyIndex'], 0, body_capacity-1, True)
+        for key in ('eventTimeStamp', 'eventMs', 'receivedMs', 'clientX', 'clientY', 'worldX', 'worldY'):
+            number(event[key], -math.inf)
+        require(event['eventTimeKind'] in ('relative', 'epoch-adjusted'), 'unknown event clock')
+        if event['eventTimeKind'] == 'relative':
+            require(event['eventMs'] == event['eventTimeStamp'], 'relative event clock differs')
+        else:
+            equal(event['eventMs'], event['eventTimeStamp']-time_origin, 'epoch event clock')
+        frame_index = event['submittedFrame']
+        if event['status'] == 'submitted':
+            require(event['kind'] == 'move' and event['bodyIndex'] is not None, 'non-move input sample')
+            frame_index = number(frame_index, 1, len(frames), True)
+            step = number(event['appliedStep'], 1, 21600, True)
+            frame = frames[frame_index-1]
+            prior = frames[frame_index-2]['s'][24] if frame_index > 1 else 0
+            require(prior < step <= frame['s'][24], 'input step differs from submitted frame')
+            equal(event['submittedMs'], frame['n'][3], 'input submission clock')
+            expected_latency = (event['submittedMs']-event['eventMs']
+                                if event['eventMs'] > 0 and event['submittedMs'] >= event['eventMs'] else None)
+            equal(event['latencyMs'], expected_latency, 'input latency')
+            if event['trusted']:
+                submitted += 1
+                trusted_gestures.add(gesture)
+                if expected_latency is not None:
+                    valid_timestamps += 1
+        else:
+            require(frame_index is None and event['submittedMs'] is None and event['latencyMs'] is None,
+                    'unsubmitted input has frame or latency')
+            if event['appliedStep'] is not None:
+                require(event['status'] == 'applied-no-frame' and event['kind'] == 'move',
+                        'unsubmitted input has applied step')
+                number(event['appliedStep'], 1, 21600, True)
+    require(gestures == record['gestures'] and submitted == record['trustedSubmittedMoves'] and
+            len(trusted_gestures) == record['trustedGesturesWithSubmittedMoves'] and
+            valid_timestamps == record['validTimestampSamples'], 'input totals differ')
+
+
 def validate(report):
     require(type(report['schema']) is int and report['schema'] == 1 and report['kind'] in ('correctness-only', 'study-collection'), 'unsupported report')
     require(report['status'] == 'collected' and report['failure'] is None and report['phase'] == 'complete',
@@ -102,7 +177,11 @@ def validate(report):
     frozen = cfg['profile'] == 'render-only'
     require(cfg['profile'] in ('render-only', 'end-to-end') and cfg['candidate'] in ('canvas', 'webgl', 'raylib'), 'invalid profile')
     require(cfg['scene'] in ('pyramid', 'rain', 'chains') and type(cfg['copies']) is int and cfg['copies'] in (1, 2, 4, 8, 16), 'invalid workload')
-    require(all(type(cfg[k]) is bool for k in ('sleep', 'diagnostic', 'sustained', 'worker')) and not cfg['worker'], 'invalid collection booleans')
+    require(all(type(cfg[k]) is bool for k in ('sleep', 'diagnostic', 'sustained', 'worker')) and not cfg['worker'] and
+            type(cfg.get('interaction', False)) is bool, 'invalid collection booleans')
+    interaction = cfg.get('interaction', False)
+    require(not interaction or (cfg['copies'] == 1 and not frozen and not cfg['diagnostic'] and
+            not cfg['sustained']), 'invalid interaction profile')
     require((frozen and cfg['instances'] in [2**i for i in range(8, 17)] and cfg['scene'] == 'rain'
              and cfg['copies'] == 1 and not cfg['sleep'] and not cfg['sustained']) or
             (not frozen and cfg['instances'] is None), 'invalid render tier')
@@ -122,6 +201,8 @@ def validate(report):
     require(type(intervals) is list and len(intervals) == 240, 'incomplete calibration')
     for value in intervals:
         number(value, 1e-30)
+    raf_quantized_tenth = all(math.isclose(value*10, round(value*10), rel_tol=0, abs_tol=1e-8)
+                              for value in intervals)
     refresh = sorted(intervals)[119]
     divisor = max(1, math.floor((1000 / 60) / refresh + .5))
     period = refresh * divisor
@@ -182,12 +263,9 @@ def validate(report):
             require(known & (1 << j) or value == 0, 'unavailable metric contains a value')
         for value in s:
             number(value, 0, 2**32-1, True)
-        # rAF and performance.now expose separately converted timestamps. CI
-        # recorded 6091.7 versus 6091.6999999999825 for the same instant.
-        # Apply only the existing 1e-9 ms arithmetic allowance to that cross-
-        # API ordering check. All performance.now ordering and budget gates
-        # remain exact; this never alters samples or measured durations.
-        require((n[0] <= n[1] or math.isclose(n[0], n[1], rel_tol=0, abs_tol=1e-9)) and
+        # Keep same-clock ordering exact. The only cross-API exception is a
+        # proven 0.1 ms rAF grid or the prior 1e-9 ms conversion allowance.
+        require(raf_before_callback(n[0], n[1], raf_quantized_tenth) and
                 n[1] <= n[3] <= n[4] and n[11] <= n[4]-n[1], 'invalid frame clocks')
         require(sum(n[5:12]) + n[23] <= n[4]-n[1]+1e-9, 'stage timings exceed the critical path')
         require(s[24] >= prior_steps and s[24]-prior_steps <= 8 and n[13] >= prior_drops and
@@ -242,6 +320,10 @@ def validate(report):
             require(decimal(world['work'][name]) == row['w'][j], 'last-step work differs')
     for j, name in enumerate(WORK):
         require(decimal(final['cumulative'][name]) == last['w'][13+j], 'final work differs')
+    if interaction:
+        validate_input(report['input'], rows, initial['configuration']['bodyCapacity'], report['clock']['timeOrigin'])
+    else:
+        require(report.get('input') is None, 'unexpected input trace')
     equal(report['elapsedSeconds'], last['elapsed'], 'elapsed')
     equal(report['debtSeconds'], last['n'][12], 'debt')
     equal(report['droppedSeconds'], last['n'][13], 'drops')

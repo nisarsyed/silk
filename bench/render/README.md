@@ -34,6 +34,7 @@ node bench/render/test_gpu.mjs
 node bench/render/test_gl_stats.mjs
 node bench/render/test_windows.mjs
 node bench/render/test_runner.mjs
+node bench/render/test_input_browser.mjs
 node bench/render/test_hud.mjs
 node bench/render/test_browser.mjs
 ```
@@ -193,10 +194,24 @@ three default fixtures and both sleep modes.
 This is the physics primitive for the required separate interaction run.
 Browser checks compare scripted interaction poses/diagnostics against the
 co-located C renderer, including graphics-preserving rebuilds with cleared grabs.
-These scripted calls are correctness checks. Browser event recording, real-input
-provenance, coalescing, event-to-step/frame
-correlation and latency qualification still need integration; the normal
-collection loop does not attach pointer listeners yet.
+These scripted calls are correctness checks. The separate `interaction:true`
+collector mode accepts only a one-copy default scene with base visuals, no
+frozen tier and no sustained run. It starts after the exact warm-up rebuild,
+attaches pointer listeners to the measured canvas, maps CSS coordinates through
+the shared camera, captures the active pointer, and applies input through the
+same private C tether. A fixed 65,536-event column buffer retains original
+event timestamps, trust, coalesced counts, coordinates, selected body, gesture,
+status, applied C step and first submitted frame. The fixed columns consume
+6,225,920 JS bytes, reported separately from WASM memory. Overflow fails the run;
+superseded or released moves remain in the record and do not become latency
+samples. Listeners and pointer capture end at the 60-second measurement boundary.
+`test_input_browser.mjs` sends trusted browser pointer events to all three
+candidates and checks their step-to-submission mapping. The default test uses
+a declared synthetic 60 Hz scheduling clock; `SL_RENDER_TEST_CLOCK=real` uses
+actual headless rAF for local correctness. Neither short run qualifies device
+latency. Timestamp precision remains unverified and the report explicitly
+sets `latencyGateEvaluable:false`; a full 100-sample/20-gesture physical trial
+and independent precision check remain required.
 
 ## Browser collection loop
 
@@ -239,8 +254,9 @@ Reports use one monotonic clock origin and distinguish actual device DPR from
 the contract's render DPR. Serialize uint64s using the study module's
 `jsonReplacer`; raw frame work counters are already exact decimal strings.
 
-This is a collection primitive, not the complete study controller. It does not
-yet implement real-input trials, optional 120 Hz measurements,
+This is a collection primitive, not the complete study controller. It records
+real-pointer trials but does not yet qualify their timestamp precision or full
+100-sample/20-gesture protocol. It also lacks optional 120 Hz measurements,
 device-condition recording,
 GC/memory profiling, repeated-run ordering or qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
@@ -253,6 +269,11 @@ inapplicable. Installed/headed browsers reject this test mode. The production
 collector and calibration limits are unchanged. Separate injected duplicate
 interval and unsupported-rate cases must still fail calibration and retain
 their reports; synthetic scheduling cannot authorize device acceptance.
+The offline auditor recognizes an observed 0.1 ms rAF timestamp grid only
+when all 240 calibration intervals demonstrate it. Cross-clock order then
+accepts exact equality after rounding the finer callback time to that grid.
+Same-clock ordering, raw samples, fixed-step accounting and all performance
+budgets remain unchanged.
 
 Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
 point/AABB/ray results. These extra C buffers cost `20*bodyCapacity + 32` bytes;
