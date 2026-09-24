@@ -223,14 +223,25 @@ whether the 100-sample/20-gesture minimum was observed. It does not mark the
 latency gate evaluable without qualified timestamp precision and physical
 device conditions.
 
-`collect.html` is the local field-recorder page for a physical interaction
-trial. It runs the same `interaction:true` collector for 60 seconds, with
-candidate, default scene, sleep and desktop/mobile buffer choices. The status
-rail announces when the warmed world has been rebuilt and dragging is active.
+`collect.html` is the local field-recorder page for physical comparison runs.
+It selects base, diagnostic, frozen render-only, frozen diagnostic, sustained
+mobile or interaction profiles through the same `runStudy` collector. The page
+locks the contract-specific scene, copies, sleep and layout fields where
+required. It exposes the existing 64–512 MiB fixed WASM budgets without
+changing module bounds. Sustained runs retain their 60-second disposable
+warm-up and 300-second measurement; other full runs measure 60 seconds. The
+status rail announces when the warmed world has been rebuilt and, for the
+interaction profile, when dragging is active. On narrow mobile viewports the
+controls collapse before the collector initializes, leaving the full 360 ×
+640 CSS-pixel canvas visible throughout measurement; they return only after
+timing ends.
 The operator enters a human device label, power/battery/brightness, ambient
 temperature and thermal state before the run; those entries are appended to
-the downloaded raw report after measurement. It uses a fresh canvas for each
-trial, and a result must be downloaded before the next run. Failed records are
+the downloaded raw report after measurement. The selected repeat stamps the
+frozen five-repeat candidate order and this candidate's slot; it does not
+automatically claim the complete matrix was collected. The page uses a fresh
+canvas for each trial, and a result must be downloaded before the next run.
+Failed records are
 downloadable. No device IDs are requested or checked into source. `?smoke=1`
 is explicitly a one-second correctness mode and cannot qualify acceptance.
 The separate 20-gesture/100-sample requirement, timestamp precision, device

@@ -81,29 +81,72 @@ try{
     await page.goto(`http://127.0.0.1:${server.address().port}/collect.html?smoke=1`);
     await page.locator('#device').fill('reference desktop');
     await page.locator('#power').selectOption('plugged');
-    for(const [candidate,layout] of [['canvas','desktop'],['webgl','desktop'],['canvas','mobile']]){
-      if(layout==='mobile')await page.setViewportSize({width:360,height:800});
-      await page.locator('#candidate').selectOption(candidate);
-      await page.locator('#layout').selectOption(layout);
+    const rotations=[['canvas','webgl','raylib'],['webgl','raylib','canvas'],
+      ['raylib','canvas','webgl'],['canvas','raylib','webgl'],['raylib','webgl','canvas']];
+    const choices=[
+      {profile:'interaction',candidate:'canvas',layout:'desktop',scene:'pyramid',copies:1,sleep:false,repeat:1},
+      {profile:'interaction',candidate:'webgl',layout:'desktop',scene:'pyramid',copies:1,sleep:false,repeat:2},
+      {profile:'interaction',candidate:'canvas',layout:'mobile',scene:'pyramid',copies:1,sleep:false,repeat:3},
+      {profile:'base',candidate:'webgl',layout:'desktop',scene:'rain',copies:2,sleep:true,repeat:4,memoryMiB:128},
+      {profile:'diagnostic',candidate:'raylib',layout:'desktop',scene:'chains',copies:1,sleep:false,repeat:5},
+      {profile:'frozen',candidate:'canvas',layout:'desktop',scene:'rain',copies:1,sleep:false,repeat:1,instances:256},
+      {profile:'frozen-diagnostic',candidate:'webgl',layout:'mobile',scene:'rain',copies:1,sleep:false,repeat:2,instances:256}
+    ];
+    for(const choice of choices){
+      await page.setViewportSize({width:choice.layout==='mobile'?360:1280,height:choice.layout==='mobile'?800:900});
+      await page.locator('#profile').selectOption(choice.profile);
+      await page.locator('#candidate').selectOption(choice.candidate);
+      await page.locator('#repeat').selectOption(String(choice.repeat));
+      if(await page.locator('#scene').isEnabled())await page.locator('#scene').selectOption(choice.scene);
+      await page.locator('#layout').selectOption(choice.layout);
+      if(await page.locator('#copies').isEnabled())await page.locator('#copies').selectOption(String(choice.copies));
+      if(choice.instances)await page.locator('#instances').selectOption(String(choice.instances));
+      await page.locator('#memory').selectOption(String(choice.memoryMiB??64));
+      if(choice.sleep)await page.locator('#sleep').check();else if(await page.locator('#sleep').isEnabled())await page.locator('#sleep').uncheck();
       await page.locator('#start').click();
+      assert.equal(await page.locator('#profile').isDisabled(),true);
+      if(choice.profile==='interaction'&&choice.layout==='mobile'){
+        await page.waitForFunction(()=>document.getElementById('phase').textContent==='DRAG NOW',undefined,{timeout:60000});
+        const visible=await page.evaluate(()=>{const rect=document.getElementById('collection-canvas').getBoundingClientRect();return {top:rect.top,bottom:rect.bottom,height:innerHeight};});
+        assert.ok(visible.top>=0&&visible.bottom<=visible.height,'Mobile interaction canvas must fit during measurement');
+        await page.screenshot({path:path.join(output,'collector-mobile-measuring.png')});
+      }
       await page.waitForFunction(()=>!document.getElementById('download').disabled,undefined,{timeout:60000});
-      if(candidate==='canvas')await page.screenshot({path:path.join(output,`collector-${layout}.png`),fullPage:true});
+      if(choice.profile==='interaction'&&choice.candidate==='canvas')await page.screenshot({path:path.join(output,`collector-${choice.layout}.png`),fullPage:true});
       const arriving=page.waitForEvent('download');await page.locator('#download').click();
       const transfer=await arriving;
       const report=JSON.parse(await fs.readFile(await transfer.path(),'utf8'));
       assert.equal(report.status,'collected',JSON.stringify(report.failure));
       assert.equal(report.kind,'correctness-only');
-      assert.equal(report.configuration.candidate,candidate);
-      assert.equal(report.configuration.layout,layout);
-      assert.equal(report.configuration.interaction,true);
+      assert.equal(report.configuration.candidate,choice.candidate);
+      assert.equal(report.configuration.layout,choice.layout);
+      assert.equal(report.configuration.scene,choice.scene);
+      assert.equal(report.configuration.copies,choice.copies);
+      assert.equal(report.configuration.sleep,choice.sleep);
+      assert.equal(report.configuration.diagnostic,['diagnostic','frozen-diagnostic'].includes(choice.profile));
+      assert.equal(report.configuration.interaction,choice.profile==='interaction');
+      assert.equal(report.configuration.instances,choice.instances??null);
+      assert.equal(report.configuration.memoryBytes,(choice.memoryMiB??64)*1024*1024);
       assert.equal(report.collectionConditions.deviceLabel,'reference desktop');
       assert.equal(report.collectionConditions.power,'plugged');
       assert.equal(report.collectionConditions.source,'operator-entered');
-      assert.equal(report.input.count,0);
-      assert.equal(report.input.typedBytes,95*65536);
+      assert.equal(report.collectionConditions.profile,choice.profile);
+      assert.equal(report.collectionConditions.repeat,choice.repeat);
+      assert.deepEqual(report.collectionConditions.candidateOrder,rotations[choice.repeat-1]);
+      assert.equal(report.collectionConditions.candidateOrder[report.collectionConditions.candidateSlot-1],choice.candidate);
+      if(choice.instances)assert.equal(report.initial.steps,120);
+      if(choice.profile==='interaction'){
+        assert.equal(report.input.count,0);assert.equal(report.input.typedBytes,95*65536);
+      }else assert.equal(report.input,null);
       assert.equal(await page.locator('#start').isEnabled(),true);
-      results.push({candidate,layout,operatorPage:'downloaded'});
+      assert.equal(await page.locator('#profile').isEnabled(),true);
+      results.push({...choice,operatorPage:'downloaded'});
     }
+    await page.locator('#profile').selectOption('sustained');
+    assert.equal(await page.locator('#scene').inputValue(),'rain');
+    assert.equal(await page.locator('#layout').inputValue(),'mobile');
+    assert.equal(await page.locator('#copies').inputValue(),'1');
+    assert.equal(await page.locator('#sleep').isDisabled(),true);
     assert.deepEqual(errors,[]);
   }finally{await page.close();}
   await fs.writeFile(path.join(output,'results.json'),JSON.stringify({kind:'correctness-only',

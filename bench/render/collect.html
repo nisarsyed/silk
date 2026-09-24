@@ -30,10 +30,11 @@
   .stage{display:flex;justify-content:center;align-items:start;overflow:auto}
   .stage canvas{display:block;touch-action:auto;max-width:none}
   .notes{border-top:1px solid var(--line);padding:16px 18px 24px;display:grid;grid-template-columns:minmax(180px,1fr) 3fr;gap:16px}
+  .hud{margin:0;padding:10px 18px;border-top:1px solid var(--line);color:var(--blue);font:11px/1.35 Menlo,monospace;white-space:pre-wrap}
   .notes h2{font:400 18px Georgia,serif;margin:0}.notes p{color:var(--muted);margin:6px 0 0;max-width:44ch;font-size:12px}
   .fields{display:flex;flex-wrap:wrap;gap:10px 12px}.fields input{width:130px}.fields input.wide{width:210px}
   .check input{width:auto}.minor{color:var(--muted)}
-  @media(max-width:650px){.mast{padding:9px 10px}.mark{width:32px;height:32px;font-size:19px}h1{font-size:19px}.badge{font-size:9px;padding:4px}.rail{gap:7px;padding:8px 10px}.rail select{min-width:90px;max-width:112px}.rail button{padding:6px 8px}.status{padding:6px 10px}.notes{grid-template-columns:1fr;padding:14px 10px}}
+  @media(max-width:650px){.mast{padding:9px 10px}.mark{width:32px;height:32px;font-size:19px}h1{font-size:19px}.badge{font-size:9px;padding:4px}.rail{gap:7px;padding:8px 10px}.rail select{min-width:90px;max-width:112px}.rail button{padding:6px 8px}.status{padding:6px 10px}.notes{grid-template-columns:1fr;padding:14px 10px}body.measuring .rail{display:none}}
 </style>
 <header class="mast">
   <div class="mark" aria-hidden="true">S/</div>
@@ -41,17 +42,23 @@
   <div id="mode" class="badge">60 SECOND RUN</div>
 </header>
 <form id="controls" class="rail">
+  <label>Profile<select id="profile"><option value="interaction">Interaction</option><option value="base">Base</option><option value="diagnostic">Diagnostic</option><option value="frozen">Render only</option><option value="frozen-diagnostic">Render diagnostics</option><option value="sustained">Sustained mobile</option></select></label>
   <label>Candidate<select id="candidate"><option value="canvas">Canvas 2D</option><option value="webgl">WebGL 2</option><option value="raylib">raylib 6</option></select></label>
   <label>Scene<select id="scene"><option value="pyramid">Pyramid</option><option value="rain">Rain</option><option value="chains">Chains</option></select></label>
+  <label>Repeat<select id="repeat"><option value="1">1 / 5</option><option value="2">2 / 5</option><option value="3">3 / 5</option><option value="4">4 / 5</option><option value="5">5 / 5</option></select></label>
   <label>Buffer<select id="layout"><option value="desktop">1280 × 720</option><option value="mobile">720 × 1280</option></select></label>
+  <label>Copies<select id="copies"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label>
+  <label>Render tier<select id="instances" disabled><option value="256">256</option><option value="512">512</option><option value="1024">1,024</option><option value="2048">2,048</option><option value="4096">4,096</option><option value="8192">8,192</option><option value="16384">16,384</option><option value="32768">32,768</option><option value="65536">65,536</option></select></label>
+  <label>WASM memory<select id="memory"><option value="64">64 MiB</option><option value="128">128 MiB</option><option value="256">256 MiB</option><option value="512">512 MiB</option></select></label>
   <label class="check"><input id="sleep" type="checkbox"> Sleep on</label>
   <button id="start" type="submit">Start trial</button>
   <button id="download" type="button" disabled>Save raw JSON</button>
 </form>
-<div class="status" role="status" aria-live="polite"><strong id="phase">READY</strong><span id="detail">After warm-up, drag a moving body at least 100 times across 20 gestures.</span></div>
+<div class="status" role="status" aria-live="polite"><strong id="phase">READY</strong><span id="detail">Choose a profile. Interaction runs need 100 applied moves across 20 gestures.</span></div>
 <main class="stage" id="stage"><canvas id="collection-canvas" aria-label="Interactive Silk renderer study"></canvas></main>
+<pre id="hud" class="hud" hidden aria-label="Renderer diagnostic counters"></pre>
 <section class="notes" aria-label="Device conditions">
-  <div><h2>Device conditions</h2><p>Entered before the run and saved with the raw report. Use a human label only; omit serial numbers and device IDs. Short smoke runs cannot qualify device results.</p></div>
+  <div><h2>Device conditions</h2><p>Entered before the run and saved with the raw report. The repeat selector records the required candidate order. Use a human label only; omit serial numbers and device IDs. Short smoke runs cannot qualify device results.</p></div>
   <div class="fields">
     <label>Device label<input id="device" class="wide" type="text" maxlength="80" autocomplete="off" placeholder="Desktop or phone model"></label>
     <label>Power<select id="power"><option value="unknown">Unknown</option><option value="plugged">Plugged in</option><option value="battery">On battery</option></select></label>
