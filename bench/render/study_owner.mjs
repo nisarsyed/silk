@@ -35,6 +35,7 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
           of:new Float32Array(buffer,m._sl_wasm_output_f32(adapter),64),
           ou:new Uint32Array(buffer,m._sl_wasm_output_u32(adapter),32)};
         const status=new Uint32Array(buffer,m._sl_render_study_status(ptr),10);
+        const pointerStatus=new Uint32Array(buffer,m._sl_render_study_pointer_status(ptr),3);
         const settings=new Float32Array(buffer,m._sl_render_study_settings(ptr),21);
         const configuration=Object.freeze({scene,copies,sleepEnabled:sleep,stepLimit:steps,
           bodyCapacity:status[5],contactCapacity:status[6],jointCapacity:status[7],substeps:status[8],seed:status[9],
@@ -55,6 +56,11 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
         const valid=()=>{live();if(!ptr)throw new Error('Study world is disposed');};
         const invalidate=()=>{frameValid=false;diagnosticsValid=false;views.state.valid=false;views.queryState.valid=false;views.rayState.valid=false;};
         const revision=state=>{if(state.revision===Number.MAX_SAFE_INTEGER)throw new RangeError('View revision exhausted');++state.revision;};
+        const pointerState=Object.freeze({
+          get held(){valid();return !!pointerStatus[0];},
+          get bodyIndex(){valid();return pointerStatus[1];},
+          get bodyGeneration(){valid();return pointerStatus[2];}
+        });
         let renderer;
         const value=Object.freeze({
           ...(attachRenderer?{createRenderer(options={}){valid();if(renderer)throw new Error('Renderer already attached');
@@ -69,7 +75,13 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
               if(retained)rendererTargets.get(next)(retained,configuration);
               return next;
             }catch(error){next?.dispose();retained?.dispose();throw error;}},
-          configuration,diagnostics,frameCounters,
+          configuration,diagnostics,frameCounters,pointerState,
+          pointer(action,x,y){
+            valid();integer(action,0,3,'pointer action');
+            if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>8192||Math.abs(y)>8192)
+              throw new RangeError('Invalid pointer world coordinate');
+            invalidate();return !!m._sl_render_study_pointer(ptr,action,Math.fround(x),Math.fround(y));
+          },
           get snapshot(){valid();return views.snapshot;},
           get steps(){valid();return status[4];},
           get drops(){valid();return m._sl_render_study_drops(ptr);},

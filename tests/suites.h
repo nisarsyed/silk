@@ -28,6 +28,7 @@ int sl_wasm_suite(void);
 int sl_wasm_bench_suite(void);
 int sl_render_scene_suite(void);
 int sl_render_frozen_suite(void);
+int sl_render_pointer_suite(void);
 #endif
 
 #endif /* SILK_SUITES_H */

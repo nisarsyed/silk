@@ -180,7 +180,7 @@ window.verifyRaylibValidation=async()=>{
   }finally{m._sl_render_dispose();canvas.remove();}
 };
 
-window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=1280,height=720})=>{
+window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=1280,height=720,interaction=false})=>{
   const canvases=[],candidates=[];let module,referenceModule,world,reference;
   const expect=(condition,message)=>{if(!condition)throw new Error(message);};
   const equalSnapshot=(a,b)=>{
@@ -198,10 +198,21 @@ window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=
     }
     module=await createRaylibStudyModule(canvases[1],{memoryBytes:256*1024*1024});
     referenceModule=await createStudyModule({memoryBytes:256*1024*1024});
-    const steps=copies===1?120:3;
+    expect(!interaction||copies===1,'Interaction requires a default fixture');
+    const steps=interaction?12:copies===1?120:3;
     world=module.create(scene,{copies,sleep,steps:steps+1});reference=referenceModule.create(scene,{copies,sleep,steps:steps+1});
     expect(world&&reference,'Co-located fixture allocation failed');
-    for(let i=0;i<steps;++i)expect(world.step()&&reference.step(),'Co-located step failed');
+    let grabX=0,grabY=0;
+    if(interaction){
+      expect(reference.refreshSnapshot(),'Interaction pick snapshot failed');
+      const s=reference.snapshot,row=s.bodies.type.findIndex(value=>value===0);
+      expect(row>=0,'Interaction has no dynamic body');grabX=s.bodies.x[row]+.02;grabY=s.bodies.y[row];
+      expect(world.pointer(0,grabX,grabY)&&reference.pointer(0,grabX,grabY),'Interaction press failed');
+    }
+    for(let i=0;i<steps;++i){
+      if(interaction)expect(world.pointer(1,grabX+.04*(i+1),grabY+.4)&&reference.pointer(1,grabX+.04*(i+1),grabY+.4),'Interaction move failed');
+      expect(world.step()&&reference.step(),'Co-located step failed');
+    }
     const candidate=world.createRenderer({diagnostic});candidates.push(candidate);
     expect(candidate.linearMemoryBytes===256*1024*1024&&module.memory.linearMemoryBytes===candidate.linearMemoryBytes,'Fixed memory budget differs');
     let rejected=false;try{world.createRenderer();}catch{rejected=true;}expect(rejected,'Duplicate renderer accepted');
@@ -244,12 +255,13 @@ window.verifyColocated=async({scene,copies=1,sleep=false,diagnostic=false,width=
     expect(canvases[1].getContext('webgl2')===context,'Transfer replaced graphics context');
     results.push(compare(rebuiltReference,rebuilt,width,height,edgeMask(draw,width,height,overlay)));
     expect(world.steps===0&&candidate.posePrepareBytes===16*draw.count,'Transfer did not rebuild initial poses');
+    expect(!world.pointerState.held&&world.pointerState.bodyIndex===0xffffffff,'Rebuild retained pointer state');
     world.dispose();rejected=false;try{candidate.draw();}catch{rejected=true;}expect(rejected,'Renderer outlived its world');
     // A disposed world releases the sole raylib window; a new owner can attach.
     const recovered=module.create('pyramid',{steps:1});expect(recovered,'Replacement world failed');
     const replacement=recovered.createRenderer();replacement.draw();module.dispose();
     rejected=false;try{replacement.draw();}catch{rejected=true;}expect(rejected,'Renderer outlived its module');
-    return {scene,copies,sleep,diagnostic,width,height,results,poseCopyBytes:0,diagnosticCopyBytes:0,linearMemoryBytes:256*1024*1024};
+    return {scene,copies,sleep,diagnostic,width,height,interaction,results,poseCopyBytes:0,diagnosticCopyBytes:0,linearMemoryBytes:256*1024*1024};
   }finally{
     for(const candidate of candidates)candidate.dispose();world?.dispose();reference?.dispose();module?.dispose();referenceModule?.dispose();
     for(const canvas of canvases)canvas.remove();

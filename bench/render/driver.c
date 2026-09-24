@@ -2,6 +2,7 @@
 #include "../../wasm/context.h"
 #include "../fixtures.h"
 #include "scene.h"
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,9 @@ struct sl_render_study {
     float *diagnostic_f32;
     uint32_t *diagnostic_u32;
     uint64_t drops;
+    uint32_t pointer_status[3];
+    sl_vec2 grab_local;
+    sl_vec2 grab_target;
     bool failed;
 };
 sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
@@ -27,6 +31,7 @@ sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
     if (study == NULL) {
         return NULL;
     }
+    study->pointer_status[1] = UINT32_MAX;
     sl_wasm_context *adapter = &study->adapter;
     if (!sl_render_scene_build(&adapter->world, &adapter->config, fixture,
                                copies, sleep_enabled != 0u) ||
@@ -107,6 +112,31 @@ bool sl_render_study_step(sl_render_study *study)
     if (study == NULL || study->failed ||
         study->status[4] >= study->status[3]) {
         return false;
+    }
+    if (study->pointer_status[0] != 0u &&
+        study->pointer_status[1] != UINT32_MAX) {
+        const sl_body_handle body = { study->pointer_status[1],
+                                      study->pointer_status[2] };
+        sl_world *world = &study->adapter.world;
+        if (!sl_world_body_is_valid(world, body)) {
+            study->pointer_status[0] = 0u;
+            study->pointer_status[1] = UINT32_MAX;
+            study->pointer_status[2] = 0u;
+        } else {
+            const sl_transform transform =
+                sl_world_body_get_transform(world, body);
+            const sl_vec2 point =
+                sl_transform_apply(transform, study->grab_local);
+            // Match the native sandbox: 15 N/m, applied once per fixed step
+            // at the original local grab point, including its induced torque.
+            const sl_vec2 force =
+                sl_vec2_scale(sl_vec2_sub(study->grab_target, point), 15.0f);
+            if (!sl_world_body_apply_force_at_point(world, body, force,
+                                                    point)) {
+                study->failed = true;
+                return false;
+            }
+        }
     }
     sl_world_step(&study->adapter.world, SL_BENCH_TIMESTEP);
     study->drops += sl_world_contact_drop_count(&study->adapter.world);
@@ -297,4 +327,72 @@ size_t sl_render_study_diagnostic_bytes(const sl_render_study *study)
     return study != NULL
                ? (size_t)study->adapter.config.body_capacity * 20u + 32u
                : 0u;
+}
+
+bool sl_render_study_pointer(sl_render_study *study, uint32_t action, float x,
+                             float y)
+{
+    if (study == NULL || study->failed || study->status[1] != 1u ||
+        study->status[4] >= study->status[3] || action > 3u || !isfinite(x) ||
+        !isfinite(y) || fabsf(x) > SL_POSITION_ABS_MAX ||
+        fabsf(y) > SL_POSITION_ABS_MAX) {
+        return false;
+    }
+    const sl_vec2 target = { x, y };
+    if (action == 0u) {
+        if (study->pointer_status[0] != 0u) {
+            return false;
+        }
+        sl_wasm_context *adapter = &study->adapter;
+        sl_world *world = &adapter->world;
+        sl_query_result result = { 0 };
+        if (!sl_world_query_point(world, target, SL_QUERY_DYNAMIC,
+                                  adapter->query_handles,
+                                  adapter->config.body_capacity, &result) ||
+            result.truncated) {
+            return false;
+        }
+        sl_body_handle selected = sl_body_handle_null();
+        float nearest = FLT_MAX;
+        // Query order is ascending body slot. Strict comparison retains that
+        // deterministic tie order, matching the sandbox's closest-center pick.
+        for (uint32_t i = 0u; i < result.count; ++i) {
+            const sl_body_handle body = adapter->query_handles[i];
+            const sl_vec2 position = sl_world_body_get_position(world, body);
+            const float distance =
+                sl_vec2_length_sq(sl_vec2_sub(target, position));
+            if (distance < nearest) {
+                nearest = distance;
+                selected = body;
+            }
+        }
+        sl_vec2 local = { 0.0f, 0.0f };
+        if (!sl_body_handle_is_null(selected)) {
+            local = sl_transform_apply_inverse(
+                sl_world_body_get_transform(world, selected), target);
+            if (!sl_world_body_wake(world, selected)) {
+                return false;
+            }
+        }
+        study->pointer_status[0] = 1u;
+        study->pointer_status[1] = selected.index;
+        study->pointer_status[2] = selected.generation;
+        study->grab_local = local;
+        study->grab_target = target;
+    } else if (action == 1u) {
+        if (study->pointer_status[0] == 0u) {
+            return false;
+        }
+        study->grab_target = target;
+    } else {
+        // Release/cancel apply no force; no force is banked by input events.
+        study->pointer_status[0] = 0u;
+        study->pointer_status[1] = UINT32_MAX;
+        study->pointer_status[2] = 0u;
+    }
+    return true;
+}
+const uint32_t *sl_render_study_pointer_status(const sl_render_study *study)
+{
+    return study != NULL ? study->pointer_status : NULL;
 }

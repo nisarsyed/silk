@@ -21,6 +21,23 @@ void sl_render_study_destroy(sl_render_study *study);
  * after a failed run.
  */
 bool sl_render_study_step(sl_render_study *study);
+/* Separate interaction trial on a one-copy default fixture. Actions are
+ * 0 press, 1 move, 2 release, 3 cancel. Coordinates are finite world metres
+ * within SL_POSITION_ABS_MAX. A press picks the nearest-center dynamic body
+ * containing the point; ties retain ascending slot order. A valid miss still
+ * begins a gesture. Duplicate presses and moves without a press reject;
+ * release/cancel are idempotent. Invalid input leaves control/physics intact.
+ * Press wakes a selected body but banks no force. step applies the sandbox's
+ * 15 N/m tether at its original local grab point before each fixed step.
+ * Release/cancel remove the tether immediately. No additional bodies/joints,
+ * capacities or allocations. Stale selection clears before the next step.
+ * A force rejection latches driver failure without executing a step.
+ */
+bool sl_render_study_pointer(sl_render_study *study, uint32_t action, float x,
+                             float y);
+/* Borrowed private columns: held (including a miss), body slot, generation.
+ * No selection uses UINT32_MAX/0. The JS owner exposes scalar getters only. */
+const uint32_t *sl_render_study_pointer_status(const sl_render_study *study);
 /* Check evolving public state: transforms/velocities, proxy bounds, live
  * contact floats and joint impulses. Failure is latched; later steps reject.
  * step performs this check after each executed step (inside measured CPU
