@@ -6,6 +6,7 @@ const kinds=['down','move','up','cancel','lost-capture'] as const;
 const eventTypes=['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'] as const;
 const states=['ignored','accepted','queued','submitted','superseded','miss',
   'released-before-step','cancelled-before-step','not-stepped','applied-no-frame','rejected'] as const;
+const gcd=(a:number,b:number):number=>{while(b){const next=a%b;a=b;b=next;}return a;};
 type PointerWorld={
   pointer(action:number,x:number,y:number):boolean;
   pointerState:{readonly held:boolean;readonly bodyIndex:number;readonly bodyGeneration:number};
@@ -115,13 +116,22 @@ export class StudyInput {
     }
   }
   report(){
-    const events=[];let trustedSubmitted=0,validTimestampSamples=0;const trustedGestures=new Set<number>();
+    const events=[];let trustedSubmitted=0,validTimestampSamples=0;
+    let previousMicros=-1,quantumMicros=0,quantumPairs=0;
+    const trustedGestures=new Set<number>();
     for(let i=0;i<this.count;++i){
       const latency=this.state[i]===3&&this.eventMs[i]>0&&this.submittedMs[i]>=this.eventMs[i]
         ?this.submittedMs[i]-this.eventMs[i]:null;
       if(this.kind[i]===1&&this.trusted[i]&&this.state[i]===3){
         ++trustedSubmitted;trustedGestures.add(this.gesture[i]);
-        if(latency!==null)++validTimestampSamples;
+        if(latency!==null){
+          ++validTimestampSamples;
+          const micros=Math.round(this.eventMs[i]*1000);
+          if(Number.isSafeInteger(micros)&&previousMicros>=0&&micros>previousMicros){
+            quantumMicros=gcd(quantumMicros,micros-previousMicros);++quantumPairs;
+          }
+          if(Number.isSafeInteger(micros))previousMicros=micros;
+        }
       }
       events.push({kind:kinds[this.kind[i]],status:states[this.state[i]],trusted:!!this.trusted[i],
         primary:!!this.primary[i],pointerId:this.pointerId[i],button:this.button[i],buttons:this.buttons[i],
@@ -136,6 +146,11 @@ export class StudyInput {
       count:this.count,gestures:this.gestures,
       trustedSubmittedMoves:trustedSubmitted,trustedGesturesWithSubmittedMoves:trustedGestures.size,
       validTimestampSamples,
+      // This describes only the grid visible in this trace. Privacy rounding,
+      // jitter or a coarser configured clock can make it an unsafe precision
+      // claim; the latency gate therefore remains unqualified.
+      observedTimestampQuantumMs:quantumPairs>=4&&quantumMicros>0?quantumMicros/1000:null,
+      observedTimestampQuantumPairs:quantumPairs,
       timestampPrecisionMs:null,timestampPrecisionStatus:'unverified',latencyGateEvaluable:false,
       timeOrigin:performance.timeOrigin,events};
   }

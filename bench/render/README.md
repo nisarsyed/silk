@@ -212,6 +212,12 @@ actual headless rAF for local correctness. Neither short run qualifies device
 latency. Timestamp precision remains unverified and the report explicitly
 sets `latencyGateEvaluable:false`; a full 100-sample/20-gesture physical trial
 and independent precision check remain required.
+The report also includes the event timestamp grid observed across valid trusted
+samples, computed after timing from integer-microsecond differences and
+checked by the offline auditor. This is descriptive, not a claim about the
+browser's actual precision: the [High Resolution Time specification](https://www.w3.org/TR/hr-time-3/)
+allows coarsening and jitter, and [Event.timeStamp documentation](https://developer.mozilla.org/en-US/docs/Web/API/Event/timeStamp)
+notes that precision can change with browser settings.
 
 `collect.html` is the local field-recorder page for a physical interaction
 trial. It runs the same `interaction:true` collector for 60 seconds, with

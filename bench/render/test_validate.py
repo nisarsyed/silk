@@ -111,6 +111,8 @@ def main():
                 lambda r: r['input'].update(latencyGateEvaluable=True),
                 lambda r: r['input'].update(trustedSubmittedMoves=0),
                 lambda r: r['input'].update(count=0),
+                lambda r: r['input'].update(observedTimestampQuantumPairs=123456),
+                lambda r: r['input'].update(observedTimestampQuantumMs=123),
                 lambda r: sample(r).update(appliedStep=0),
                 lambda r: sample(r).update(submittedFrame=r['frames']['count']+1),
                 lambda r: sample(r).update(submittedMs=0),

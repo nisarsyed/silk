@@ -115,7 +115,8 @@ def validate_input(record, frames, body_capacity, time_origin):
     statuses = ('ignored', 'accepted', 'queued', 'submitted', 'superseded', 'miss',
                 'released-before-step', 'cancelled-before-step', 'not-stepped',
                 'applied-no-frame', 'rejected')
-    gestures = submitted = valid_timestamps = 0
+    gestures = submitted = valid_timestamps = quantum_pairs = quantum_micros = 0
+    previous_micros = -1
     trusted_gestures = set()
     for event in record['events']:
         require(type(event) is dict and event['kind'] in kinds and event['status'] in statuses,
@@ -154,6 +155,12 @@ def validate_input(record, frames, body_capacity, time_origin):
                 trusted_gestures.add(gesture)
                 if expected_latency is not None:
                     valid_timestamps += 1
+                    micros = math.floor(event['eventMs']*1000+.5)
+                    if micros <= 2**53-1:
+                        if previous_micros >= 0 and micros > previous_micros:
+                            quantum_micros = math.gcd(quantum_micros, micros-previous_micros)
+                            quantum_pairs += 1
+                        previous_micros = micros
         else:
             require(frame_index is None and event['submittedMs'] is None and event['latencyMs'] is None,
                     'unsubmitted input has frame or latency')
@@ -161,7 +168,11 @@ def validate_input(record, frames, body_capacity, time_origin):
                 require(event['status'] == 'applied-no-frame' and event['kind'] == 'move',
                         'unsubmitted input has applied step')
                 number(event['appliedStep'], 1, 21600, True)
-    require(gestures == record['gestures'] and submitted == record['trustedSubmittedMoves'] and
+    observed_quantum = quantum_micros/1000 if quantum_pairs >= 4 and quantum_micros > 0 else None
+    equal(record['observedTimestampQuantumMs'], observed_quantum, 'observed input quantum')
+    number(record['observedTimestampQuantumPairs'], 0, 65535, True)
+    require(record['observedTimestampQuantumPairs'] == quantum_pairs and
+            gestures == record['gestures'] and submitted == record['trustedSubmittedMoves'] and
             len(trusted_gestures) == record['trustedGesturesWithSubmittedMoves'] and
             valid_timestamps == record['validTimestampSamples'], 'input totals differ')
 
