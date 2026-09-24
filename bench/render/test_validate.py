@@ -102,7 +102,11 @@ def main():
     if input_root is not None:
         for candidate in ('canvas', 'webgl', 'raylib'):
             report = audit.load(input_root / f'{candidate}.json')
-            assert audit.validate(report)['rawTimingIntegrity'] == 'passed'
+            checked_input = audit.validate(report)
+            assert checked_input['rawTimingIntegrity'] == 'passed'
+            assert checked_input['input']['trustedSubmittedMoves'] == report['input']['trustedSubmittedMoves']
+            assert not checked_input['input']['minimumSamplesObserved']
+            assert checked_input['input']['latencyGateEvaluable'] is False
             assert report['input']['trustedSubmittedMoves'] > 0
             def sample(value):
                 return next(event for event in value['input']['events'] if event['status'] == 'submitted')

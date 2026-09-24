@@ -118,6 +118,8 @@ def validate_input(record, frames, body_capacity, time_origin):
     gestures = submitted = valid_timestamps = quantum_pairs = quantum_micros = 0
     previous_micros = -1
     trusted_gestures = set()
+    valid_gestures = set()
+    latencies = []
     for event in record['events']:
         require(type(event) is dict and event['kind'] in kinds and event['status'] in statuses,
                 'invalid input event')
@@ -155,6 +157,8 @@ def validate_input(record, frames, body_capacity, time_origin):
                 trusted_gestures.add(gesture)
                 if expected_latency is not None:
                     valid_timestamps += 1
+                    valid_gestures.add(gesture)
+                    latencies.append(expected_latency)
                     micros = math.floor(event['eventMs']*1000+.5)
                     if micros <= 2**53-1:
                         if previous_micros >= 0 and micros > previous_micros:
@@ -175,6 +179,11 @@ def validate_input(record, frames, body_capacity, time_origin):
             gestures == record['gestures'] and submitted == record['trustedSubmittedMoves'] and
             len(trusted_gestures) == record['trustedGesturesWithSubmittedMoves'] and
             valid_timestamps == record['validTimestampSamples'], 'input totals differ')
+    return dict(trustedSubmittedMoves=submitted, validLatencySamples=valid_timestamps,
+                validGestures=len(valid_gestures), rawLatencyMs=distribution(latencies),
+                minimumSamplesObserved=valid_timestamps >= 100 and len(valid_gestures) >= 20,
+                observedTimestampQuantumMs=observed_quantum,
+                latencyGateEvaluable=False)
 
 
 def validate(report):
@@ -332,9 +341,10 @@ def validate(report):
     for j, name in enumerate(WORK):
         require(decimal(final['cumulative'][name]) == last['w'][13+j], 'final work differs')
     if interaction:
-        validate_input(report['input'], rows, initial['configuration']['bodyCapacity'], report['clock']['timeOrigin'])
+        input_summary = validate_input(report['input'], rows, initial['configuration']['bodyCapacity'], report['clock']['timeOrigin'])
     else:
         require(report.get('input') is None, 'unexpected input trace')
+        input_summary = None
     equal(report['elapsedSeconds'], last['elapsed'], 'elapsed')
     equal(report['debtSeconds'], last['n'][12], 'debt')
     equal(report['droppedSeconds'], last['n'][13], 'drops')
@@ -369,6 +379,7 @@ def validate(report):
         equal(actual, expected, 'window')
     return dict(schema=1, kind='collection-timing-audit', rawTimingIntegrity='passed', acceptanceEligible=False,
                 baseBudgetsApplicable=not cfg['diagnostic'] and not synthetic, syntheticTiming=synthetic, correctnessOnly=report['kind'] == 'correctness-only',
+                input=input_summary,
                 wholeRun=budgets(summary, period, last['n'][13], final_drops, last['n'][12]),
                 windows=window_gates, unverified=['provenance authenticity', 'device conditions', 'real input',
                 'startup/cache protocol', 'allocation/GC and memory profiling', 'physical presentation',

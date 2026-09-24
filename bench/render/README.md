@@ -218,6 +218,10 @@ checked by the offline auditor. This is descriptive, not a claim about the
 browser's actual precision: the [High Resolution Time specification](https://www.w3.org/TR/hr-time-3/)
 allows coarsening and jitter, and [Event.timeStamp documentation](https://developer.mozilla.org/en-US/docs/Web/API/Event/timeStamp)
 notes that precision can change with browser settings.
+The auditor independently reports the raw trusted latency distribution and
+whether the 100-sample/20-gesture minimum was observed. It does not mark the
+latency gate evaluable without qualified timestamp precision and physical
+device conditions.
 
 `collect.html` is the local field-recorder page for a physical interaction
 trial. It runs the same `interaction:true` collector for 60 seconds, with
