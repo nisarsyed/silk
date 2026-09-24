@@ -71,7 +71,42 @@ try{
       results.push({candidate,events:report.input.count,submitted:report.input.trustedSubmittedMoves});
     }finally{await page.close();}
   }
+  // The operator page must use a fresh canvas for each candidate, preserve
+  // entered conditions outside measured frames, and offer failed/successful
+  // records as downloads rather than discarding a run on navigation.
+  const page=await browser.newPage({viewport:{width:1280,height:900},acceptDownloads:true}),errors=[];
+  page.on('pageerror',error=>errors.push(String(error)));
+  try{
+    await page.addInitScript(installSyntheticClock);
+    await page.goto(`http://127.0.0.1:${server.address().port}/collect.html?smoke=1`);
+    await page.locator('#device').fill('reference desktop');
+    await page.locator('#power').selectOption('plugged');
+    for(const [candidate,layout] of [['canvas','desktop'],['webgl','desktop'],['canvas','mobile']]){
+      if(layout==='mobile')await page.setViewportSize({width:360,height:800});
+      await page.locator('#candidate').selectOption(candidate);
+      await page.locator('#layout').selectOption(layout);
+      await page.locator('#start').click();
+      await page.waitForFunction(()=>!document.getElementById('download').disabled,undefined,{timeout:60000});
+      if(candidate==='canvas')await page.screenshot({path:path.join(output,`collector-${layout}.png`),fullPage:true});
+      const arriving=page.waitForEvent('download');await page.locator('#download').click();
+      const transfer=await arriving;
+      const report=JSON.parse(await fs.readFile(await transfer.path(),'utf8'));
+      assert.equal(report.status,'collected',JSON.stringify(report.failure));
+      assert.equal(report.kind,'correctness-only');
+      assert.equal(report.configuration.candidate,candidate);
+      assert.equal(report.configuration.layout,layout);
+      assert.equal(report.configuration.interaction,true);
+      assert.equal(report.collectionConditions.deviceLabel,'reference desktop');
+      assert.equal(report.collectionConditions.power,'plugged');
+      assert.equal(report.collectionConditions.source,'operator-entered');
+      assert.equal(report.input.count,0);
+      assert.equal(report.input.typedBytes,95*65536);
+      assert.equal(await page.locator('#start').isEnabled(),true);
+      results.push({candidate,layout,operatorPage:'downloaded'});
+    }
+    assert.deepEqual(errors,[]);
+  }finally{await page.close();}
   await fs.writeFile(path.join(output,'results.json'),JSON.stringify({kind:'correctness-only',
     clock:testClock==='synthetic'?'deterministic-rAF-60Hz':'actual-headless-rAF',browser:browser.version(),results},null,2)+'\n');
-  console.log('Real PointerEvent smoke: three candidates, fixed-step-to-submission trace, trusted browser events PASS');
+  console.log('Real PointerEvent smoke: three candidates, fixed-step-to-submission trace, trusted browser events and operator downloads PASS');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

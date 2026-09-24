@@ -65,7 +65,7 @@ def main():
     shutil.copytree(args.raylib/'licenses', output/'licenses', dirs_exist_ok=True)
     shutil.copytree(ROOT/'wasm/licenses', output/'licenses/emscripten', dirs_exist_ok=True)
     shutil.copyfile(ROOT/'LICENSE', output/'LICENSE')
-    for name in ('verify.html', 'verify.mjs', 'runner.mjs'):
+    for name in ('verify.html', 'verify.mjs', 'runner.mjs', 'collect.html', 'collect.mjs'):
         shutil.copyfile(ROOT/'bench/render'/name, output/name)
     shutil.copytree(args.benchmark, output/'benchmark', dirs_exist_ok=True)
     shutil.copytree(physics, output/'physics', dirs_exist_ok=True)

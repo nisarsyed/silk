@@ -213,6 +213,25 @@ latency. Timestamp precision remains unverified and the report explicitly
 sets `latencyGateEvaluable:false`; a full 100-sample/20-gesture physical trial
 and independent precision check remain required.
 
+`collect.html` is the local field-recorder page for a physical interaction
+trial. It runs the same `interaction:true` collector for 60 seconds, with
+candidate, default scene, sleep and desktop/mobile buffer choices. The status
+rail announces when the warmed world has been rebuilt and dragging is active.
+The operator enters a human device label, power/battery/brightness, ambient
+temperature and thermal state before the run; those entries are appended to
+the downloaded raw report after measurement. It uses a fresh canvas for each
+trial, and a result must be downloaded before the next run. Failed records are
+downloadable. No device IDs are requested or checked into source. `?smoke=1`
+is explicitly a one-second correctness mode and cannot qualify acceptance.
+The separate 20-gesture/100-sample requirement, timestamp precision, device
+conditions and comparison ordering still need independent audit.
+Serve the assembled directory on the reference desktop with
+`python3 -m http.server 8000 --bind 0.0.0.0 --directory build/render-study`,
+then open `/collect.html` on that desktop or a phone on the same local network.
+The page does not upload reports. Keep downloaded JSON in ignored local storage
+until the comparison artifact is prepared; never commit the operator's device
+inventory. Shut down the temporary server after collection.
+
 ## Browser collection loop
 
 `runner.mjs` exports `runStudy` for an attached, uniquely identified canvas and
