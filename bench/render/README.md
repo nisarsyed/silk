@@ -297,8 +297,8 @@ the contract's render DPR. Serialize uint64s using the study module's
 This is a collection primitive, not the complete study controller. It records
 real-pointer trials but does not yet qualify their timestamp precision or full
 100-sample/20-gesture protocol. It also lacks optional 120 Hz measurements,
-device-condition recording,
-GC/memory profiling, repeated-run ordering or qualification. Browser tests
+independent device-condition verification, GC/memory profiling and complete
+study qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
 `test_runner.mjs` defaults to real clocks for local and installed-browser checks.
 CI explicitly sets `SL_RENDER_TEST_CLOCK=synthetic`: native rAF still schedules
@@ -390,6 +390,23 @@ checks short browser reports for all 12 candidate/profile combinations,
 rejects deliberately corrupted copies and failed-run prefixes, and pins exact
 budget boundaries. A synthetic stalled timeline from the actual JS producer
 checks boundary gaps, empty windows, frozen preparation baselines and overshoot.
+
+`python3 bench/render/protocol.py <raw-report-directory> --device-label <label>
+--layout desktop` (or `mobile`) audits a directory of downloaded **full-run**
+collector JSON for one device. It revalidates each successful report, checks
+reported conditions and a clean matched source/browser, then checks every
+required workload's five repetitions and prescribed candidate order. The
+desktop grid has 1,215 successful slots; mobile adds 15 sustained slots. It
+checks the reported start-to-previous-measurement-end gap at candidate switches
+against the five-minute minimum. Failed runs stay listed separately and can
+be replaced by successful reruns; malformed, short, synthetic and duplicated
+success records cannot fill a slot. It reports missing slots and individual
+base-budget or interaction-minimum failures. A complete matrix still has
+`acceptanceEligible: false`: operator entries and clock-derived idle gaps do not
+prove a physical device, actual idle state, graphics backend, input timestamp
+precision, memory/GC or presentation. Keep the raw files in ignored local
+storage; the audit prints no device inventory unless the operator supplies it.
+`python3 bench/render/test_protocol.py` mutation-checks the matrix rules.
 
 ## Frame recording
 
