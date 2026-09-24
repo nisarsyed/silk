@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation-check the independent auditor against preserved real browser runs."""
+"""Mutation-check the independent auditor against preserved browser runs."""
 import copy
 import json
 from pathlib import Path
@@ -29,7 +29,7 @@ def main():
                 report = audit.load(path)
                 result = audit.validate(report)
                 assert result['rawTimingIntegrity'] == 'passed' and result['acceptanceEligible'] is False
-                assert result['correctnessOnly'] and result['baseBudgetsApplicable'] == (not diagnostic)
+                assert result['correctnessOnly'] and result['baseBudgetsApplicable'] == (not diagnostic and not result['syntheticTiming'])
                 for mutate in (
                     lambda r: r.update(acceptanceEligible=True),
                     lambda r: r.update(status='failed'),
@@ -72,6 +72,10 @@ def main():
                 rounded['frames']['numbers'][0] = rounded['frames']['numbers'][1] + 5e-10
                 assert audit.validate(rounded) == result
                 checked += 1
+    for fault in ('duplicate', 'slow'):
+        path = root / f'calibration-{fault}.json'
+        if path.exists():
+            rejects(audit.load(path), lambda r: None)
     # A synthetic resolved sample exercises optional GPU distributions even on
     # CI hosts without timer support. This is never saved as device evidence.
     timed = audit.load(root / 'webgl-base.json')
@@ -138,7 +142,7 @@ def main():
             except ValueError:
                 continue
             raise AssertionError('invalid JSON accepted')
-    print(f'Collection audit: {checked} real reports, corruption rejection, exact budget boundaries, canonical counters and failed-run exclusion PASS')
+    print(f'Collection audit: {checked} browser reports, corruption rejection, exact budget boundaries, canonical counters and failed-run exclusion PASS')
 
 
 if __name__ == '__main__':

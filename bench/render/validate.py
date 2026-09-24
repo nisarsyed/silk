@@ -96,6 +96,8 @@ def validate(report):
     require(report['status'] == 'collected' and report['failure'] is None and report['phase'] == 'complete',
             'collection failed or incomplete; preserve its partial record')
     require(report['acceptanceEligible'] is False, 'collection primitive cannot certify acceptance')
+    synthetic = report['clock'].get('testOverride') is not None
+    require(not synthetic or (report['clock']['testOverride'] == 'deterministic-rAF-60Hz' and report['kind'] == 'correctness-only'), 'invalid synthetic timing claim')
     cfg = report['configuration']
     frozen = cfg['profile'] == 'render-only'
     require(cfg['profile'] in ('render-only', 'end-to-end') and cfg['candidate'] in ('canvas', 'webgl', 'raylib'), 'invalid profile')
@@ -273,7 +275,7 @@ def validate(report):
     for actual, expected in zip(report['windows'], windows):
         equal(actual, expected, 'window')
     return dict(schema=1, kind='collection-timing-audit', rawTimingIntegrity='passed', acceptanceEligible=False,
-                baseBudgetsApplicable=not cfg['diagnostic'], correctnessOnly=report['kind'] == 'correctness-only',
+                baseBudgetsApplicable=not cfg['diagnostic'] and not synthetic, syntheticTiming=synthetic, correctnessOnly=report['kind'] == 'correctness-only',
                 wholeRun=budgets(summary, period, last['n'][13], final_drops, last['n'][12]),
                 windows=window_gates, unverified=['provenance authenticity', 'device conditions', 'real input',
                 'startup/cache protocol', 'allocation/GC and memory profiling', 'physical presentation',

@@ -7,7 +7,8 @@ const source=JSON.parse(await fs.readFile(process.argv[2],'utf8'));
 const build=path.resolve(process.argv[3]??'build/render-study');
 const {FrameRecorder,numberNames,requiredNumbers}=await import(pathToFileURL(path.join(build,'recording.js')));
 const r=structuredClone(source),period=r.calibration.targetPeriodMs,duration=60;
-r.testSynthetic=true;r.kind='study-collection';r.configuration.durationSeconds=duration;
+// This separate numeric test vector is independent of the browser test clock.
+delete r.clock.testOverride;r.testSynthetic=true;r.kind='study-collection';r.configuration.durationSeconds=duration;
 const recorder=new FrameRecorder(Math.ceil(duration*1000/period)+2);
 const counters={valid:true,stats:new Uint32Array(r.frames.stats.slice(0,25)),work:new BigUint64Array(r.frames.work.slice(0,26).map(BigInt)),statNames:r.frames.statNames,workNames:r.frames.workNames};
 const tails=process.argv[4]==='tails',timeline=tails?Array.from({length:601},(_,i)=>100*i):[0,9980,10040,19990,20000,59990,60030];

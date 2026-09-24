@@ -25,6 +25,7 @@ node bench/render/test_provenance.mjs
 node bench/render/test_study.mjs build/wasm-release/render-physics
 node bench/render/test_geometry.mjs
 node bench/render/test_overlay.mjs
+node bench/render/test_pointer.mjs
 node bench/render/test_frozen.mjs
 node bench/render/test_canvas_frozen.mjs
 node bench/render/test_recording.mjs
@@ -169,6 +170,34 @@ executed-step/drop counters and rejects later steps. The original step-only
 benchmark and core simulation are unchanged. Tests inject non-finite values
 between calls, restore them, and verify that the failed-run latch remains set.
 
+## Interaction driver
+
+The private study owner exposes `pointer(action,x,y)` for a separate interaction
+trial on a one-copy default fixture. Actions 0/1/2/3 are press/move/release/cancel;
+coordinates are finite world metres within the existing body-position domain.
+A press picks the nearest-center dynamic body containing the point, breaking
+ties by ascending slot, and stores its local grab point. A valid miss preserves
+the gesture without creating a body. Duplicate presses and unheld moves reject;
+release/cancel are idempotent. Scalar `pointerState` getters expose held state and
+the selected slot/generation without leaking native buffers or allocating rows.
+
+This matches the native sandbox's 15 N/m tether. Input events bank no force;
+each executed fixed step applies force and torque once at the original local
+grab point. Release/cancel stop it immediately. No fixture capacity, solver
+setting or workload limit changes, and queries reuse existing bounded storage.
+Stale selection clears safely; rejected force application fails the driver.
+Rebuild starts with no held gesture. C tests compare each stepped world against
+an independent twin driven through public force-at-point calls, across all
+three default fixtures and both sleep modes.
+
+This is the physics primitive for the required separate interaction run.
+Browser checks compare scripted interaction poses/diagnostics against the
+co-located C renderer, including graphics-preserving rebuilds with cleared grabs.
+These scripted calls are correctness checks. Browser event recording, real-input
+provenance, coalescing, event-to-step/frame
+correlation and latency qualification still need integration; the normal
+collection loop does not attach pointer listeners yet.
+
 ## Browser collection loop
 
 `runner.mjs` exports `runStudy` for an attached, uniquely identified canvas and
@@ -215,6 +244,15 @@ yet implement real-input trials, optional 120 Hz measurements,
 device-condition recording,
 GC/memory profiling, repeated-run ordering or qualification. Browser tests
 use short runs and injected interruption events; they are correctness evidence.
+`test_runner.mjs` defaults to real clocks for local and installed-browser checks.
+CI explicitly sets `SL_RENDER_TEST_CLOCK=synthetic`: native rAF still schedules
+real rendering, while a test-only clock supplies deterministic 60 Hz timestamps.
+This avoids making headless host cadence a CI performance gate. Every resulting
+report declares `clock.testOverride`, and the auditor marks its timing budgets
+inapplicable. Installed/headed browsers reject this test mode. The production
+collector and calibration limits are unchanged. Separate injected duplicate
+interval and unsupported-rate cases must still fail calibration and retain
+their reports; synthetic scheduling cannot authorize device acceptance.
 
 Diagnostic refresh adds proxy AABBs keyed by body slot and the frozen central
 point/AABB/ray results. These extra C buffers cost `20*bodyCapacity + 32` bytes;
@@ -279,7 +317,7 @@ and `6091.6999999999825` from `performance.now()` for the same instant. Ordering
 among `performance.now()` samples stays exact, and raw samples are never changed.
 
 The audit reports each continuity/CPU/cadence budget separately, including empty
-windows. Diagnostic budgets are marked inapplicable and short correctness runs
+windows. Diagnostic and synthetic-clock budgets are marked inapplicable; short correctness runs
 remain identified. A structurally valid report may still fail numeric budgets.
 Every audit remains `acceptanceEligible: false`: provenance authenticity, real
 input, device conditions, startup/cache protocol, allocation/GC, presentation,
@@ -287,7 +325,7 @@ companion quality runs and the repeated cross-device decision still require
 separate evidence. This is a raw timing audit, not complete study qualification.
 
 `python3 bench/render/test_validate.py <runner-report-directory> <assembled-build>`
-checks real short browser reports for all 12 candidate/profile combinations,
+checks short browser reports for all 12 candidate/profile combinations,
 rejects deliberately corrupted copies and failed-run prefixes, and pins exact
 budget boundaries. A synthetic stalled timeline from the actual JS producer
 checks boundary gaps, empty windows, frozen preparation baselines and overshoot.

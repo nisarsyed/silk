@@ -82,6 +82,7 @@ jobs:
           node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
+          node bench/render/test_pointer.mjs "build/render-study-$mode"
           node bench/render/test_frozen.mjs "build/render-study-$mode"
           node bench/render/test_canvas_frozen.mjs "build/render-study-$mode"
           node bench/render/test_recording.mjs "build/render-study-$mode"
@@ -89,13 +90,14 @@ jobs:
           node bench/render/test_gpu.mjs "build/render-study-$mode"
           node bench/render/test_gl_stats.mjs "build/render-study-$mode"
           node bench/render/test_windows.mjs "build/render-study-$mode"
-          node bench/render/test_runner.mjs "build/render-study-$mode" "build/reports/render-$mode/runner"
+          SL_RENDER_TEST_CLOCK=synthetic node bench/render/test_runner.mjs "build/render-study-$mode" "build/reports/render-$mode/runner"
           python3 bench/render/test_validate.py "build/reports/render-$mode/runner" "build/render-study-$mode"
           mkdir -p "build/reports/render-$mode/runner/audits"
           for report in build/reports/render-"$mode"/runner/*-base.json build/reports/render-"$mode"/runner/*-diagnostic.json; do
             python3 bench/render/validate.py "$report" > "build/reports/render-$mode/runner/audits/$(basename "$report")"
           done
           node bench/render/test_hud.mjs "build/render-study-$mode" "build/reports/render-$mode/hud"
+          node bench/render/test_pointer_browser.mjs "build/render-study-$mode" "build/reports/render-$mode/pointer"
           node bench/render/test_browser.mjs "build/render-study-$mode" "build/reports/render-$mode"
       - uses: actions/upload-artifact@v7
         if: always()

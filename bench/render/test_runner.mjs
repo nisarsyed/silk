@@ -2,11 +2,15 @@ import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {installSyntheticClock} from './test_clock.mjs';
 import {chromium} from '../../wasm/node_modules/@playwright/test/index.mjs';
 const build=path.resolve(process.argv[2]??'build/render-study');
 const output=path.resolve(process.argv[3]??'build/reports/render-runner');
 const provenance=JSON.parse(await fs.readFile(path.join(build,'provenance.json'),'utf8'));
 const channel=process.env.SL_RENDER_BROWSER,headed=process.env.SL_RENDER_HEADED==='1';
+const testClock=process.env.SL_RENDER_TEST_CLOCK??'real',synthetic=testClock==='synthetic';
+if(!['real','synthetic'].includes(testClock)||(synthetic&&(headed||channel)))throw new Error('Synthetic test clock requires bundled headless Chromium');
+const markClock=report=>{if(synthetic)report.clock.testOverride='deterministic-rAF-60Hz';};
 if(channel!==undefined&&channel!=='chrome')throw new Error('SL_RENDER_BROWSER must be chrome or unset');
 if(process.env.SL_RENDER_HEADED!==undefined&&!['0','1'].includes(process.env.SL_RENDER_HEADED))throw new Error('SL_RENDER_HEADED must be 0 or 1');
 await fs.mkdir(output,{recursive:true});
@@ -25,6 +29,7 @@ try{
   const page=await browser.newPage({viewport:headed?null:{width:1280,height:900}}),errors=[];
   page.on('pageerror',error=>errors.push(String(error)));
   page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon'))errors.push(message.text());});
+  if(synthetic)await page.addInitScript(installSyntheticClock);
   await page.goto(`http://127.0.0.1:${server.address().port}/verify.html`);
   for(const frozen of [false,true])for(const candidate of ['canvas','webgl','raylib'])for(const diagnostic of [false,true]){
     const result=await page.evaluate(async({candidate,diagnostic,frozen})=>{
@@ -36,6 +41,7 @@ try{
         layout:diagnostic?'mobile':'desktop',onPhase:value=>phases.push(value)}),(_key,value)=>typeof value==='bigint'?String(value):value));}
       finally{canvas.remove();hudElement.remove();}
     },{candidate,diagnostic,frozen});
+    markClock(result);
     await fs.writeFile(path.join(output,`${frozen?'frozen-':''}${candidate}-${diagnostic?'diagnostic':'base'}.json`),JSON.stringify(result)+'\n');
     assert.equal(result.status,'collected',JSON.stringify(result.failure));assert.equal(result.kind,'correctness-only');
     assert.equal(result.acceptanceEligible,false);assert.equal(result.warmup.callbacks,120);assert.equal(result.warmup.world.steps,120);
@@ -97,6 +103,7 @@ try{
         return JSON.parse(JSON.stringify({report,replacement},(_key,value)=>typeof value==='bigint'?String(value):value));
       }finally{if(reason==='hidden')delete document.visibilityState;canvas.remove();}
     },reason);
+    markClock(result.report);markClock(result.replacement);
     await fs.writeFile(path.join(output,`interrupted-${reason}.json`),JSON.stringify(result)+'\n');
     assert.equal(result.report.status,'failed');assert.equal(result.report.failure.phase,'measurement');
     assert.deepEqual(result.report.provenance,provenance);assert.deepEqual(result.replacement.provenance,provenance);
@@ -105,8 +112,27 @@ try{
     assert.equal(result.replacement.status,'failed');assert.match(result.replacement.failure.reason,/aborted/);
     assert.equal(result.replacement.calibrationIntervals.length,0);assert.equal(result.replacement.setupMs,null);
   }
+  // The production calibration gate must still reject duplicate intervals and
+  // an unsupported display rate; synthetic scheduling is not a gate bypass.
+  if(synthetic)for(const fault of ['duplicate','slow']){
+    const report=await page.evaluate(async fault=>{
+      const {runStudy}=await import('./runner.mjs'),canvas=document.createElement('canvas');
+      canvas.id='invalid-calibration';document.body.append(canvas);
+      try{
+        return JSON.parse(JSON.stringify(await runStudy({canvas,candidate:'canvas',correctnessSeconds:.25,
+          onPhase:phase=>{if(phase==='calibration'){
+            window.__silkTestClock.periodMs=fault==='slow'?1000/30:1000/60;
+            window.__silkTestClock.repeatAfter=fault==='duplicate'?2:0;
+          }}}),(_key,value)=>typeof value==='bigint'?String(value):value));
+      }finally{window.__silkTestClock.periodMs=1000/60;window.__silkTestClock.repeatAfter=0;canvas.remove();}
+    },fault);
+    markClock(report);await fs.writeFile(path.join(output,`calibration-${fault}.json`),JSON.stringify(report)+'\n');
+    assert.equal(report.status,'failed');assert.equal(report.failure.phase,'calibration');
+    assert.match(report.failure.reason,fault==='duplicate'?/Invalid refresh interval/:/59–61 Hz/);
+    assert.equal(report.calibrationIntervals.length,240);assert.equal(report.frames,undefined);
+  }
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(output,'results.json'),JSON.stringify({kind:'correctness-only',browser:browser.version(),
-    channel:channel??'bundled-chromium',headless:!headed,results},null,2)+'\n');
-  console.log('Browser runner: all candidates/profiles, exact rebuild, bounded records, fixed-step accounting, partial failures and disposal PASS');
+    channel:channel??'bundled-chromium',headless:!headed,testClock,results},null,2)+'\n');
+  console.log(`Browser runner (${testClock} scheduling): all candidates/profiles, exact rebuild, bounded records, fixed-step accounting, partial failures and disposal PASS`);
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
