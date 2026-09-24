@@ -54,6 +54,7 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           node bench/wasm/test_driver.mjs build/wasm-${{ matrix.mode }}/benchmark/driver.mjs
+          node bench/render/test_study.mjs build/wasm-${{ matrix.mode }}/render-physics
           for sleep in off on; do
             for host in node browser; do
               browser_args=()
@@ -66,18 +67,59 @@ jobs:
             done
           done
           python3 bench/wasm/test_report.py --report build/wasm-${{ matrix.mode }}/benchmark-reports/node-off/run-1.json
+      - name: Verify matched renderer base visuals
+        shell: bash
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          mode="${{ matrix.mode }}"
+          emcmake cmake -S . -B "build/wasm-render-$mode" \
+            -DCMAKE_BUILD_TYPE="${mode^}" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DSL_BUILD_TESTS=OFF -DSL_INSTALL=OFF -DSL_RENDER_STUDY=ON
+          cmake --build "build/wasm-render-$mode" --parallel 2
+          python3 bench/render/build.py --benchmark "build/wasm-$mode/benchmark" \
+            --raylib "build/wasm-render-$mode/render-study" --output "build/render-study-$mode"
+          python3 bench/render/test_metadata.py
+          node bench/render/test_provenance.mjs "build/render-study-$mode"
+          node bench/render/test_geometry.mjs "build/render-study-$mode"
+          node bench/render/test_overlay.mjs "build/render-study-$mode"
+          node bench/render/test_pointer.mjs "build/render-study-$mode"
+          node bench/render/test_frozen.mjs "build/render-study-$mode"
+          node bench/render/test_canvas_frozen.mjs "build/render-study-$mode"
+          node bench/render/test_recording.mjs "build/render-study-$mode"
+          node bench/render/test_timing.mjs "build/render-study-$mode"
+          node bench/render/test_gpu.mjs "build/render-study-$mode"
+          node bench/render/test_gl_stats.mjs "build/render-study-$mode"
+          node bench/render/test_windows.mjs "build/render-study-$mode"
+          SL_RENDER_TEST_CLOCK=synthetic node bench/render/test_runner.mjs "build/render-study-$mode" "build/reports/render-$mode/runner"
+          mkdir -p "build/reports/render-$mode/runner/audits"
+          for report in build/reports/render-"$mode"/runner/*-base.json build/reports/render-"$mode"/runner/*-diagnostic.json; do
+            python3 bench/render/validate.py "$report" > "build/reports/render-$mode/runner/audits/$(basename "$report")"
+          done
+          node bench/render/test_hud.mjs "build/render-study-$mode" "build/reports/render-$mode/hud"
+          node bench/render/test_pointer_browser.mjs "build/render-study-$mode" "build/reports/render-$mode/pointer"
+          node bench/render/test_input_browser.mjs "build/render-study-$mode" "build/reports/render-$mode/input"
+          python3 bench/render/test_validate.py "build/reports/render-$mode/runner" "build/render-study-$mode" "build/reports/render-$mode/input"
+          python3 bench/render/test_protocol.py
+          node bench/render/test_browser.mjs "build/render-study-$mode" "build/reports/render-$mode"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: wasm-core-${{ matrix.mode }}-${{ github.sha }}
           path: |
+            build/reports/render-${{ matrix.mode }}/
+            build/wasm-render-${{ matrix.mode }}/compile_commands.json
+            build/wasm-render-${{ matrix.mode }}/bench/render/CMakeFiles/silk_render_raylib.dir/link.txt
             build/wasm-${{ matrix.mode }}/toolchain.txt
             build/wasm-${{ matrix.mode }}/package-consumers.txt
             build/wasm-${{ matrix.mode }}/compile_commands.json
             build/wasm-${{ matrix.mode }}/tests/CMakeFiles/sl_tests.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_bench.dir/link.txt
+            build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm_study.dir/link.txt
             build/wasm-${{ matrix.mode }}/benchmark/build.json
+            build/wasm-${{ matrix.mode }}/render-physics/build.json
+            build/wasm-render-${{ matrix.mode }}/render-study/build.json
+            build/render-study-${{ matrix.mode }}/provenance.json
             build/wasm-${{ matrix.mode }}/benchmark-reports/
             build/wasm-${{ matrix.mode }}/Testing/Temporary/
           retention-days: 14

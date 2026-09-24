@@ -86,3 +86,8 @@ option(SL_BUILD_EXAMPLE "Build the public headless example" OFF)
 if(SL_BUILD_EXAMPLE)
     add_subdirectory(examples/headless)
 endif()
+
+option(SL_RENDER_STUDY "Build the raylib WebGL comparison candidate" OFF)
+if(SL_RENDER_STUDY)
+    add_subdirectory(bench/render)
+endif()
