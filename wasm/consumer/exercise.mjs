@@ -1,5 +1,9 @@
 import { exports as declared, worldKeys, silkKeys } from './types/api.js';
 const check = (value, message) => { if (!value) throw new Error(message); };
+const reject = (run, message) => {
+  try { run(); } catch { return; }
+  throw new Error(`Malformed input accepted: ${message}`);
+};
 const keysEqual = (actual, expected) => JSON.stringify(actual.sort()) === JSON.stringify(Object.keys(expected).sort());
 export async function exercise(api, options = {}) {
   check(keysEqual(Object.keys(api), declared), 'Declaration/runtime export mismatch');
@@ -12,6 +16,11 @@ export async function exercise(api, options = {}) {
   const shape = a.circle(0.5), body = w.createBody({mass:1,shape});
   const support = w.createBody({type:'static',shape,position:{x:0,y:-0.75}});
   check(body && support, 'Body creation');
+  const original=w.readBody(body);
+  reject(()=>a.circle(NaN),'non-finite circle radius');
+  reject(()=>w.createBody({mass:'1'}),'string mass');
+  reject(()=>w.step(Infinity),'non-finite step');
+  check(w.readBody(body).position.y===original.position.y,'Malformed input changed world state');
   const other = b.createWorld({bodyCapacity:16});
   for (const [name,value] of Object.entries(api.defaults)) {
     check(JSON.stringify(other.configuration[name]) === JSON.stringify(value), `Public default mismatch: ${name}`);
@@ -35,6 +44,7 @@ export async function exercise(api, options = {}) {
   check(!w.isBodyValid(body) && !w.isJointValid(joint) && !snapshot.valid, 'Reset ownership/lifetime');
   check(retained.bodyCount === 2, 'Retained output');
   w.dispose(); w.dispose(); a.dispose(); a.dispose();
+  reject(()=>w.readBody(body),'disposed world access');
   check(other.step(1/60), 'Disposing one instance leaves another usable');
   b.dispose();
   return { version: a.version, bodyCount: retained.bodyCount, exports: Object.keys(api).sort() };

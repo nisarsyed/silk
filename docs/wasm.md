@@ -239,27 +239,30 @@ notices, with an explicit file allowlist and no runtime npm dependencies.
 
 ```sh
 npm ci --prefix wasm --ignore-scripts --no-audit --no-fund
-PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install chromium
-node wasm/test_package.mjs build/wasm-debug/package
-node wasm/test_package.mjs build/wasm-release/package
+PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install chromium firefox webkit
+node wasm/test_package.mjs build/wasm-debug/package chromium,firefox,webkit build/wasm-debug/package-consumer-reports
+node wasm/test_package.mjs build/wasm-release/package chromium,firefox,webkit build/wasm-release/package-consumer-reports
 ```
 
-On Linux CI install Chromium with `--with-deps`. The development lockfile pins
+On Linux CI install the three browsers with `--with-deps`. The development lockfile pins
 TypeScript, Vite, Playwright, and transitive tools. The verifier creates a fresh
 temporary consumer outside the checkout, packs and inspects the archive,
 installs it with npm, removes SDK/compiler environment search paths, and checks
 TypeScript positive/negative examples against installed declarations. It also
 compares declared public exports and all world/module member names to runtime.
 
-The installed consumer executes Node, an HTTP-served browser page, an actual
-dedicated module worker, and a production Vite bundle under `/nested/demo/`.
+The installed consumer executes Node, an HTTP-served page and actual dedicated
+module worker in Chromium, Firefox, and WebKit, plus a production Vite bundle
+under `/nested/demo/`. The report records browser versions and console/page
+errors; a failing browser run retains a Playwright trace.
 It tests relative default asset discovery, absolute/relocated overrides,
 missing/corrupt responses, independent instances, ownership, reset/disposal,
 queries/snapshots, and exact counters. Failures propagate to the command's exit
 status. The temporary consumer path is printed and retained for inspection;
 these machine-specific artifacts are never checked in. Integration checks are
 not substitutes for sustained physical-device or native-browser performance
-validation in the later milestone issues.
+validation in the later milestone issues. WebKit CI is not physical Safari or
+iOS acceptance.
 
 See [the package API guide](../wasm/README.md) for loading examples, all lifetime
 and memory contracts, bundler and worker details, and intentional C omissions.

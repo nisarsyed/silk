@@ -17,11 +17,22 @@ jobs:
       fail-fast: false
       matrix:
         mode: [debug, release]
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/playwright
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.5.0"
+          cache: npm
+          cache-dependency-path: wasm/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: .cache/playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('wasm/package-lock.json') }}
       - name: Install pinned SDK
         shell: bash
         run: |
@@ -36,6 +47,8 @@ jobs:
           cmake --preset wasm-${{ matrix.mode }}
           emcc --version > build/wasm-${{ matrix.mode }}/toolchain.txt
           "$EMSDK_NODE" --version >> build/wasm-${{ matrix.mode }}/toolchain.txt
+          node --version >> build/wasm-${{ matrix.mode }}/toolchain.txt
+          npm --version >> build/wasm-${{ matrix.mode }}/toolchain.txt
           git -C "$EMSDK" rev-parse HEAD >> build/wasm-${{ matrix.mode }}/toolchain.txt
           git rev-parse HEAD >> build/wasm-${{ matrix.mode }}/toolchain.txt
           cmake --build --preset wasm-${{ matrix.mode }} --parallel 2
@@ -47,8 +60,10 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           npm ci --prefix wasm --ignore-scripts --no-audit --no-fund
-          PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium
-          node wasm/test_package.mjs build/wasm-${{ matrix.mode }}/package | tee build/wasm-${{ matrix.mode }}/package-consumers.txt
+          PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium firefox webkit
+          node wasm/node_modules/@playwright/test/cli.js --version >> build/wasm-${{ matrix.mode }}/toolchain.txt
+          node wasm/test_package.mjs build/wasm-${{ matrix.mode }}/package chromium,firefox,webkit \
+            build/wasm-${{ matrix.mode }}/package-consumer-reports | tee build/wasm-${{ matrix.mode }}/package-consumers.txt
       - name: Verify benchmark phases and Node/browser smoke replay
         shell: bash
         run: |
@@ -73,6 +88,8 @@ jobs:
           path: |
             build/wasm-${{ matrix.mode }}/toolchain.txt
             build/wasm-${{ matrix.mode }}/package-consumers.txt
+            build/wasm-${{ matrix.mode }}/package-consumer-reports/
+            build/wasm-${{ matrix.mode }}/package/
             build/wasm-${{ matrix.mode }}/compile_commands.json
             build/wasm-${{ matrix.mode }}/tests/CMakeFiles/sl_tests.dir/link.txt
             build/wasm-${{ matrix.mode }}/wasm/CMakeFiles/silk_wasm.dir/link.txt
