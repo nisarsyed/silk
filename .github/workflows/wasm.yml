@@ -55,6 +55,8 @@ jobs:
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           node bench/wasm/test_driver.mjs build/wasm-${{ matrix.mode }}/benchmark/driver.mjs
           node bench/render/test_study.mjs build/wasm-${{ matrix.mode }}/render-physics
+          node browser/test_runtime.mjs
+          node browser/test_wasm_runtime.mjs build/wasm-${{ matrix.mode }}/render-physics
           for sleep in off on; do
             for host in node browser; do
               browser_args=()
