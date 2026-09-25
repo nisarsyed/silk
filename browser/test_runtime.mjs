@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import {FixedClock,fixedStepSeconds,catchUpStepsMax} from './clock.mjs';
-import {PointerQueue,pointerAction,pointerQueueCapacity} from './input_queue.mjs';
+import {PointerQueue,pointerAction,pointerQueueCapacity,validPointerBatch} from './input_queue.mjs';
 
 assert.equal(fixedStepSeconds,Math.fround(1/60));
 assert.equal(catchUpStepsMax,8);
 assert.equal(pointerQueueCapacity,256);
+assert.equal(validPointerBatch([[1,1,pointerAction.down,3,0,0],
+  [1,2,pointerAction.up,3,0,0]]),true);
+for(const batch of [[],[[1,1,0,3,0,0],[2,2,2,3,0,0]],
+  [[1,1,0,3,0,0],[1,1,2,3,0,0]],[[1,1,0,3,0,0],[1,2,99,3,0,0]]])
+  assert.equal(validPointerBatch(batch),false);
+assert.equal(new PointerQueue(4,7).epoch,7);
 
 // The same fixed-step input sequence has identical state at 30/60/120/144 Hz.
 function replay(hz) {

@@ -1,4 +1,5 @@
 import {createRuntimeOwner} from './runtime_owner.mjs';
+import {validPointerBatch} from './host_input_queue.mjs';
 
 const claimed=new WeakSet();
 const pendingMax=32;
@@ -7,13 +8,15 @@ const cssFrames=Object.freeze({desktop:[1280,720],mobile:[360,640]});
 // Main-thread coordinator. A worker receives the canvas only after ownership
 // is claimed. Startup failure terminates the worker, replaces the transferred
 // canvas, then constructs one fresh main-thread world from the initial scene.
-export async function startBrowserRuntime(canvas,profile,{preferWorker=true,workerUrl,onStatus}={}){
+export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,workerUrl,onStatus}={}){
   if(!(canvas instanceof HTMLCanvasElement)||!canvas.isConnected||
+      profile===null||typeof profile!=='object'||Array.isArray(profile)||
       typeof preferWorker!=='boolean'||(onStatus!==undefined&&typeof onStatus!=='function'))
     throw new TypeError('Invalid browser runtime canvas or options');
   if(claimed.has(canvas))throw new Error('Canvas already has a runtime controller');
   claimed.add(canvas);
   let current=canvas,worker=null,owner=null,mode='starting',fallbackReason=null,failureReason=null,disposed=false;
+  let currentEpoch=1,currentLayout=profile.layout??'desktop',currentScene=profile.scene??'pyramid';
   let userPaused=false,visibilityPaused=false;
   let nextId=0;
   const pending=new Map();
@@ -30,11 +33,15 @@ export async function startBrowserRuntime(canvas,profile,{preferWorker=true,work
     stopWorker(reason);
     if(mode==='worker'){mode='failed';onStatus?.({state:'failed',reason});}
   };
+  const status=value=>{
+    if(Number.isSafeInteger(value?.epoch))currentEpoch=value.epoch;
+    onStatus?.(value);
+  };
   const received=event=>{
     const data=event.data;
     if(data?.kind==='status'){
       if(data.status?.state==='failed')failWorker(data.status.reason||'Worker runtime failed');
-      else onStatus?.(data.status);
+      else status(data.status);
       return;
     }
     const entry=pending.get(data?.id);
@@ -68,7 +75,9 @@ export async function startBrowserRuntime(canvas,profile,{preferWorker=true,work
     current.style.width=`${width}px`;current.style.height=`${height}px`;
   };
   const startMain=async()=>{
-    owner=await createRuntimeOwner(current,{...profile,onStatus});mode='main';
+    owner=await createRuntimeOwner(current,{...profile,onStatus:status});mode='main';
+    currentEpoch=owner.epoch;currentLayout=profile.layout??'desktop';
+    currentScene=profile.scene??'pyramid';
     setCssFrame(profile.layout??'desktop');
   };
   try{
@@ -80,7 +89,8 @@ export async function startBrowserRuntime(canvas,profile,{preferWorker=true,work
         worker.addEventListener('error',event=>failWorker(event.message||'Worker startup failed'));
         worker.addEventListener('messageerror',()=>failWorker('Worker message failed'));
         const offscreen=canvas.transferControlToOffscreen();
-        await request('init',{canvas:offscreen,profile},[offscreen]);
+        const initial=await request('init',{canvas:offscreen,profile},[offscreen]);
+        currentEpoch=initial.epoch;
         mode='worker';
         setCssFrame(profile.layout??'desktop');
       }catch(error){
@@ -101,10 +111,24 @@ export async function startBrowserRuntime(canvas,profile,{preferWorker=true,work
         if(kind==='reset')return owner.reset(...fields.args);
         if(kind==='resize')return owner.resize(fields.layout);
         if(kind==='pointer')return owner.pointer(...fields.args);
+        if(kind==='pointer-batch'){
+          const counts={queued:0,coalesced:0,droppedMove:0,stale:0};
+          for(const item of fields.events){const status=owner.pointer(...item);
+            if(status==='queued')++counts.queued;
+            else if(status==='coalesced')++counts.coalesced;
+            else if(status==='dropped-move')++counts.droppedMove;
+            else if(status==='stale')++counts.stale;
+            else throw new Error(`Pointer batch failed: ${status}`);
+          }
+          return counts;
+        }
         if(kind==='report')return owner.report();
       }
       if(mode!=='worker')throw new Error('Runtime requires explicit recovery');
-      try{return (await request(kind,fields)).result;}
+      try{const packet=await request(kind,fields);
+        if(Number.isSafeInteger(packet.epoch))currentEpoch=packet.epoch;
+        return packet.result;
+      }
       catch(error){failWorker(`Worker ${kind} failed: ${error}`);throw error;}
     };
     const visibility=()=>{
@@ -119,17 +143,25 @@ export async function startBrowserRuntime(canvas,profile,{preferWorker=true,work
     if(document.visibilityState!=='visible')visibility();
     return Object.freeze({
       get canvas(){return current;},get mode(){return mode;},
+      get epoch(){return currentEpoch;},get layout(){return currentLayout;},
+      get scene(){return currentScene;},
       get fallbackReason(){return fallbackReason;},get failureReason(){return failureReason;},
       async pause(){userPaused=true;visibilityPaused=false;return control('pause');},
       async resume(){userPaused=false;
         if(document.visibilityState!=='visible'){visibilityPaused=true;return false;}
         return control('resume');},
       singleStep(){return control('single-step');},
-      reset(scene,sleep){return control('reset',{args:[scene,sleep]});},
+      async reset(scene,sleep){const changed=await control('reset',{args:[scene,sleep]});
+        if(changed)currentScene=scene??currentScene;return changed;},
       async resize(layout){const changed=await control('resize',{layout});
-        if(changed)setCssFrame(layout);return changed;},
+        if(changed){currentLayout=layout;setCssFrame(layout);}return changed;},
       pointer(epoch,sequence,action,pointerId,x,y){
         return control('pointer',{args:[epoch,sequence,action,pointerId,x,y]});
+      },
+      pointerBatch(events){
+        if(!validPointerBatch(events))
+          throw new TypeError('Invalid pointer batch');
+        return control('pointer-batch',{events});
       },
       report(){return control('report');},
       async recoverToMain(){

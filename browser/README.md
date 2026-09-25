@@ -49,9 +49,15 @@ canvas before worker startup. If startup fails, it terminates the worker,
 replaces the transferred canvas and starts a fresh main-thread world. Mid-run
 failure requires an explicit `recoverToMain()` reset. It bounds outstanding
 worker controls to 32 and terminates a worker that fails or exceeds that bound.
+`pointer_adapter.mjs` binds primary DOM pointer actions to the owned canvas,
+maps CSS coordinates through the shared camera, coalesces moves in a 256-entry
+queue, and sends at most one bounded batch at a time. Pause/reset epochs discard
+stale input and release capture; a saturated transition queue pauses with an
+explicit error. The adapter rebinds when explicit recovery replaces the canvas.
 Visibility changes pause/resume without repaying suspended time; a user pause
 stays paused when the tab returns. `test_runtime_browser.mjs` and
-`test_runtime_controller_browser.mjs` exercise both actual execution contexts,
+`test_runtime_controller_browser.mjs` and `test_pointer_adapter_browser.mjs`
+exercise both actual execution contexts,
 unsupported or failed worker startup, context failure, reset, resize, pointer
 cancellation and shutdown. A transferred HTML canvas cannot change its
 intrinsic width/height attributes; portrait resizing updates the OffscreenCanvas
@@ -59,6 +65,5 @@ drawing buffer to 720 × 1280 and the visible CSS frame to 360 × 640. Separate
 portrait pixel comparisons verify the result against the main-thread image.
 These are correctness runs with no physical-device speed claim.
 
-Still required by #96: a DOM pointer adapter with bounded/coalesced transport
-and a real input latency trace, measured worker scheduling and memory on the
+Still required by #96: a real input latency trace, measured worker scheduling and memory on the
 reference devices, sustained comparisons, and a supported placement decision.

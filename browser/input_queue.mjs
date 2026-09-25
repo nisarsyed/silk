@@ -3,6 +3,21 @@
 export const pointerQueueCapacity = 256;
 export const pointerAction = Object.freeze({down:0,move:1,up:2,cancel:3});
 
+export function validPointerMessage(epoch,sequence,action,pointerId,x,y){
+  return Number.isSafeInteger(epoch)&&Number.isSafeInteger(sequence)&&sequence>=1&&
+    Number.isInteger(action)&&action>=0&&action<=3&&
+    Number.isInteger(pointerId)&&pointerId>=-2147483648&&pointerId<=2147483647&&
+    Number.isFinite(x)&&Number.isFinite(y)&&Math.abs(x)<=8192&&Math.abs(y)<=8192&&
+    Number.isFinite(Math.fround(x))&&Number.isFinite(Math.fround(y));
+}
+
+export function validPointerBatch(batch){
+  return Array.isArray(batch)&&batch.length>=1&&batch.length<=pointerQueueCapacity&&
+    batch.every((item,index)=>Array.isArray(item)&&item.length===6&&
+      validPointerMessage(...item)&&
+      (index===0||(item[0]===batch[0][0]&&item[1]>batch[index-1][1])));
+}
+
 export class PointerQueue {
   #sequence;
   #action;
@@ -18,10 +33,12 @@ export class PointerQueue {
   #droppedMoves = 0;
   #evictedMoves = 0;
 
-  constructor(capacity=pointerQueueCapacity) {
+  constructor(capacity=pointerQueueCapacity,epoch=1) {
     if (!Number.isInteger(capacity) || capacity < 4 || capacity > pointerQueueCapacity ||
-        (capacity & (capacity-1)) !== 0) throw new RangeError('Invalid pointer queue capacity');
+        (capacity & (capacity-1)) !== 0 || !Number.isSafeInteger(epoch) || epoch<1)
+      throw new RangeError('Invalid pointer queue capacity or epoch');
     this.capacity = capacity;
+    this.#epoch = epoch;
     this.#sequence = new Float64Array(capacity);
     this.#action = new Uint8Array(capacity);
     this.#pointer = new Int32Array(capacity);
@@ -48,11 +65,7 @@ export class PointerQueue {
   }
 
   enqueue(epoch, sequence, action, pointerId, x, y) {
-    if (!Number.isSafeInteger(epoch) || !Number.isSafeInteger(sequence) || sequence < 1 ||
-        !Number.isInteger(action) || action < 0 || action > 3 ||
-        !Number.isInteger(pointerId) || pointerId < -2147483648 || pointerId > 2147483647 ||
-        !Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 8192 || Math.abs(y) > 8192 ||
-        !Number.isFinite(Math.fround(x)) || !Number.isFinite(Math.fround(y)))
+    if (!validPointerMessage(epoch,sequence,action,pointerId,x,y))
       throw new RangeError('Invalid pointer message');
     if (epoch !== this.#epoch) return 'stale';
     if (this.#draining) throw new Error('Cannot enqueue while applying pointer actions');

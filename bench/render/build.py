@@ -67,7 +67,8 @@ def main():
     shutil.copyfile(ROOT/'LICENSE', output/'LICENSE')
     for name in ('verify.html', 'verify.mjs', 'runner.mjs', 'collect.html', 'collect.mjs',
                  'placement.html', 'placement_probe.mjs', 'placement_worker.mjs',
-                 'runtime_owner.mjs', 'runtime_worker.mjs', 'runtime_controller.mjs'):
+                 'runtime_owner.mjs', 'runtime_worker.mjs', 'runtime_controller.mjs',
+                 'pointer_adapter.mjs'):
         shutil.copyfile(ROOT/'bench/render'/name, output/name)
     for name, target in (('clock.mjs', 'host_clock.mjs'), ('input_queue.mjs', 'host_input_queue.mjs')):
         shutil.copyfile(ROOT/'browser'/name, output/target)

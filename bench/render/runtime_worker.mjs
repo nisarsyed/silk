@@ -1,7 +1,9 @@
 import {createRuntimeOwner} from './runtime_owner.mjs';
+import {validPointerBatch} from './host_input_queue.mjs';
 
 let owner=null,opening=false;
-const reply=(id,ok,result)=>self.postMessage({id,ok,...(ok?{result}:{error:String(result)})});
+const reply=(id,ok,result)=>self.postMessage({id,ok,epoch:owner?.epoch??null,
+  ...(ok?{result}:{error:String(result)})});
 
 self.onmessage=async event=>{
   const {id,kind}=event.data;
@@ -19,6 +21,21 @@ self.onmessage=async event=>{
     }else{
       if(!owner)throw new Error('Worker has no authoritative owner');
       if(kind==='pointer')result=owner.pointer(...event.data.args);
+      else if(kind==='pointer-batch'){
+        const batch=event.data.events;
+        if(!validPointerBatch(batch))
+          throw new TypeError('Invalid pointer batch');
+        const counts={queued:0,coalesced:0,droppedMove:0,stale:0};
+        for(const item of batch){
+          const status=owner.pointer(...item);
+          if(status==='queued')++counts.queued;
+          else if(status==='coalesced')++counts.coalesced;
+          else if(status==='dropped-move')++counts.droppedMove;
+          else if(status==='stale')++counts.stale;
+          else throw new Error(`Pointer batch failed: ${status}`);
+        }
+        result=counts;
+      }
       else if(kind==='pause')result=owner.pause();
       else if(kind==='resume')result=owner.resume();
       else if(kind==='single-step')result=owner.singleStep();
