@@ -7,9 +7,15 @@ import { resolve, dirname, join, extname, sep, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { chromium } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 const source = dirname(fileURLToPath(import.meta.url));
 const packageDir = process.argv[2] ? resolve(process.argv[2]) : resolve(source, '../build/wasm-release/package');
+const browserTypes = {chromium,firefox,webkit};
+const browserNames = process.argv[3] ? process.argv[3].split(',') : ['chromium'];
+if (!browserNames.length || new Set(browserNames).size !== browserNames.length ||
+    browserNames.some(name => !Object.hasOwn(browserTypes,name)))
+  throw new TypeError('Expected unique chromium,firefox,webkit browser names');
+const reportDir = process.argv[4] ? resolve(process.argv[4]) : null;
 const consumer = await mkdtemp(join(tmpdir(), 'silk-package-consumer-'));
 console.log(`Independent consumer: ${consumer}`);
 const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(EMSDK|EM_|EMCC|EMSCRIPTEN|CMAKE)/.test(key)));
@@ -55,23 +61,43 @@ const server = createServer(async (request,response) => {
 });
 await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
-let browser;
+const summary={archive:packed.filename,browsers:[]};
+if(reportDir)await mkdir(reportDir,{recursive:true});
 try {
-  browser = await chromium.launch();
-  const page = await browser.newPage();
-  const failures = [], messages = [];
-  page.on('console',message => { if (message.type() === 'error') messages.push(message.text()); });
-  page.on('pageerror',error => failures.push(error.message));
-  for (const path of ['/browser.html','/nested/demo/']) {
-    await page.goto(origin+path);
-    await page.waitForFunction(() => document.documentElement.dataset.result,{timeout:45000});
-    const result = await page.locator('#result').innerText();
-    assert.equal(await page.locator('html').getAttribute('data-result'),'pass',`${result}\n${messages.join('\n')}`);
-    assert.deepEqual(failures,[],'Uncaught browser errors');
-    console.log(`Installed consumer ${path}: ${result}`);
+  for(const name of browserNames){
+    let browser,context;
+    const row={name,version:null,paths:[],pageErrors:[],consoleErrors:[],passed:false};
+    try {
+      browser=await browserTypes[name].launch();row.version=browser.version();
+      context=await browser.newContext();
+      if(reportDir)await context.tracing.start({screenshots:true,snapshots:true});
+      const page=await context.newPage();
+      page.on('console',message => {if(message.type()==='error')row.consoleErrors.push(message.text());});
+      page.on('pageerror',error => row.pageErrors.push(error.message));
+      for(const path of ['/browser.html','/nested/demo/']){
+        await page.goto(origin+path);
+        await page.waitForFunction(()=>document.documentElement.dataset.result,null,{timeout:45000});
+        const result=await page.locator('#result').innerText();
+        const passed=await page.locator('html').getAttribute('data-result')==='pass';
+        row.paths.push({path,passed,result});
+        assert.equal(passed,true,`${name} ${path}: ${result}\n${row.consoleErrors.join('\n')}`);
+        assert.deepEqual(row.pageErrors,[],`${name} uncaught browser errors`);
+        console.log(`${name} installed consumer ${path}: ${result}`);
+      }
+      row.passed=true;
+    }catch(error){
+      row.error=String(error?.stack??error);
+      if(reportDir&&context){
+        try{await context.tracing.stop({path:join(reportDir,`${name}-failure.zip`)});}
+        catch(traceError){row.traceError=String(traceError);}
+      }
+      throw error;
+    }finally{
+      if(reportDir&&context&&!row.error)await context.tracing.stop();
+      await context?.close();await browser?.close();
+      summary.browsers.push(row);
+      if(reportDir)await writeFile(join(reportDir,'package-results.json'),JSON.stringify(summary,null,2));
+    }
   }
-  console.log(`Archive ${packed.filename}: exact allowlist, types, Node, browser, actual worker, relocated assets, failures, and production bundle passed`);
-} finally {
-  if (browser) await browser.close();
-  await new Promise(resolve => server.close(resolve));
-}
+  console.log(`Archive ${packed.filename}: exact allowlist, types, Node, ${browserNames.join('/')} browser and actual worker, relocated assets, failures, and production bundle passed`);
+}finally{await new Promise(resolve=>server.close(resolve));}
