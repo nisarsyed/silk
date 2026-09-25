@@ -52,6 +52,14 @@ try{
         delete document.visibilityState;
         document.dispatchEvent(new Event('visibilitychange'));
         await wait(async()=>(await main.report()).steps>hiddenSteps);
+        for(let cycle=0;cycle<3;++cycle){
+          Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});
+          document.dispatchEvent(new Event('visibilitychange'));
+          await wait(async()=>(await main.report()).state==='paused');
+          delete document.visibilityState;
+          document.dispatchEvent(new Event('visibilitychange'));
+          await wait(async()=>(await main.report()).state==='running');
+        }
         await main.pause();
         Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});
         document.dispatchEvent(new Event('visibilitychange'));
@@ -139,8 +147,26 @@ try{
           oldDetached:!recoveryCanvas.isConnected,restoredScene:restored.scene,
           restoredSteps:restored.steps,reason:recovering.fallbackReason};
       }finally{await recovering.dispose();}
+      const saturation=[];
+      for(const preferWorker of [false,true]){
+        const canvas=document.createElement('canvas');document.body.append(canvas);
+        const runtime=await startBrowserRuntime(canvas,{candidate:'canvas'},{preferWorker});
+        try{
+          await runtime.pause();const epoch=runtime.epoch;
+          const batch=Array.from({length:256},(_,index)=>
+            [epoch,index+1,index%2?2:0,7,0,0]);
+          const result=await runtime.pointerBatch(batch),full=await runtime.report();
+          let rejected=false;
+          try{await runtime.pointerBatch([[epoch,257,3,7,0,0]]);}catch{rejected=true;}
+          const failed=runtime.mode==='main'?(await runtime.report()).reason:
+            runtime.failureReason;
+          await runtime.recoverToMain();
+          saturation.push({mode:preferWorker?'worker':'main',result,full:full.input.count,
+            rejected,failed,recovered:runtime.mode==='main'&&runtime.canvas!==canvas});
+        }finally{await runtime.dispose();}
+      }
       return {duplicate,mainRecovery,mainPortrait,unsupportedFallback,workerMode,workerSteps,
-        workerPlaceholder,workerCss,workerBuffer,startupFallback,midrun};
+        workerPlaceholder,workerCss,workerBuffer,startupFallback,midrun,saturation};
     });
     assert.equal(result.duplicate,true);
     assert.equal(result.mainRecovery,true);
@@ -161,6 +187,13 @@ try{
     assert.equal(result.midrun.restoredScene,'pyramid');
     assert.ok(result.midrun.restoredSteps<=1);
     assert.match(result.midrun.reason,/Explicit recovery restarted/);
+    for(const entry of result.saturation){
+      assert.equal(entry.result.queued,256);
+      assert.equal(entry.full,256);
+      assert.equal(entry.rejected,true);
+      assert.match(entry.failed,/Pointer queue capacity exhausted/);
+      assert.equal(entry.recovered,true);
+    }
     assert.deepEqual(errors,[]);
     console.log('Browser controller main/worker ownership, startup fallback, explicit recovery and shutdown PASS');
   }finally{await page.close();}

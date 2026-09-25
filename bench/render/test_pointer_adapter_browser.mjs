@@ -79,6 +79,20 @@ try{
       await waitHeld(true);
       await page.mouse.up();
       await waitHeld(false);
+      await page.setViewportSize({width:300,height:500});
+      const fitted=await page.evaluate(async()=>{
+        const report=await window.__study.controller.report();
+        return {cssWidth:report.cssWidth,cssHeight:report.cssHeight,
+          bufferWidth:report.bufferWidth,bufferHeight:report.bufferHeight,
+          dpr:report.devicePixelRatio,ratioX:report.bufferCssRatioX,
+          ratioY:report.bufferCssRatioY};
+      });
+      assert.ok(Math.abs(fitted.cssWidth-281.25)<0.01);
+      assert.equal(fitted.cssHeight,500);
+      assert.deepEqual([fitted.bufferWidth,fitted.bufferHeight],[720,1280]);
+      assert.ok(fitted.dpr>0&&Number.isFinite(fitted.dpr));
+      assert.ok(Math.abs(fitted.ratioX-fitted.ratioY)<0.01);
+      await page.setViewportSize({width:1400,height:900});
       const recovered=await page.evaluate(async()=>{
         const {controller}=window.__study,original=controller.canvas;
         if(controller.mode==='worker'){

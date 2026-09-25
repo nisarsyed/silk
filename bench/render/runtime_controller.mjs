@@ -72,7 +72,12 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
   };
   const setCssFrame=layout=>{
     const [width,height]=cssFrames[layout];
-    current.style.width=`${width}px`;current.style.height=`${height}px`;
+    // Keep the contract buffer fixed while fitting its CSS frame into either
+    // viewport dimension. The explicit ratio also covers a transferred HTML
+    // canvas whose intrinsic attributes cannot be changed after transfer.
+    current.style.aspectRatio=`${width} / ${height}`;
+    current.style.width=`min(${width}px, 100vw, ${100*width/height}vh)`;
+    current.style.height='auto';
   };
   const startMain=async()=>{
     owner=await createRuntimeOwner(current,{...profile,onStatus:status});mode='main';
@@ -163,7 +168,11 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
           throw new TypeError('Invalid pointer batch');
         return control('pointer-batch',{events});
       },
-      report(){return control('report');},
+      async report(){const value=await control('report'),rect=current.getBoundingClientRect();
+        return {...value,cssWidth:rect.width,cssHeight:rect.height,
+          devicePixelRatio:window.devicePixelRatio,
+          bufferCssRatioX:value.bufferWidth/rect.width,
+          bufferCssRatioY:value.bufferHeight/rect.height};},
       async recoverToMain(){
         assertLive();
         if(mode==='main'&&owner.state!=='failed')throw new Error('Live main owner needs no recovery');

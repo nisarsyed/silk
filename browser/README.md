@@ -63,6 +63,9 @@ cancellation and shutdown. A transferred HTML canvas cannot change its
 intrinsic width/height attributes; portrait resizing updates the OffscreenCanvas
 drawing buffer to 720 × 1280 and the visible CSS frame to 360 × 640. Separate
 portrait pixel comparisons verify the result against the main-thread image.
+The CSS frame fits either viewport dimension at a fixed aspect ratio while
+the drawing buffer stays fixed; reports include actual CSS size, device DPR,
+and both buffer/CSS ratios.
 These are correctness runs with no physical-device speed claim.
 
 Still required by #96: a real input latency trace, measured worker scheduling and memory on the
