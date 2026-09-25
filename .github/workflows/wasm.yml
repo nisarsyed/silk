@@ -82,6 +82,7 @@ jobs:
             --raylib "build/wasm-render-$mode/render-study" --output "build/render-study-$mode"
           python3 bench/render/test_metadata.py
           node bench/render/test_provenance.mjs "build/render-study-$mode"
+          node bench/render/test_placement_browser.mjs "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_pointer.mjs "build/render-study-$mode"

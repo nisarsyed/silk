@@ -65,8 +65,11 @@ def main():
     shutil.copytree(args.raylib/'licenses', output/'licenses', dirs_exist_ok=True)
     shutil.copytree(ROOT/'wasm/licenses', output/'licenses/emscripten', dirs_exist_ok=True)
     shutil.copyfile(ROOT/'LICENSE', output/'LICENSE')
-    for name in ('verify.html', 'verify.mjs', 'runner.mjs', 'collect.html', 'collect.mjs'):
+    for name in ('verify.html', 'verify.mjs', 'runner.mjs', 'collect.html', 'collect.mjs',
+                 'placement.html', 'placement_probe.mjs', 'placement_worker.mjs'):
         shutil.copyfile(ROOT/'bench/render'/name, output/name)
+    for name, target in (('clock.mjs', 'host_clock.mjs'), ('input_queue.mjs', 'host_input_queue.mjs')):
+        shutil.copyfile(ROOT/'browser'/name, output/target)
     shutil.copytree(args.benchmark, output/'benchmark', dirs_exist_ok=True)
     shutil.copytree(physics, output/'physics', dirs_exist_ok=True)
     for kind, module in modules.items():

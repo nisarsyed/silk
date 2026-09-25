@@ -29,6 +29,13 @@ ordering and cancellation checks. Run `node browser/test_wasm_runtime.mjs
 build/wasm-release/render-physics` after the WASM build to compare actual C
 world snapshots and work reports across 30/60/120/144 Hz callback schedules
 with the same queued pointer sequence. These are host correctness tests, not
-real-device placement or latency measurements. Main/worker ownership,
-OffscreenCanvas capability and recovery, browser controls, and the placement
-decision remain required by #96.
+real-device placement or latency measurements. `node
+bench/render/test_placement_browser.mjs build/render-study` also runs actual
+dedicated-worker WASM simulation and OffscreenCanvas drawing against the
+main-thread candidate for Canvas 2D and WebGL 2, pyramid and chains, sleep
+off/on. It checks final C pose/work and composited pixels without transferring
+a world snapshot per frame. The worker's final rAF lets a synchronous replay
+reach the compositor before its pixel comparison. This does not select a
+renderer or worker placement. The lifecycle owner, fallback/recovery, controls,
+measured worker scheduling, reference-device evidence and placement decision
+remain required by #96.
