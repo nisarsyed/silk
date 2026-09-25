@@ -19,13 +19,17 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try {
   browser=await chromium.launch({headless:true});
-  for(const candidate of ['canvas','webgl'])for(const scene of ['pyramid','chains'])for(const sleep of [false,true]){
+  for(const layout of ['desktop','mobile'])for(const candidate of ['canvas','webgl'])
+    for(const scene of ['pyramid','chains'])for(const sleep of [false,true]){
     const page=await browser.newPage({viewport:{width:680,height:760}}),errors=[];
     page.on('pageerror',error=>errors.push(String(error)));
     try {
       await page.goto(`http://127.0.0.1:${server.address().port}/placement.html`);
       const pair=await page.evaluate(async profile=>{
         const {runPlacement}=await import('./placement_probe.mjs');
+        if(profile.layout==='mobile')for(const canvas of document.querySelectorAll('canvas')){
+          canvas.style.width='360px';canvas.style.height='640px';
+        }
         const main=await runPlacement(document.querySelector('#main'),profile);
         const worker=new Worker('./placement_worker.mjs',{type:'module'});
         const canvas=document.querySelector('#worker').transferControlToOffscreen();
@@ -43,7 +47,7 @@ try {
           window.__placementWorker=worker;
           return {main,result};
         } catch(error) {worker.terminate();throw error;}
-      },{candidate,scene,sleep});
+      },{candidate,scene,sleep,layout});
       assert.equal(pair.main.worker,false);
       assert.equal(pair.result.worker,true);
       assert.equal(pair.main.crossOriginIsolated,false);
@@ -55,14 +59,14 @@ try {
       if (!second.equals(first)) {
         const output=path.resolve('build/reports/placement');
         await fs.mkdir(output,{recursive:true});
-        await fs.writeFile(path.join(output,`${candidate}-${scene}-${sleep?'sleep':'awake'}-main.png`),first);
-        await fs.writeFile(path.join(output,`${candidate}-${scene}-${sleep?'sleep':'awake'}-worker.png`),second);
-        console.log(`${candidate}/${scene}/${sleep?'sleep':'awake'} PNG sizes: ${first.length}, ${second.length}`);
+        await fs.writeFile(path.join(output,`${layout}-${candidate}-${scene}-${sleep?'sleep':'awake'}-main.png`),first);
+        await fs.writeFile(path.join(output,`${layout}-${candidate}-${scene}-${sleep?'sleep':'awake'}-worker.png`),second);
+        console.log(`${layout}/${candidate}/${scene}/${sleep?'sleep':'awake'} PNG sizes: ${first.length}, ${second.length}`);
       }
-      assert.equal(second.equals(first),true,`${candidate}/${scene}/${sleep?'sleep':'awake'} main/worker pixels differ`);
+      assert.equal(second.equals(first),true,`${layout}/${candidate}/${scene}/${sleep?'sleep':'awake'} main/worker pixels differ`);
       await page.evaluate(()=>window.__placementWorker.terminate());
       assert.deepEqual(errors,[]);
-      console.log(`${candidate}/${scene}/${sleep?'sleep':'awake'} actual OffscreenCanvas worker pose, work and pixels PASS`);
+      console.log(`${layout}/${candidate}/${scene}/${sleep?'sleep':'awake'} actual OffscreenCanvas worker pose, work and pixels PASS`);
     } finally {await page.close();}
   }
 } finally {await browser?.close();await new Promise(resolve=>server.close(resolve));}

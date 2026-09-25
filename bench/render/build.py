@@ -66,7 +66,8 @@ def main():
     shutil.copytree(ROOT/'wasm/licenses', output/'licenses/emscripten', dirs_exist_ok=True)
     shutil.copyfile(ROOT/'LICENSE', output/'LICENSE')
     for name in ('verify.html', 'verify.mjs', 'runner.mjs', 'collect.html', 'collect.mjs',
-                 'placement.html', 'placement_probe.mjs', 'placement_worker.mjs'):
+                 'placement.html', 'placement_probe.mjs', 'placement_worker.mjs',
+                 'runtime_owner.mjs', 'runtime_worker.mjs', 'runtime_controller.mjs'):
         shutil.copyfile(ROOT/'bench/render'/name, output/name)
     for name, target in (('clock.mjs', 'host_clock.mjs'), ('input_queue.mjs', 'host_input_queue.mjs')):
         shutil.copyfile(ROOT/'browser'/name, output/target)

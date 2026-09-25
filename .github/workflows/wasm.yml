@@ -83,6 +83,8 @@ jobs:
           python3 bench/render/test_metadata.py
           node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_placement_browser.mjs "build/render-study-$mode"
+          node bench/render/test_runtime_browser.mjs "build/render-study-$mode"
+          node bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_pointer.mjs "build/render-study-$mode"

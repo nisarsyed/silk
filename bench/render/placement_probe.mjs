@@ -8,10 +8,12 @@ import {PointerQueue,pointerAction} from './host_input_queue.mjs';
 // Correctness probe only: the same source scene, drawing code and precommitted
 // callback/input sequence execute on main or inside a dedicated worker. No
 // whole-world frame data crosses the thread boundary.
-export async function runPlacement(canvas,{candidate,scene,sleep}) {
+export async function runPlacement(canvas,{candidate,scene,sleep,layout='desktop'}) {
   if (!['canvas','webgl'].includes(candidate) || !['pyramid','chains'].includes(scene) ||
-      typeof sleep !== 'boolean') throw new TypeError('Invalid placement probe');
-  canvas.width = 1280; canvas.height = 720;
+      typeof sleep !== 'boolean' || !['desktop','mobile'].includes(layout))
+    throw new TypeError('Invalid placement probe');
+  canvas.width = layout==='desktop'?1280:720;
+  canvas.height = layout==='desktop'?720:1280;
   const module = await createStudyModule();
   let world,renderer;
   try {
@@ -56,7 +58,7 @@ export async function runPlacement(canvas,{candidate,scene,sleep}) {
     for(let row=0;row<snapshot.bodyCount;++row)for(const column of bits)
       hash=Math.imul(hash^column[row],16777619)>>>0;
     const report=world.report();
-    return {candidate,scene,sleep,worker:canvas instanceof OffscreenCanvas,
+    return {candidate,scene,sleep,layout,worker:canvas instanceof OffscreenCanvas,
       crossOriginIsolated:globalThis.crossOriginIsolated,
       steps:world.steps,bodyCount:snapshot.bodyCount,poseHash:hash,
       contacts:report.stats.contactCount,drops:String(report.drops),

@@ -33,9 +33,32 @@ real-device placement or latency measurements. `node
 bench/render/test_placement_browser.mjs build/render-study` also runs actual
 dedicated-worker WASM simulation and OffscreenCanvas drawing against the
 main-thread candidate for Canvas 2D and WebGL 2, pyramid and chains, sleep
-off/on. It checks final C pose/work and composited pixels without transferring
+off/on, in both desktop and mobile buffers (16 profiles per build). It checks
+final C pose/work and composited pixels without transferring
 a world snapshot per frame. The worker's final rAF lets a synchronous replay
 reach the compositor before its pixel comparison. This does not select a
-renderer or worker placement. The lifecycle owner, fallback/recovery, controls,
-measured worker scheduling, reference-device evidence and placement decision
-remain required by #96.
+renderer or worker placement.
+
+`runtime_owner.mjs` in the assembled study creates one authoritative C world
+and matching Canvas or WebGL renderer per canvas. Main and worker contexts use
+the same fixed clock and pointer queue. It supports pause, single-step, exact
+source reset, desktop/mobile buffer changes, pointer cancellation and disposal.
+A lost graphics context stops the owner; recovery creates a new owner and
+canvas, never a silent continuation. `runtime_controller.mjs` claims the DOM
+canvas before worker startup. If startup fails, it terminates the worker,
+replaces the transferred canvas and starts a fresh main-thread world. Mid-run
+failure requires an explicit `recoverToMain()` reset. It bounds outstanding
+worker controls to 32 and terminates a worker that fails or exceeds that bound.
+Visibility changes pause/resume without repaying suspended time; a user pause
+stays paused when the tab returns. `test_runtime_browser.mjs` and
+`test_runtime_controller_browser.mjs` exercise both actual execution contexts,
+unsupported or failed worker startup, context failure, reset, resize, pointer
+cancellation and shutdown. A transferred HTML canvas cannot change its
+intrinsic width/height attributes; portrait resizing updates the OffscreenCanvas
+drawing buffer to 720 × 1280 and the visible CSS frame to 360 × 640. Separate
+portrait pixel comparisons verify the result against the main-thread image.
+These are correctness runs with no physical-device speed claim.
+
+Still required by #96: a DOM pointer adapter with bounded/coalesced transport
+and a real input latency trace, measured worker scheduling and memory on the
+reference devices, sustained comparisons, and a supported placement decision.
