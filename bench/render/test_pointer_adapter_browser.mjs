@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
-import {chromium} from '../../wasm/node_modules/@playwright/test/index.mjs';
+import {chromium,firefox,webkit} from '../../wasm/node_modules/@playwright/test/index.mjs';
 
 const build=path.resolve(process.argv[2]??'build/render-study');
+const engineName=process.argv[3]??'chromium';
+const engine={chromium,firefox,webkit}[engineName];
+if(!engine)throw new Error('Unknown browser engine');
 const server=http.createServer(async(req,res)=>{
   try{
     const name=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
@@ -18,7 +21,7 @@ const server=http.createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
-  browser=await chromium.launch({headless:true});
+  browser=await engine.launch({headless:true});
   for(const candidate of ['canvas','webgl'])for(const preferWorker of [false,true]){
     const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];
     const waitHeld=async expected=>{
@@ -120,7 +123,7 @@ try{
       assert.ok(final.report.steps>=1,JSON.stringify(final.report));
       assert.ok(final.statistics.capacity===256);
       assert.deepEqual(errors,[]);
-      console.log(`${candidate} ${initial.mode} trusted DOM input, bounded batching, epoch cancellation and mobile mapping PASS`);
+      console.log(`${engineName} ${candidate} ${initial.mode} trusted DOM input, bounded batching, epoch cancellation and mobile mapping PASS`);
     }finally{await page.close();}
   }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

@@ -76,6 +76,8 @@ The CSS frame fits either viewport dimension at a fixed aspect ratio while
 the drawing buffer stays fixed; reports include actual CSS size, device DPR,
 and both buffer/CSS ratios.
 These are correctness runs with no physical-device speed claim.
+The runtime, controller, pointer and trace smokes run in Chromium, Firefox and
+WebKit. A Playwright WebKit pass is not physical Safari/iOS acceptance.
 
 Still required by #96: a real input latency trace, measured worker scheduling and memory on the
 reference devices, sustained comparisons, and a supported placement decision.

@@ -47,7 +47,7 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           npm ci --prefix wasm --ignore-scripts --no-audit --no-fund
-          PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium
+          PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium firefox webkit
           node wasm/test_package.mjs build/wasm-${{ matrix.mode }}/package | tee build/wasm-${{ matrix.mode }}/package-consumers.txt
       - name: Verify benchmark phases and Node/browser smoke replay
         shell: bash
@@ -84,10 +84,12 @@ jobs:
           python3 bench/render/test_metadata.py
           node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_placement_browser.mjs "build/render-study-$mode"
-          node bench/render/test_runtime_browser.mjs "build/render-study-$mode"
-          node bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode"
-          node bench/render/test_input_trace_browser.mjs "build/render-study-$mode"
-          node bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode"
+          for engine in chromium firefox webkit; do
+            node bench/render/test_runtime_browser.mjs "build/render-study-$mode" "$engine"
+            node bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
+            node bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"
+            node bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode" "$engine"
+          done
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_pointer.mjs "build/render-study-$mode"
