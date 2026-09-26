@@ -86,9 +86,9 @@ jobs:
           node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_placement_browser.mjs "build/render-study-$mode"
           for engine in chromium firefox webkit; do
-            # Firefox's Linux software WebGL 2 needs an X display on GPU-less runners.
+            # Firefox and WebKit need an X display for WebGL 2 on GPU-less runners.
             browser_command=(node)
-            if [[ "$engine" == firefox ]]; then browser_command=(xvfb-run -a node); fi
+            if [[ "$engine" != chromium ]]; then browser_command=(xvfb-run -a node); fi
             "${browser_command[@]}" bench/render/test_runtime_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"
