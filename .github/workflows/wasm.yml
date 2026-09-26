@@ -86,10 +86,13 @@ jobs:
           node bench/render/test_provenance.mjs "build/render-study-$mode"
           node bench/render/test_placement_browser.mjs "build/render-study-$mode"
           for engine in chromium firefox webkit; do
-            node bench/render/test_runtime_browser.mjs "build/render-study-$mode" "$engine"
-            node bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
-            node bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"
-            node bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode" "$engine"
+            # Firefox's Linux software WebGL 2 needs an X display on GPU-less runners.
+            browser_command=(node)
+            if [[ "$engine" == firefox ]]; then browser_command=(xvfb-run -a node); fi
+            "${browser_command[@]}" bench/render/test_runtime_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode" "$engine"
           done
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
