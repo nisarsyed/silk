@@ -56,6 +56,7 @@ jobs:
           node bench/wasm/test_driver.mjs build/wasm-${{ matrix.mode }}/benchmark/driver.mjs
           node bench/render/test_study.mjs build/wasm-${{ matrix.mode }}/render-physics
           node browser/test_runtime.mjs
+          node browser/test_input_trace.mjs
           node browser/test_wasm_runtime.mjs build/wasm-${{ matrix.mode }}/render-physics
           for sleep in off on; do
             for host in node browser; do
@@ -85,6 +86,7 @@ jobs:
           node bench/render/test_placement_browser.mjs "build/render-study-$mode"
           node bench/render/test_runtime_browser.mjs "build/render-study-$mode"
           node bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode"
+          node bench/render/test_input_trace_browser.mjs "build/render-study-$mode"
           node bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode"
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"

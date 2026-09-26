@@ -54,6 +54,15 @@ maps CSS coordinates through the shared camera, coalesces moves in a 256-entry
 queue, and sends at most one bounded batch at a time. Pause/reset epochs discard
 stale input and release capture; a saturated transition queue pauses with an
 explicit error. The adapter rebinds when explicit recovery replaces the canvas.
+Optional `traceInput` preallocates 8,192 host-only records. A trusted DOM event
+timestamp travels with each bounded pointer message; the owner records its
+application time and the first completed renderer submission containing that
+step. `inputTrace()` copies the records only on request, with main and owner
+time origins for clock correlation. Reports include the trace storage size;
+a full trace fails the run explicitly.
+`test_input_trace_browser.mjs` checks event, step and submission ordering in
+both renderers and both execution paths. This is a correctness trace, not a
+physical-device input-latency measurement or an input-to-photon claim.
 Visibility changes pause/resume without repaying suspended time; a user pause
 stays paused when the tab returns. `test_runtime_browser.mjs` and
 `test_runtime_controller_browser.mjs` and `test_pointer_adapter_browser.mjs`

@@ -58,7 +58,8 @@ export function createPointerAdapter(controller,{onError}={}){
     try{
       if(!sync()||failure)return;
       const [x,y]=coordinates(event);
-      const result=queue.enqueue(epoch,++sequence,action,event.pointerId,x,y);
+      const eventMs=performance.timeOrigin+event.timeStamp;
+      const result=queue.enqueue(epoch,++sequence,action,event.pointerId,x,y,eventMs);
       if(result==='overflow')fail('DOM pointer queue capacity exhausted');
     }catch(error){fail(error);}
   };
@@ -94,7 +95,7 @@ export function createPointerAdapter(controller,{onError}={}){
       const ready=sync();
       if(ready&&!failure&&!pending&&queue.count){
         const batch=[];
-        queue.drain((action,id,x,y,number)=>batch.push([epoch,number,action,id,x,y]));
+        queue.drain((action,id,x,y,number,eventMs)=>batch.push([epoch,number,action,id,x,y,eventMs]));
         pending=true;
         Promise.resolve(controller.pointerBatch(batch)).then(result=>{
           if(result?.queued+result?.coalesced+result?.droppedMove+result?.stale!==batch.length)

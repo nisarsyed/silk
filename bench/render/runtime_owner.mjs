@@ -4,6 +4,7 @@ import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
 import {FixedClock} from './host_clock.mjs';
 import {PointerQueue} from './host_input_queue.mjs';
+import {InputTrace} from './host_input_trace.mjs';
 
 const active=new WeakSet();
 const layouts=Object.freeze({desktop:[1280,720],mobile:[720,1280]});
@@ -12,11 +13,12 @@ const layouts=Object.freeze({desktop:[1280,720],mobile:[720,1280]});
 // state copy or second C world is used for rendering. This is a bounded host
 // path for the placement experiment, not a production renderer decision.
 export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep=false,
-  layout='desktop',onStatus}={}) {
+  layout='desktop',traceInput=false,onStatus}={}) {
   if (!((typeof HTMLCanvasElement!=='undefined'&&canvas instanceof HTMLCanvasElement) ||
         (typeof OffscreenCanvas!=='undefined'&&canvas instanceof OffscreenCanvas)) ||
       !['canvas','webgl'].includes(candidate) || !['pyramid','rain','chains'].includes(scene) ||
       typeof sleep!=='boolean' || !Object.hasOwn(layouts,layout) ||
+      typeof traceInput!=='boolean'||
       (onStatus!==undefined&&typeof onStatus!=='function'))
     throw new TypeError('Invalid browser runtime profile');
   if (active.has(canvas)) throw new Error('Canvas already has an authoritative owner');
@@ -24,6 +26,7 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
   let module,world,drawScene,renderer,frameId=0,disposed=false,failure=null;
   let state='initializing',sceneName=scene,sleepEnabled=sleep,layoutName=layout;
   const clock=new FixedClock(),queue=new PointerQueue();
+  const trace=traceInput?new InputTrace():null;
   const notify=()=>onStatus?.({state,reason:failure,steps:world?.steps??null,epoch:queue.epoch});
   const live=()=>{if(disposed)throw new Error('Browser runtime is disposed');};
   const stopped=()=>{live();if(state==='failed')throw new Error(`Browser runtime failed: ${failure}`);};
@@ -45,15 +48,19 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
     renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene):new WebglCandidate(canvas,drawScene);
     renderer.draw();
   };
+  const applyQueued=(action,_id,x,y,sequence,eventMs)=>{
+    if(!world.pointer(action,x,y))throw new Error('Queued pointer action failed');
+    if(trace&&eventMs>0)
+      trace.record(queue.epoch,sequence,action,eventMs,performance.timeOrigin+performance.now());
+  };
   const drawFrame=()=>{
     frameId=0;
     if(disposed||state==='failed')return;
     try{
+      const traceFirst=trace?.count??0;
       const steps=clock.tick(performance.now());
       for(let i=0;i<steps;++i){
-        queue.drain((action,_id,x,y)=>{
-          if(!world.pointer(action,x,y))throw new Error('Queued pointer action failed');
-        });
+        queue.drain(applyQueued);
         if(!world.step())throw new Error('Runtime step failed');
       }
       if(steps){
@@ -61,6 +68,7 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         drawScene.copyTransforms(world.snapshot);
       }
       renderer.draw();
+      trace?.submit(traceFirst,performance.timeOrigin+performance.now());
       frameId=requestAnimationFrame(drawFrame);
     }catch(error){fail(error);}
   };
@@ -75,8 +83,8 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
     return Object.freeze({
       get state(){return state;},get failure(){return failure;},get epoch(){return queue.epoch;},
       get canvas(){return canvas;},
-      pointer(epoch,sequence,action,pointerId,x,y){
-        stopped();const result=queue.enqueue(epoch,sequence,action,pointerId,x,y);
+      pointer(epoch,sequence,action,pointerId,x,y,eventMs=0){
+        stopped();const result=queue.enqueue(epoch,sequence,action,pointerId,x,y,eventMs);
         if(result==='overflow')fail('Pointer queue capacity exhausted');
         return result;
       },
@@ -116,7 +124,10 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         pointerHeld:world?.pointerState.held??null,clock:{totalSteps:clock.totalSteps,
           debtSeconds:clock.debtSeconds,droppedSeconds:clock.droppedSeconds,
           suspendedSeconds:clock.suspendedSeconds,interpolation:clock.interpolation},
-        input:queue.statistics,memory:module?.memory??null};},
+        input:queue.statistics,inputTraceCount:trace?.count??null,
+        inputTraceStorageBytes:trace?.storageBytes??0,
+        memory:module?.memory??null};},
+      inputTrace(){live();return trace?.copy(performance.timeOrigin)??null;},
       dispose(){if(disposed)return;
         disposed=true;state='disposed';cancelAnimationFrame(frameId);frameId=0;
         canvas.removeEventListener('webglcontextlost',graphicsLost);

@@ -42,6 +42,7 @@ self.onmessage=async event=>{
       else if(kind==='reset')result=owner.reset(...event.data.args);
       else if(kind==='resize')result=owner.resize(event.data.layout);
       else if(kind==='report')result=owner.report();
+      else if(kind==='input-trace')result=owner.inputTrace();
       else if(kind==='dispose'){
         owner.dispose();owner=null;result='disposed';
       }else throw new TypeError('Unknown worker control');

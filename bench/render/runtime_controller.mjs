@@ -128,6 +128,7 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
           return counts;
         }
         if(kind==='report')return owner.report();
+        if(kind==='input-trace')return owner.inputTrace();
       }
       if(mode!=='worker')throw new Error('Runtime requires explicit recovery');
       try{const packet=await request(kind,fields);
@@ -160,8 +161,8 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
         if(changed)currentScene=scene??currentScene;return changed;},
       async resize(layout){const changed=await control('resize',{layout});
         if(changed){currentLayout=layout;setCssFrame(layout);}return changed;},
-      pointer(epoch,sequence,action,pointerId,x,y){
-        return control('pointer',{args:[epoch,sequence,action,pointerId,x,y]});
+      pointer(epoch,sequence,action,pointerId,x,y,eventMs=0){
+        return control('pointer',{args:[epoch,sequence,action,pointerId,x,y,eventMs]});
       },
       pointerBatch(events){
         if(!validPointerBatch(events))
@@ -173,6 +174,8 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
           devicePixelRatio:window.devicePixelRatio,
           bufferCssRatioX:value.bufferWidth/rect.width,
           bufferCssRatioY:value.bufferHeight/rect.height};},
+      async inputTrace(){const value=await control('input-trace');
+        return value===null?null:{...value,mainTimeOrigin:performance.timeOrigin};},
       async recoverToMain(){
         assertLive();
         if(mode==='main'&&owner.state!=='failed')throw new Error('Live main owner needs no recovery');

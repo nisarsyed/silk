@@ -1,19 +1,20 @@
-// Ordered pointer actions applied only at fixed-step boundaries. The small
-// typed queue is local to the sole simulation owner on main or worker thread.
+// Ordered pointer actions applied only at fixed-step boundaries. Identical
+// bounded queues serve the DOM transport and sole simulation owner.
 export const pointerQueueCapacity = 256;
 export const pointerAction = Object.freeze({down:0,move:1,up:2,cancel:3});
 
-export function validPointerMessage(epoch,sequence,action,pointerId,x,y){
+export function validPointerMessage(epoch,sequence,action,pointerId,x,y,eventMs=0){
   return Number.isSafeInteger(epoch)&&Number.isSafeInteger(sequence)&&sequence>=1&&
     Number.isInteger(action)&&action>=0&&action<=3&&
     Number.isInteger(pointerId)&&pointerId>=-2147483648&&pointerId<=2147483647&&
     Number.isFinite(x)&&Number.isFinite(y)&&Math.abs(x)<=8192&&Math.abs(y)<=8192&&
-    Number.isFinite(Math.fround(x))&&Number.isFinite(Math.fround(y));
+    Number.isFinite(Math.fround(x))&&Number.isFinite(Math.fround(y))&&
+    Number.isFinite(eventMs)&&eventMs>=0&&eventMs<=Number.MAX_SAFE_INTEGER;
 }
 
 export function validPointerBatch(batch){
   return Array.isArray(batch)&&batch.length>=1&&batch.length<=pointerQueueCapacity&&
-    batch.every((item,index)=>Array.isArray(item)&&item.length===6&&
+    batch.every((item,index)=>Array.isArray(item)&&(item.length===6||item.length===7)&&
       validPointerMessage(...item)&&
       (index===0||(item[0]===batch[0][0]&&item[1]>batch[index-1][1])));
 }
@@ -24,6 +25,7 @@ export class PointerQueue {
   #pointer;
   #x;
   #y;
+  #eventMs;
   #count = 0;
   #lastSequence = 0;
   #epoch = 1;
@@ -44,6 +46,7 @@ export class PointerQueue {
     this.#pointer = new Int32Array(capacity);
     this.#x = new Float32Array(capacity);
     this.#y = new Float32Array(capacity);
+    this.#eventMs = new Float64Array(capacity);
   }
 
   get count() { return this.#count; }
@@ -64,8 +67,8 @@ export class PointerQueue {
     this.#evictedMoves = 0;
   }
 
-  enqueue(epoch, sequence, action, pointerId, x, y) {
-    if (!validPointerMessage(epoch,sequence,action,pointerId,x,y))
+  enqueue(epoch, sequence, action, pointerId, x, y, eventMs=0) {
+    if (!validPointerMessage(epoch,sequence,action,pointerId,x,y,eventMs))
       throw new RangeError('Invalid pointer message');
     if (epoch !== this.#epoch) return 'stale';
     if (this.#draining) throw new Error('Cannot enqueue while applying pointer actions');
@@ -78,6 +81,7 @@ export class PointerQueue {
       this.#sequence[n-1] = sequence;
       this.#x[n-1] = Math.fround(x);
       this.#y[n-1] = Math.fround(y);
+      this.#eventMs[n-1] = eventMs;
       ++this.#coalesced;
       return 'coalesced';
     }
@@ -89,6 +93,7 @@ export class PointerQueue {
       for (let i = firstMove; i < n-1; ++i) {
         this.#sequence[i] = this.#sequence[i+1]; this.#action[i] = this.#action[i+1];
         this.#pointer[i] = this.#pointer[i+1]; this.#x[i] = this.#x[i+1]; this.#y[i] = this.#y[i+1];
+        this.#eventMs[i] = this.#eventMs[i+1];
       }
       --this.#count;
       ++this.#evictedMoves;
@@ -99,6 +104,7 @@ export class PointerQueue {
     this.#pointer[slot] = pointerId;
     this.#x[slot] = Math.fround(x);
     this.#y[slot] = Math.fround(y);
+    this.#eventMs[slot] = eventMs;
     return 'queued';
   }
 
@@ -111,7 +117,7 @@ export class PointerQueue {
     this.#draining = true;
     try {
       for (let i = 0; i < count; ++i)
-        apply(this.#action[i],this.#pointer[i],this.#x[i],this.#y[i],this.#sequence[i]);
+        apply(this.#action[i],this.#pointer[i],this.#x[i],this.#y[i],this.#sequence[i],this.#eventMs[i]);
       this.#count = 0;
       return count;
     } catch (error) {

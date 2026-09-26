@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {InputTrace,inputTraceCapacity} from './input_trace.mjs';
+
+const trace=new InputTrace(2);
+trace.record(1,1,0,100,101);
+trace.record(1,2,2,101,102);
+assert.throws(()=>trace.record(1,3,3,102,103),/capacity exhausted/);
+trace.submit(0,103);
+const copy=trace.copy(99);
+assert.deepEqual(Array.from(copy.epoch),[1,1]);
+assert.deepEqual(Array.from(copy.sequence),[1,2]);
+assert.deepEqual(Array.from(copy.submittedMs),[103,103]);
+assert.equal(copy.storageBytes,82);
+copy.eventMs[0]=0;
+assert.equal(trace.copy(99).eventMs[0],100);
+const invalid=new InputTrace(1);
+assert.throws(()=>invalid.record(2,4,0,200,199),/Invalid input trace/);
+assert.equal(invalid.count,0);
+assert.equal(inputTraceCapacity,8192);
+console.log('Bounded input trace timing, copy lifetime and explicit saturation PASS');
