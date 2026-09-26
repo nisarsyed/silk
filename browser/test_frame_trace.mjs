@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {FrameTrace,frameTraceCapacity} from './frame_trace.mjs';
+
+const trace=new FrameTrace(2);
+trace.record(100,101,103,105,1);
+trace.record(110,110.5,110.5,111,0);
+assert.throws(()=>trace.record(112,113,114,115,1),/capacity exhausted/);
+const copy=trace.copy(99);
+assert.deepEqual(Array.from(copy.scheduleMs),[1,0.5]);
+assert.deepEqual(Array.from(copy.stepMs),[2,0]);
+assert.deepEqual(Array.from(copy.drawMs),[2,0.5]);
+assert.deepEqual(Array.from(copy.steps),[1,0]);
+assert.equal(copy.storageBytes,82);
+copy.callbackMs[0]=0;
+assert.equal(trace.copy(99).callbackMs[0],100);
+const invalid=new FrameTrace(1);
+assert.throws(()=>invalid.record(3,2,4,5,1),/Invalid frame trace/);
+assert.equal(invalid.count,0);
+assert.equal(frameTraceCapacity,131072);
+console.log('Bounded frame trace stage timing, copy lifetime and explicit saturation PASS');

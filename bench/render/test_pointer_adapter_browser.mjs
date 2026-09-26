@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {chromium,firefox,webkit} from '../../wasm/node_modules/@playwright/test/index.mjs';
+import {launchTestBrowser} from './test_browser_launch.mjs';
 
 const build=path.resolve(process.argv[2]??'build/render-study');
 const engineName=process.argv[3]??'chromium';
@@ -21,7 +22,7 @@ const server=http.createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
-  browser=await engine.launch({headless:true});
+  browser=await launchTestBrowser(engine,engineName);
   for(const candidate of ['canvas','webgl'])for(const preferWorker of [false,true]){
     const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];
     const waitHeld=async expected=>{

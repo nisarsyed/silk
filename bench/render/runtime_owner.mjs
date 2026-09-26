@@ -5,6 +5,7 @@ import {WebglCandidate} from './webgl.js';
 import {FixedClock} from './host_clock.mjs';
 import {PointerQueue} from './host_input_queue.mjs';
 import {InputTrace} from './host_input_trace.mjs';
+import {FrameTrace} from './host_frame_trace.mjs';
 
 const active=new WeakSet();
 const layouts=Object.freeze({desktop:[1280,720],mobile:[720,1280]});
@@ -13,12 +14,12 @@ const layouts=Object.freeze({desktop:[1280,720],mobile:[720,1280]});
 // state copy or second C world is used for rendering. This is a bounded host
 // path for the placement experiment, not a production renderer decision.
 export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep=false,
-  layout='desktop',traceInput=false,onStatus}={}) {
+  layout='desktop',traceInput=false,traceFrames=false,onStatus}={}) {
   if (!((typeof HTMLCanvasElement!=='undefined'&&canvas instanceof HTMLCanvasElement) ||
         (typeof OffscreenCanvas!=='undefined'&&canvas instanceof OffscreenCanvas)) ||
       !['canvas','webgl'].includes(candidate) || !['pyramid','rain','chains'].includes(scene) ||
       typeof sleep!=='boolean' || !Object.hasOwn(layouts,layout) ||
-      typeof traceInput!=='boolean'||
+      typeof traceInput!=='boolean'||typeof traceFrames!=='boolean'||
       (onStatus!==undefined&&typeof onStatus!=='function'))
     throw new TypeError('Invalid browser runtime profile');
   if (active.has(canvas)) throw new Error('Canvas already has an authoritative owner');
@@ -27,6 +28,7 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
   let state='initializing',sceneName=scene,sleepEnabled=sleep,layoutName=layout;
   const clock=new FixedClock(),queue=new PointerQueue();
   const trace=traceInput?new InputTrace():null;
+  const frames=traceFrames?new FrameTrace():null;
   const notify=()=>onStatus?.({state,reason:failure,steps:world?.steps??null,epoch:queue.epoch});
   const live=()=>{if(disposed)throw new Error('Browser runtime is disposed');};
   const stopped=()=>{live();if(state==='failed')throw new Error(`Browser runtime failed: ${failure}`);};
@@ -58,7 +60,9 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
     if(disposed||state==='failed')return;
     try{
       const traceFirst=trace?.count??0;
-      const steps=clock.tick(performance.now());
+      const callbackMs=performance.now();
+      const steps=clock.tick(callbackMs);
+      const scheduleEndMs=frames?performance.now():callbackMs;
       for(let i=0;i<steps;++i){
         queue.drain(applyQueued);
         if(!world.step())throw new Error('Runtime step failed');
@@ -67,8 +71,11 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         if(!world.refreshSnapshot())throw new Error('Runtime snapshot failed');
         drawScene.copyTransforms(world.snapshot);
       }
+      const stepEndMs=frames?performance.now():scheduleEndMs;
       renderer.draw();
-      trace?.submit(traceFirst,performance.timeOrigin+performance.now());
+      const submittedMs=(frames||trace)?performance.now():0;
+      if(trace)trace.submit(traceFirst,performance.timeOrigin+submittedMs);
+      frames?.record(callbackMs,scheduleEndMs,stepEndMs,submittedMs,steps);
       frameId=requestAnimationFrame(drawFrame);
     }catch(error){fail(error);}
   };
@@ -126,8 +133,11 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
           suspendedSeconds:clock.suspendedSeconds,interpolation:clock.interpolation},
         input:queue.statistics,inputTraceCount:trace?.count??null,
         inputTraceStorageBytes:trace?.storageBytes??0,
+        frameTraceCount:frames?.count??null,
+        frameTraceStorageBytes:frames?.storageBytes??0,
         memory:module?.memory??null};},
       inputTrace(){live();return trace?.copy(performance.timeOrigin)??null;},
+      frameTrace(){live();return frames?.copy(performance.timeOrigin)??null;},
       dispose(){if(disposed)return;
         disposed=true;state='disposed';cancelAnimationFrame(frameId);frameId=0;
         canvas.removeEventListener('webglcontextlost',graphicsLost);

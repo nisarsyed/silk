@@ -129,6 +129,7 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
         }
         if(kind==='report')return owner.report();
         if(kind==='input-trace')return owner.inputTrace();
+        if(kind==='frame-trace')return owner.frameTrace();
       }
       if(mode!=='worker')throw new Error('Runtime requires explicit recovery');
       try{const packet=await request(kind,fields);
@@ -175,6 +176,8 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
           bufferCssRatioX:value.bufferWidth/rect.width,
           bufferCssRatioY:value.bufferHeight/rect.height};},
       async inputTrace(){const value=await control('input-trace');
+        return value===null?null:{...value,mainTimeOrigin:performance.timeOrigin};},
+      async frameTrace(){const value=await control('frame-trace');
         return value===null?null:{...value,mainTimeOrigin:performance.timeOrigin};},
       async recoverToMain(){
         assertLive();
