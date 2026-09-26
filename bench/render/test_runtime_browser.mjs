@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {chromium,firefox,webkit} from '../../wasm/node_modules/@playwright/test/index.mjs';
+import {workerWebgl2} from './test_worker_webgl.mjs';
 
 const build=path.resolve(process.argv[2]??'build/render-study');
 const engineName=process.argv[3]??'chromium';
@@ -71,6 +72,25 @@ try{
       assert.deepEqual(main.mobile,[720,1280]);
       assert.equal(main.failed,'failed');
       assert.match(main.failure,/Graphics context lost/);
+
+      if(candidate==='webgl'&&!await workerWebgl2(page)){
+        const fallback=await page.evaluate(async()=>{
+          const {startBrowserRuntime}=await import('./runtime_controller.mjs');
+          const original=document.querySelector('#worker');
+          const runtime=await startBrowserRuntime(original,{candidate:'webgl'});
+          try{return {mode:runtime.mode,reason:runtime.fallbackReason,
+            replaced:runtime.canvas!==original,report:await runtime.report()};}
+          finally{await runtime.dispose();}
+        });
+        assert.equal(fallback.mode,'main');
+        assert.equal(fallback.replaced,true);
+        assert.match(fallback.reason,/WebGL 2 unavailable/);
+        assert.equal(fallback.report.candidate,'webgl');
+        assert.equal(fallback.report.state,'running');
+        assert.deepEqual(errors,[]);
+        console.log(`${engineName} webgl main owner and unavailable-worker fallback PASS`);
+        continue;
+      }
 
       const worker=await page.evaluate(async candidate=>{
         const canvas=document.querySelector('#worker').transferControlToOffscreen();

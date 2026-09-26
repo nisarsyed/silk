@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {chromium,firefox,webkit} from '../../wasm/node_modules/@playwright/test/index.mjs';
+import {workerWebgl2} from './test_worker_webgl.mjs';
 
 const build=path.resolve(process.argv[2]??'build/render-study');
 const engineName=process.argv[3]??'chromium';
@@ -36,16 +37,25 @@ try{
     };
     try{
       await page.goto(`http://127.0.0.1:${server.address().port}/placement.html`);
-      const mode=await page.evaluate(async({candidate,preferWorker})=>{
+      const supportsWorkerWebgl=candidate==='webgl'&&preferWorker?
+        await workerWebgl2(page):true;
+      const placement=await page.evaluate(async({candidate,preferWorker})=>{
         const {startBrowserRuntime}=await import('./runtime_controller.mjs');
         const {createPointerAdapter}=await import('./pointer_adapter.mjs');
         const canvas=document.createElement('canvas');canvas.id='trace';document.body.prepend(canvas);
         const controller=await startBrowserRuntime(canvas,{candidate,traceInput:true,
           traceFrames:true},{preferWorker});
         const adapter=createPointerAdapter(controller);
-        window.__study={controller,adapter};return controller.mode;
+        window.__study={controller,adapter};
+        return {mode:controller.mode,reason:controller.fallbackReason,
+          replaced:controller.canvas!==canvas};
       },{candidate,preferWorker});
-      assert.equal(mode,preferWorker?'worker':'main');
+      const mode=placement.mode;
+      assert.equal(mode,preferWorker&&supportsWorkerWebgl?'worker':'main');
+      if(!supportsWorkerWebgl){
+        assert.match(placement.reason,/WebGL 2 unavailable/);
+        assert.equal(placement.replaced,true);
+      }
       const box=await page.locator('#trace').boundingBox();
       await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
       await page.mouse.down();await waitHeld(true);
@@ -102,7 +112,8 @@ try{
       }
       for(const row of result.rows)assert.ok(submissions.has(row.submittedMs));
       assert.deepEqual(errors,[]);
-      console.log(`${engineName} ${candidate} ${mode} trusted input-to-step-to-submission trace PASS`);
+      const placementLabel=!supportsWorkerWebgl?'main capability fallback':mode;
+      console.log(`${engineName} ${candidate} ${placementLabel} trusted input-to-step-to-submission trace PASS`);
     }finally{await page.close();}
   }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

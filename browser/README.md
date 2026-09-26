@@ -70,6 +70,10 @@ The owner exposes one bounded copy on request, and a full trace fails the run.
 The main and worker trace share identical stages; the worker's stages use its
 own clock and are not added to overlapping main-thread work. These times are
 CPU submission proxies, not GPU completion or physical presentation times.
+Linux Playwright WebKit exposes WebGL 2 on HTML canvas but may lack WebGL 2 in a
+dedicated OffscreenCanvas worker. Browser checks probe the worker context and
+require explicit main-thread WebGL fallback when it is unavailable; macOS
+WebKit checks exercise the actual WebGL worker path.
 Visibility changes pause/resume without repaying suspended time; a user pause
 stays paused when the tab returns. `test_runtime_browser.mjs` and
 `test_runtime_controller_browser.mjs` and `test_pointer_adapter_browser.mjs`

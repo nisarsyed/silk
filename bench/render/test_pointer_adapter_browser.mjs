@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {chromium,firefox,webkit} from '../../wasm/node_modules/@playwright/test/index.mjs';
+import {workerWebgl2} from './test_worker_webgl.mjs';
 
 const build=path.resolve(process.argv[2]??'build/render-study');
 const engineName=process.argv[3]??'chromium';
@@ -36,6 +37,8 @@ try{
     page.on('pageerror',error=>errors.push(String(error)));
     try{
       await page.goto(`http://127.0.0.1:${server.address().port}/placement.html`);
+      const supportsWorkerWebgl=candidate==='webgl'&&preferWorker?
+        await workerWebgl2(page):true;
       const initial=await page.evaluate(async({candidate,preferWorker})=>{
         const {startBrowserRuntime}=await import('./runtime_controller.mjs');
         const {createPointerAdapter}=await import('./pointer_adapter.mjs');
@@ -48,9 +51,15 @@ try{
         catch{rejected=true;}
         const adapter=createPointerAdapter(controller);
         window.__study={controller,adapter};
-        return {mode:controller.mode,rejected,held:(await controller.report()).pointerHeld};
+        return {mode:controller.mode,reason:controller.fallbackReason,
+          replaced:controller.canvas!==canvas,rejected,
+          held:(await controller.report()).pointerHeld};
       },{candidate,preferWorker});
-      assert.equal(initial.mode,preferWorker?'worker':'main');
+      assert.equal(initial.mode,preferWorker&&supportsWorkerWebgl?'worker':'main');
+      if(!supportsWorkerWebgl){
+        assert.match(initial.reason,/WebGL 2 unavailable/);
+        assert.equal(initial.replaced,true);
+      }
       assert.equal(initial.rejected,true);
       assert.equal(initial.held,false);
       const box=await page.locator('#input').boundingBox();
@@ -123,7 +132,8 @@ try{
       assert.ok(final.report.steps>=1,JSON.stringify(final.report));
       assert.ok(final.statistics.capacity===256);
       assert.deepEqual(errors,[]);
-      console.log(`${engineName} ${candidate} ${initial.mode} trusted DOM input, bounded batching, epoch cancellation and mobile mapping PASS`);
+      const placementLabel=!supportsWorkerWebgl?'main capability fallback':initial.mode;
+      console.log(`${engineName} ${candidate} ${placementLabel} trusted DOM input, bounded batching, epoch cancellation and mobile mapping PASS`);
     }finally{await page.close();}
   }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

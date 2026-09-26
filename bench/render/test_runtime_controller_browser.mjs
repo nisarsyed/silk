@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {chromium,firefox,webkit} from '../../wasm/node_modules/@playwright/test/index.mjs';
+import {workerWebgl2} from './test_worker_webgl.mjs';
 
 const build=path.resolve(process.argv[2]??'build/render-study');
 const engineName=process.argv[3]??'chromium';
@@ -26,7 +27,8 @@ try{
   page.on('pageerror',error=>errors.push(String(error)));
   try{
     await page.goto(`http://127.0.0.1:${server.address().port}/placement.html`);
-    const result=await page.evaluate(async()=>{
+    const supportsWorkerWebgl=await workerWebgl2(page);
+    const result=await page.evaluate(async supportsWorkerWebgl=>{
       const {startBrowserRuntime}=await import('./runtime_controller.mjs');
       const wait=async test=>{
         const deadline=performance.now()+10000;
@@ -89,7 +91,8 @@ try{
       await unsupported.dispose();
 
       const workerCanvas=document.querySelector('#worker');
-      const worker=await startBrowserRuntime(workerCanvas,{candidate:'webgl'});
+      const worker=await startBrowserRuntime(workerCanvas,
+        {candidate:supportsWorkerWebgl?'webgl':'canvas'});
       let workerMode,workerSteps,workerPlaceholder,workerCss,workerBuffer;
       try{
         workerMode=worker.mode;
@@ -122,6 +125,15 @@ try{
         document.dispatchEvent(new Event('visibilitychange'));
         await wait(async()=>(await worker.report()).steps>hiddenSteps);
       }finally{await worker.dispose();}
+
+      let webglCapabilityFallback=null;
+      if(!supportsWorkerWebgl){
+        const canvas=document.createElement('canvas');document.body.append(canvas);
+        const runtime=await startBrowserRuntime(canvas,{candidate:'webgl'});
+        try{webglCapabilityFallback={mode:runtime.mode,reason:runtime.fallbackReason,
+          replaced:runtime.canvas!==canvas,candidate:(await runtime.report()).candidate};}
+        finally{await runtime.dispose();}
+      }
 
       const failedCanvas=document.createElement('canvas');failedCanvas.id='failed-start';
       document.body.append(failedCanvas);
@@ -169,8 +181,9 @@ try{
         }finally{await runtime.dispose();}
       }
       return {duplicate,mainRecovery,mainPortrait,unsupportedFallback,workerMode,workerSteps,
-        workerPlaceholder,workerCss,workerBuffer,startupFallback,midrun,saturation};
-    });
+        workerPlaceholder,workerCss,workerBuffer,webglCapabilityFallback,
+        startupFallback,midrun,saturation};
+    },supportsWorkerWebgl);
     assert.equal(result.duplicate,true);
     assert.equal(result.mainRecovery,true);
     assert.equal(result.mainPortrait,true);
@@ -180,6 +193,12 @@ try{
     assert.deepEqual(result.workerPlaceholder,[1280,720]);
     assert.deepEqual(result.workerCss,[360,640]);
     assert.deepEqual(result.workerBuffer,[720,1280]);
+    if(!supportsWorkerWebgl){
+      assert.equal(result.webglCapabilityFallback.mode,'main');
+      assert.match(result.webglCapabilityFallback.reason,/WebGL 2 unavailable/);
+      assert.equal(result.webglCapabilityFallback.replaced,true);
+      assert.equal(result.webglCapabilityFallback.candidate,'webgl');
+    }else assert.equal(result.webglCapabilityFallback,null);
     assert.equal(result.startupFallback.mode,'main');
     assert.equal(result.startupFallback.replaced,true);
     assert.equal(result.startupFallback.oldDetached,true);
