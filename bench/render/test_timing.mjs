@@ -36,6 +36,29 @@ for(let i=0;i<12000;++i){
   }
 }
 assert.ok(jittered.frameCount>=5999&&jittered.frameCount<=6001);
+// Chrome can coarsen the observed 120/240 Hz median to 8.3/4.2 ms although
+// actual callbacks advance at 8.333/4.167 ms. An absolute target lattice
+// oscillated between neighboring native callbacks and invented 25 ms gaps.
+for(const [hz,median] of [[120,8.3],[240,4.2]]){
+  const c=calibrate60(new Float64Array(240).fill(median)),clock=new StudyClock(c,dt);
+  let seed=0x735f210,previous=null,missing=0,maximumGap=0;
+  for(let i=0;i<=hz*60;++i){
+    seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
+    const raf=Math.round((i*1000/hz+((seed>>>0)/4294967296-.5))*10)/10;
+    if(clock.tick(raf,raf+1)){
+      if(previous!==null){
+        const gap=raf-previous;
+        missing+=Math.max(0,Math.round(gap/c.targetPeriodMs)-1);
+        maximumGap=Math.max(maximumGap,gap);
+      }
+      previous=raf;
+    }
+  }
+  assert.equal(clock.frameCount,3601);
+  assert.equal(missing,0);
+  assert.ok(maximumGap<1.25*c.targetPeriodMs);
+  assert.equal(clock.droppedSeconds,0);
+}
 // A delayed first callback must not replay overdue submission slots. Exercise
 // queued timestamps followed by normal callbacks, including the short-run
 // storage bound which exposed this startup bug in real browser collection.
