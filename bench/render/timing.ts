@@ -46,7 +46,13 @@ export class StudyClock {
     // Keep the original calibrated phase; no warm-up time enters simulation.
     const skipped=first?Math.max(0,Math.round((nowMs-rafMs)/this.targetPeriodMs)):
       Math.floor((horizon-deadline)/this.targetPeriodMs);
-    const target=deadline+skipped*this.targetPeriodMs,next=target+this.targetPeriodMs;
+    const target=deadline+skipped*this.targetPeriodMs;
+    // Re-anchor after an accepted native refresh. Chromium can round a
+    // 120 Hz median to 8.3 ms while the display actually advances by about
+    // 8.333 ms. Keeping one absolute 16.6 ms grid then oscillates between
+    // adjacent callbacks, yielding avoidable 8/25 ms submission gaps. The
+    // calibrated target period and every acceptance budget stay unchanged.
+    const next=(first?target:rafMs)+this.targetPeriodMs;
     const origin=first?nowMs:this.origin,previous=first?nowMs:this.renderedNow;
     // Frozen render-only runs keep presentation deadlines and elapsed time but
     // execute no simulation. Their source's 120 preparation steps are separate.

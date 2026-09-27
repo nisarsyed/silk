@@ -282,7 +282,12 @@ from duration and calibrated target cadence, with no growth or discarded prefix.
 If the first rAF timestamp is stale, its deadline advances on the calibrated
 grid to the target nearest callback entry. Simulation still starts at zero debt
 at that entry. This prevents queued startup timestamps from producing a burst
-of overdue submissions. A full frame buffer fails before executing another
+of overdue submissions. Each subsequent target uses the same calibrated period
+from the last accepted native refresh. That phase correction prevents an
+8.3 ms coarsened median on a real 120 Hz display from drifting across the
+8.333 ms callback cadence and alternating short/long submissions. It does not
+change the calibration formula, period, budgets or fixed physics dt. A full
+frame buffer fails before executing another
 simulation step or attempting GPU timing; all existing limits remain unchanged.
 
 Base and diagnostic frames record CPU stage timings, submission times, work,
