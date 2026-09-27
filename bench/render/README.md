@@ -286,9 +286,11 @@ of overdue submissions. Each subsequent target uses the same calibrated period
 from the last accepted native refresh. That phase correction prevents an
 8.3 ms coarsened median on a real 120 Hz display from drifting across the
 8.333 ms callback cadence and alternating short/long submissions. It does not
-change the calibration formula, period, budgets or fixed physics dt. A full
-frame buffer fails before executing another
-simulation step or attempting GPU timing; all existing limits remain unchanged.
+change the calibration formula, period, budgets or fixed physics dt. An
+absolute calibrated-slot ceiling prevents that phase correction from
+outpacing the existing duration/target-period frame capacity when the median
+rounds upward. A full frame buffer fails before executing another simulation
+step or attempting GPU timing; all existing limits remain unchanged.
 
 Base and diagnostic frames record CPU stage timings, submission times, work,
 drops and debt; diagnostic HUD updates remain at 4 Hz. Unknown GPU metrics are

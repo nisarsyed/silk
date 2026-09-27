@@ -23,6 +23,7 @@ export function calibrate60(intervals:Float64Array):Calibration60 {
 export class StudyClock {
   readonly refreshPeriodMs:number;readonly targetPeriodMs:number;
   private previousRaf=-1;private previousNow=-1;private renderedNow=0;private origin=0;private deadline=0;
+  private targetOriginRaf=0;
   frameCount=0;steps=0;totalSteps=0;debtSeconds=0;droppedSeconds=0;elapsedSeconds=0;targetRafMs=0;
   constructor(calibration:Calibration60,readonly timestepSeconds:number,readonly renderOnly=false){
     if(!calibration.supports60Hz||!Number.isFinite(calibration.refreshPeriodMs)||calibration.refreshPeriodMs<=0||
@@ -34,7 +35,12 @@ export class StudyClock {
   tick(rafMs:number,nowMs:number):boolean {
     if(!Number.isFinite(rafMs)||!Number.isFinite(nowMs)||rafMs<0||nowMs<0||
         rafMs<this.previousRaf||nowMs<this.previousNow)throw new RangeError('Invalid or backwards clock');
-    const first=this.previousRaf<0,deadline=first?rafMs:this.deadline;
+    const first=this.previousRaf<0;
+    // Phase-locking must not submit faster than the calibrated target on a
+    // coarsened 16.7/4.2 ms median. The absolute slot ceiling also preserves
+    // the preallocated duration/T frame capacity without increasing it.
+    const quota=first?rafMs:this.targetOriginRaf+this.frameCount*this.targetPeriodMs;
+    const deadline=first?rafMs:Math.max(this.deadline,quota);
     // Select the callback nearest each calibrated target. Half a native refresh
     // avoids alternating missed deadlines from sub-millisecond rAF jitter; at
     // high refresh it still selects only one callback per integer target slot.
@@ -68,6 +74,7 @@ export class StudyClock {
     if(!Number.isSafeInteger(this.totalSteps+steps)||!Number.isSafeInteger(this.frameCount+1)||
         !Number.isFinite(dropped)||debt<0||debt>=this.timestepSeconds)throw new RangeError('Invalid scheduling arithmetic');
     this.previousRaf=rafMs;this.previousNow=nowMs;this.renderedNow=nowMs;this.origin=origin;this.deadline=next;
+    if(first)this.targetOriginRaf=rafMs;
     this.targetRafMs=target;this.steps=steps;this.totalSteps+=steps;this.debtSeconds=debt;this.droppedSeconds=dropped;
     this.elapsedSeconds=(nowMs-origin)/1000;++this.frameCount;return true;
   }
