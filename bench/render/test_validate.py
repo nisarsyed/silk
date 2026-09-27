@@ -167,6 +167,10 @@ def main():
     assert audit.raf_before_callback(8236.9, 8236.89999961853, True)
     assert not audit.raf_before_callback(8236.9, 8236.89999961853, False)
     assert not audit.raf_before_callback(8236.9, 8236.84, True)
+    assert audit.raf_before_callback(42249.4, 42249.300000190735, True)
+    assert not audit.raf_before_callback(42249.4, 42249.300000190735, False)
+    assert not audit.raf_before_callback(42249.5, 42249.300000190735, True)
+    assert not audit.raf_before_callback(42249.4, 42249.29, True)
     # A startup interval can be off-grid while the 239 steady intervals and
     # every measured rAF timestamp demonstrate the 0.1 ms clock grid.
     steady = [8.268] + [8.3]*239

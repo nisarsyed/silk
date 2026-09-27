@@ -94,11 +94,17 @@ def budgets(summary, period, dropped, contacts, debt):
 def raf_before_callback(raf, callback, quantized_tenth):
     if raf <= callback or math.isclose(raf, callback, rel_tol=0, abs_tol=1e-9):
         return True
-    # A real Chromium trace reported rAF=8236.9 and performance.now()=
-    # 8236.89999961853. Its 240 calibration intervals were all on a 0.1 ms
-    # grid, so these readings have the same rounded rAF time. This does not
-    # change CPU/cadence budgets or forgive two distinct rAF ticks.
-    return quantized_tenth and raf == math.floor(callback*10+0.5)/10
+    if not quantized_tenth:
+        return False
+    snapped = math.floor(callback*10+0.5)/10
+    if math.isclose(raf, snapped, rel_tol=0, abs_tol=1e-9):
+        return True
+    # Headed Chrome also reported rAF=42249.4 and callback=42249.300000190735.
+    # Both APIs are on the observed 0.1 ms grid but can choose adjacent ticks.
+    # Require a grid-aligned callback and forgive only one tick of cross-API
+    # coarsening; same-clock ordering and all performance budgets remain exact.
+    return (math.isclose(callback, snapped, rel_tol=0, abs_tol=1e-6) and
+            math.isclose(raf, snapped+0.1, rel_tol=0, abs_tol=1e-9))
 
 
 def quantized_raf_grid(intervals, measured_rafs):
