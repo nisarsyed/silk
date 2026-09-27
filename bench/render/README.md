@@ -310,8 +310,9 @@ collector and calibration limits are unchanged. Separate injected duplicate
 interval and unsupported-rate cases must still fail calibration and retain
 their reports; synthetic scheduling cannot authorize device acceptance.
 The offline auditor recognizes an observed 0.1 ms rAF timestamp grid only
-when all 240 calibration intervals demonstrate it. Cross-clock order then
-accepts exact equality after rounding the finer callback time to that grid.
+when the 239 steady calibration intervals and every measured rAF timestamp
+demonstrate it. Cross-clock order then accounts for adjacent quantized ticks
+only when the callback timestamp itself is on the same grid.
 Same-clock ordering, raw samples, fixed-step accounting and all performance
 budgets remain unchanged.
 
@@ -376,11 +377,15 @@ the unchanged exact inclusive thresholds. The cross-API rAF/callback ordering
 check uses the same 1e-9 ms arithmetic allowance: CI observed `6091.7` from rAF
 and `6091.6999999999825` from `performance.now()` for the same instant. Ordering
 among `performance.now()` samples stays exact, and raw samples are never changed.
-When rAF is coarsened to a 0.1 ms grid, the auditor also recognizes a callback
-reading that rounds to the same rAF tick, but only if the 239 intervals after
-the first startup interval and every measured rAF timestamp demonstrate that
-grid. An off-grid measured timestamp or later calibration interval removes this
-exception; no CPU, cadence, quality or continuity budget changes.
+When rAF is coarsened to a 0.1 ms grid, the auditor recognizes a callback
+reading that rounds to the same rAF tick. A fresh headed Chrome trace also
+reported `42249.4` from rAF and `42249.300000190735` from the callback's
+`performance.now()`: the two coarsened API readings can choose adjacent ticks.
+The auditor permits that one-tick cross-API difference only when the callback
+is itself grid-aligned and the 239 steady calibration intervals plus every
+measured rAF timestamp demonstrate the grid. It rejects off-grid callback or
+measured rAF timestamps, later off-grid calibration intervals and larger
+reversals. No CPU, cadence, quality or continuity budget changes.
 
 The audit reports each continuity/CPU/cadence budget separately, including empty
 windows. Diagnostic and synthetic-clock budgets are marked inapplicable; short correctness runs
