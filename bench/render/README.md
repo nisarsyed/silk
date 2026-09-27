@@ -376,6 +376,11 @@ the unchanged exact inclusive thresholds. The cross-API rAF/callback ordering
 check uses the same 1e-9 ms arithmetic allowance: CI observed `6091.7` from rAF
 and `6091.6999999999825` from `performance.now()` for the same instant. Ordering
 among `performance.now()` samples stays exact, and raw samples are never changed.
+When rAF is coarsened to a 0.1 ms grid, the auditor also recognizes a callback
+reading that rounds to the same rAF tick, but only if the 239 intervals after
+the first startup interval and every measured rAF timestamp demonstrate that
+grid. An off-grid measured timestamp or later calibration interval removes this
+exception; no CPU, cadence, quality or continuity budget changes.
 
 The audit reports each continuity/CPU/cadence budget separately, including empty
 windows. Diagnostic and synthetic-clock budgets are marked inapplicable; short correctness runs
@@ -586,7 +591,7 @@ Still required for #95: complete
 sustained protocol reporting; matched render-only/end-to-end timing and input
 collection; startup, memory and allocation
 records; context-loss/lifecycle recovery; report validators; the complete
-five-repeat desktop and physical Android protocol; and an evidence-backed
+five-repeat desktop and physical iPhone Safari protocol; and an evidence-backed
 renderer decision. These prototypes and CI-style screenshots cannot satisfy
 those acceptance gates or authorize a production renderer choice.
 

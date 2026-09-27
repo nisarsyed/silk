@@ -70,7 +70,17 @@ def main():
                     rejects(report, lambda r: r['frames']['numbers'].__setitem__(6, 1))
                 rounded = copy.deepcopy(report)
                 rounded['frames']['numbers'][0] = rounded['frames']['numbers'][1] + 5e-10
-                assert audit.validate(rounded) == result
+                values = rounded['frames']['numbers']
+                grid = audit.quantized_raf_grid(rounded['calibrationIntervals'],
+                                               (values[24*i] for i in range(rounded['frames']['count'])))
+                plain_order = all(audit.raf_before_callback(values[24*i], values[24*i+1], False)
+                                  for i in range(rounded['frames']['count']))
+                # An off-grid mutation also removes the evidence needed to
+                # excuse a different frame's quantized cross-API round-off.
+                if grid or plain_order:
+                    assert audit.validate(rounded) == result
+                else:
+                    rejects(rounded, lambda r: None)
                 checked += 1
     for fault in ('duplicate', 'slow'):
         path = root / f'calibration-{fault}.json'
@@ -157,6 +167,12 @@ def main():
     assert audit.raf_before_callback(8236.9, 8236.89999961853, True)
     assert not audit.raf_before_callback(8236.9, 8236.89999961853, False)
     assert not audit.raf_before_callback(8236.9, 8236.84, True)
+    # A startup interval can be off-grid while the 239 steady intervals and
+    # every measured rAF timestamp demonstrate the 0.1 ms clock grid.
+    steady = [8.268] + [8.3]*239
+    assert audit.quantized_raf_grid(steady, [28528.6, 28545.2])
+    assert not audit.quantized_raf_grid([8.268, 8.267]+[8.3]*238, [28528.6, 28545.2])
+    assert not audit.quantized_raf_grid(steady, [28528.6, 28545.23])
     summary['missedTargetFraction'] = .0100000001
     assert not audit.budgets(summary, 20, 0, 0, 0)['missedSlots']
     assert audit.distribution([4, 1, 2, 3]) == dict(count=4, p50=2, p95=4, p99=4, max=4)

@@ -113,7 +113,7 @@ def entry(path, report):
     source = provenance['source']
     contract = provenance['contract']
     timing.require(source['dirty'] is False, 'dirty build cannot enter matched protocol')
-    timing.require(contract['declaredRevision'] == 2 and
+    timing.require(contract['declaredRevision'] == 3 and
                    provenance['verification'] == 'assembly-time', 'unrecognized provenance')
     fingerprint = hashlib.sha256(json.dumps(provenance, sort_keys=True,
                                             separators=(',', ':')).encode()).hexdigest()
