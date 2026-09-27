@@ -52,6 +52,14 @@ export class FixedClock {
     this.#steps = 0;
   }
 
+  // Calibration suspends execution without repaying its elapsed wall time.
+  // Keep the world's executed-step count, residual debt and manual requests.
+  rebase(nowMs) {
+    this.#time(nowMs);
+    if (this.#lastMs !== null) this.#suspended += (nowMs-this.#lastMs)/1000;
+    this.#lastMs = nowMs;
+  }
+
   // Returns the number of C steps to execute before this presentation. No
   // per-frame objects or wall-clock reads are needed in the scheduling path.
   tick(nowMs) {

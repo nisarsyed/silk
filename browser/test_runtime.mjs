@@ -79,6 +79,20 @@ assert.equal(paused.droppedSeconds,0);
 assert.equal(paused.suspendedSeconds,0);
 assert.equal(paused.paused,true);
 
+const calibrated=new FixedClock();
+calibrated.tick(0);
+calibrated.rebase(4000);
+assert.equal(calibrated.tick(4000+1000/60),0);
+assert.equal(calibrated.droppedSeconds,0);
+assert.equal(calibrated.totalSteps,0);
+assert.equal(calibrated.suspendedSeconds,4);
+calibrated.setPaused(true,4020);
+assert.equal(calibrated.requestSingleStep(),true);
+calibrated.rebase(9000);
+assert.equal(calibrated.tick(9001),1);
+assert.equal(calibrated.totalSteps,1);
+assert.ok(calibrated.suspendedSeconds>=8.98);
+
 const queue = new PointerQueue(4),seen = [];
 assert.equal(queue.enqueue(1,1,pointerAction.down,3,0,0),'queued');
 assert.equal(queue.enqueue(1,2,pointerAction.move,3,1,0),'queued');

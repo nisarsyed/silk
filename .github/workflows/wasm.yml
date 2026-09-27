@@ -58,6 +58,7 @@ jobs:
           node browser/test_runtime.mjs
           node browser/test_input_trace.mjs
           node browser/test_frame_trace.mjs
+          node browser/test_presentation_clock.mjs
           node browser/test_wasm_runtime.mjs build/wasm-${{ matrix.mode }}/render-physics
           for sleep in off on; do
             for host in node browser; do
@@ -89,6 +90,7 @@ jobs:
             # Firefox and WebKit need an X display for WebGL 2 on GPU-less runners.
             browser_command=(node)
             if [[ "$engine" != chromium ]]; then browser_command=(xvfb-run -a node); fi
+            "${browser_command[@]}" bench/render/test_presentation_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_runtime_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"

@@ -70,6 +70,17 @@ The owner exposes one bounded copy on request, and a full trace fails the run.
 The main and worker trace share identical stages; the worker's stages use its
 own clock and are not added to overlapping main-thread work. These times are
 CPU submission proxies, not GPU completion or physical presentation times.
+Before stepping the world, each owner measures 240 idle animation intervals
+and schedules submissions at the nearest 60 Hz target deadline. It reports the
+median interval, target period, divisor, skipped/duplicate callbacks, missed
+target slots and timestamp discontinuities. A regressing browser timestamp
+triggers idle recalibration and is reported so the affected timed run can be
+rejected. Calibration time is recorded as suspended time by the fixed-step clock;
+it cannot become catch-up physics work. Resume and drawing-buffer resize
+recalibrate. A refresh rate that cannot produce a 59–61 Hz target remains
+usable, but `presentation.targetSupported` is false and that run cannot qualify
+for the required 60 Hz performance comparison. The synthetic 120 Hz browser
+test verifies this pacing against the actual WASM owner and frame trace.
 Linux Playwright WebKit exposes WebGL 2 on HTML canvas but may lack WebGL 2 in a
 dedicated OffscreenCanvas worker. Browser checks probe the worker context and
 require explicit main-thread WebGL fallback when it is unavailable; macOS
@@ -79,9 +90,10 @@ stays paused when the tab returns. `test_runtime_browser.mjs` and
 `test_runtime_controller_browser.mjs` and `test_pointer_adapter_browser.mjs`
 exercise both actual execution contexts,
 unsupported or failed worker startup, context failure, reset, resize, pointer
-cancellation and shutdown. A transferred HTML canvas cannot change its
-intrinsic width/height attributes; portrait resizing updates the OffscreenCanvas
-drawing buffer to 720 × 1280 and the visible CSS frame to 360 × 640. Separate
+cancellation and shutdown. Portrait resizing updates the OffscreenCanvas
+drawing buffer to 720 × 1280 and the visible CSS frame to 360 × 640. Browsers
+may retain or mirror the old HTML placeholder's intrinsic dimensions after
+transfer; they do not define the worker drawing buffer. Separate
 portrait pixel comparisons verify the result against the main-thread image.
 The CSS frame fits either viewport dimension at a fixed aspect ratio while
 the drawing buffer stays fixed; reports include actual CSS size, device DPR,

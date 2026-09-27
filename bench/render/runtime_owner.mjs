@@ -6,6 +6,7 @@ import {FixedClock} from './host_clock.mjs';
 import {PointerQueue} from './host_input_queue.mjs';
 import {InputTrace} from './host_input_trace.mjs';
 import {FrameTrace} from './host_frame_trace.mjs';
+import {PresentationClock} from './host_presentation_clock.mjs';
 
 const active=new WeakSet();
 const layouts=Object.freeze({desktop:[1280,720],mobile:[720,1280]});
@@ -26,9 +27,10 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
   active.add(canvas);
   let module,world,drawScene,renderer,frameId=0,disposed=false,failure=null;
   let state='initializing',sceneName=scene,sleepEnabled=sleep,layoutName=layout;
-  const clock=new FixedClock(),queue=new PointerQueue();
+  const clock=new FixedClock(),presentation=new PresentationClock(),queue=new PointerQueue();
   const trace=traceInput?new InputTrace():null;
   const frames=traceFrames?new FrameTrace():null;
+  let traceSubmitted=0;
   const notify=()=>onStatus?.({state,reason:failure,steps:world?.steps??null,epoch:queue.epoch});
   const live=()=>{if(disposed)throw new Error('Browser runtime is disposed');};
   const stopped=()=>{live();if(state==='failed')throw new Error(`Browser runtime failed: ${failure}`);};
@@ -55,11 +57,14 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
     if(trace&&eventMs>0)
       trace.record(queue.epoch,sequence,action,eventMs,performance.timeOrigin+performance.now());
   };
-  const drawFrame=()=>{
+  const drawFrame=rafMs=>{
     frameId=0;
     if(disposed||state==='failed')return;
     try{
-      const traceFirst=trace?.count??0;
+      const calibrated=presentation.calibrated;
+      const present=presentation.tick(rafMs);
+      if(!calibrated&&presentation.calibrated)clock.rebase(performance.now());
+      if(!present){frameId=requestAnimationFrame(drawFrame);return;}
       const callbackMs=performance.now();
       const steps=clock.tick(callbackMs);
       const scheduleEndMs=frames?performance.now():callbackMs;
@@ -74,7 +79,8 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
       const stepEndMs=frames?performance.now():scheduleEndMs;
       renderer.draw();
       const submittedMs=(frames||trace)?performance.now():0;
-      if(trace)trace.submit(traceFirst,performance.timeOrigin+submittedMs);
+      if(trace){trace.submit(traceSubmitted,performance.timeOrigin+submittedMs);
+        traceSubmitted=trace.count;}
       frames?.record(callbackMs,scheduleEndMs,stepEndMs,submittedMs,steps);
       frameId=requestAnimationFrame(drawFrame);
     }catch(error){fail(error);}
@@ -103,14 +109,16 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         }catch(error){fail(error);return false;}
       },
       resume(){stopped();if(!clock.paused)return false;
-        clock.setPaused(false,performance.now());state='running';notify();return true;},
+        clock.setPaused(false,performance.now());presentation.reset();
+        state='running';notify();return true;},
       singleStep(){stopped();return clock.requestSingleStep();},
       reset(nextScene=sceneName,nextSleep=sleepEnabled){
         stopped();if(!['pyramid','rain','chains'].includes(nextScene)||typeof nextSleep!=='boolean')
           throw new TypeError('Invalid runtime reset profile');
         try{
           clearWorld();sceneName=nextScene;sleepEnabled=nextSleep;
-          queue.reset(queue.epoch+1);clock.reset(performance.now());openWorld();
+          queue.reset(queue.epoch+1);clock.reset(performance.now());
+          traceSubmitted=trace?.count??0;openWorld();
           notify();return true;
         }catch(error){fail(error);return false;}
       },
@@ -122,7 +130,7 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
           const [width,height]=layouts[nextLayout];canvas.width=width;canvas.height=height;
           layoutName=nextLayout;
           renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene):new WebglCandidate(canvas,drawScene);
-          renderer.draw();notify();return true;
+          renderer.draw();presentation.reset();notify();return true;
         }catch(error){fail(error);return false;}
       },
       report(){live();return {state,reason:failure,candidate,scene:sceneName,sleep:sleepEnabled,
@@ -131,6 +139,7 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         pointerHeld:world?.pointerState.held??null,clock:{totalSteps:clock.totalSteps,
           debtSeconds:clock.debtSeconds,droppedSeconds:clock.droppedSeconds,
           suspendedSeconds:clock.suspendedSeconds,interpolation:clock.interpolation},
+        presentation:presentation.report,
         input:queue.statistics,inputTraceCount:trace?.count??null,
         inputTraceStorageBytes:trace?.storageBytes??0,
         frameTraceCount:frames?.count??null,

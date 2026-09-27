@@ -72,7 +72,8 @@ def main():
         shutil.copyfile(ROOT/'bench/render'/name, output/name)
     for name, target in (('clock.mjs', 'host_clock.mjs'), ('input_queue.mjs', 'host_input_queue.mjs'),
                          ('input_trace.mjs', 'host_input_trace.mjs'),
-                         ('frame_trace.mjs', 'host_frame_trace.mjs')):
+                         ('frame_trace.mjs', 'host_frame_trace.mjs'),
+                         ('presentation_clock.mjs', 'host_presentation_clock.mjs')):
         shutil.copyfile(ROOT/'browser'/name, output/target)
     shutil.copytree(args.benchmark, output/'benchmark', dirs_exist_ok=True)
     shutil.copytree(physics, output/'physics', dirs_exist_ok=True)

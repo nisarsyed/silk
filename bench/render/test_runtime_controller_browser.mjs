@@ -190,7 +190,11 @@ try{
     assert.equal(result.unsupportedFallback,true);
     assert.equal(result.workerMode,'worker');
     assert.ok(result.workerSteps>=3);
-    assert.deepEqual(result.workerPlaceholder,[1280,720]);
+    // A transferred HTML placeholder may retain its initial attributes or
+    // mirror the OffscreenCanvas resize, depending on the browser. The actual
+    // worker buffer and visible CSS frame are asserted independently below.
+    assert.ok([[1280,720],[720,1280]].some(size=>
+      size[0]===result.workerPlaceholder[0]&&size[1]===result.workerPlaceholder[1]));
     assert.deepEqual(result.workerCss,[360,640]);
     assert.deepEqual(result.workerBuffer,[720,1280]);
     if(!supportsWorkerWebgl){
