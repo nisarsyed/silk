@@ -11,6 +11,7 @@ export class PresentationClock{
   #targetMs=null;
   #divisor=null;
   #nextMs=null;
+  #lastSubmittedMs=null;
   #submitted=0;
   #skipped=0;
   #missed=0;
@@ -29,6 +30,7 @@ export class PresentationClock{
   #restart(rafMs){
     this.#lastMs=rafMs;this.#count=0;this.#calibrated=false;
     this.#medianMs=null;this.#targetMs=null;this.#divisor=null;this.#nextMs=null;
+    this.#lastSubmittedMs=null;
     this.#targetSupported=null;
   }
 
@@ -68,12 +70,17 @@ export class PresentationClock{
       return false;
     }
     // Submit on the callback nearest the target, at most a quarter of one
-    // calibrated rAF interval early. Late callbacks skip expired target slots.
+    // calibrated rAF interval early. Late callback gaps remain observable.
     if(rafMs+this.#medianMs/4<this.#nextMs){++this.#skipped;return false;}
-    const overdue=Math.max(0,rafMs-this.#nextMs);
-    const slots=1+Math.floor(overdue/this.#targetMs);
-    this.#missed+=slots-1;
-    this.#nextMs+=slots*this.#targetMs;
+    // Count gaps in accepted rAF callbacks, not just expired arithmetic
+    // deadlines. The latter misses a real 25 ms gap if quantized timestamps
+    // make two successive callbacks straddle one fixed deadline.
+    if(this.#lastSubmittedMs!==null)
+      this.#missed+=Math.max(0,Math.round((rafMs-this.#lastSubmittedMs)/this.#targetMs)-1);
+    this.#lastSubmittedMs=rafMs;
+    // Re-anchor after each accepted native refresh. A coarsened 8.3 ms median
+    // cannot preserve the phase of an actual 8.333 ms display over long runs.
+    this.#nextMs=rafMs+this.#targetMs;
     ++this.#submitted;return true;
   }
 }

@@ -71,9 +71,14 @@ The main and worker trace share identical stages; the worker's stages use its
 own clock and are not added to overlapping main-thread work. These times are
 CPU submission proxies, not GPU completion or physical presentation times.
 Before stepping the world, each owner measures 240 idle animation intervals
-and schedules submissions at the nearest 60 Hz target deadline. It reports the
-median interval, target period, divisor, skipped/duplicate callbacks, missed
-target slots and timestamp discontinuities. A regressing browser timestamp
+and schedules submissions at the nearest 60 Hz target deadline. Each accepted
+native refresh anchors the next deadline at the same calibrated period, so a
+coarsened median cannot accumulate phase drift against a 120 Hz display. It
+reports the median interval, target period, divisor, skipped/duplicate
+callbacks, target slots missed between accepted rAF callbacks, and timestamp
+discontinuities. The frame trace carries actual submission timestamps for the
+physical cadence audit; the rAF counter alone cannot certify that gate. A
+regressing browser timestamp
 triggers idle recalibration and is reported so the affected timed run can be
 rejected. Calibration time is recorded as suspended time by the fixed-step clock;
 it cannot become catch-up physics work. Resume and drawing-buffer resize
