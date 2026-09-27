@@ -586,7 +586,7 @@ Still required for #95: complete
 sustained protocol reporting; matched render-only/end-to-end timing and input
 collection; startup, memory and allocation
 records; context-loss/lifecycle recovery; report validators; the complete
-five-repeat desktop and physical Android protocol; and an evidence-backed
+five-repeat desktop and physical iPhone Safari protocol; and an evidence-backed
 renderer decision. These prototypes and CI-style screenshots cannot satisfy
 those acceptance gates or authorize a production renderer choice.
 

@@ -124,12 +124,12 @@ merging; completion requires delivery on `main`.
 - [ ] Distribution and wrap: tested GitHub Pages deployment, downloadable package artifacts, version 0.5.0, documentation, and final release verification ([#100](https://github.com/nisarsyed/silk/issues/100), [#102](https://github.com/nisarsyed/silk/issues/102))
 
 Required default demos target smooth 60 Hz with unchanged fixed-step physics
-on desktop and the Android reference device. Report sustainable workload
+on desktop and the iPhone Safari reference device. Report sustainable workload
 tiers and 120 Hz rendering headroom separately. Renderer and worker choices
 are measured decisions; no browser performance is claimed before evidence.
-Physical iOS validation is deferred until hardware is available; WebKit CI
-does not establish real-device iOS support. Device inventories and installed
-versions stay in GitHub tracking and test artifacts.
+Physical Android Chrome validation is deferred until hardware is available;
+WebKit CI does not establish real-device Safari support. Device inventories
+and installed versions stay in GitHub tracking and test artifacts.
 
 The portable scalar core remains supported. Compiler-generated WASM SIMD is
 an evidence-gated investigation; worker placement does not add a parallel

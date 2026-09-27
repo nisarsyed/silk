@@ -1,6 +1,6 @@
 # Phase 5 browser and performance contract
 
-Contract revision 2, originating in [issue #89](https://github.com/nisarsyed/silk/issues/89).
+Contract revision 3, originating in [issue #89](https://github.com/nisarsyed/silk/issues/89).
 The [Phase 5 tracker](https://github.com/nisarsyed/silk/issues/88) and
 [milestone](https://github.com/nisarsyed/silk/milestone/3) own delivery toward
 0.5.0. This document specifies acceptance; it does not claim that a WASM build,
@@ -22,6 +22,13 @@ The instance query and repeated source colors/proxies are specified below.
 Workloads, capacities, timing budgets, quality limits and Phase 5 scope are
 unchanged; collect matched results for this clarified diagnostic profile.
 
+Revision 3 replaces the previously named Android Chrome mobile reference with
+an available iPhone running Safari. Physical Android Chrome coverage is now
+unverified, not passed. Desktop browser coverage, frozen workloads, visual
+settings, capacities, timing budgets and quality limits are unchanged. This
+device change precedes matched physical baselines; collect fresh results under
+this revision rather than combining reports from different mobile references.
+
 ## Delivery and support
 
 Deliver the existing 2D rigid-body engine as an independent JavaScript package
@@ -40,12 +47,13 @@ until the matched Canvas 2D/WebGL 2/raylib study in
 
 ### Browser coverage and test environments
 
-Required acceptance covers desktop Chrome, Firefox, and Safari, plus Chrome
-on the available Android reference device. iOS remains a compatibility target;
-physical iOS acceptance is deferred until hardware is available and does not
-block Phase 5. Report it as unverified, not passed. Chromium/Firefox/WebKit CI
-covers repeatable correctness and loading; WebKit CI and viewport emulation
-do not certify Safari/iOS or Android hardware.
+Required acceptance covers desktop Chrome, Firefox, and Safari, plus Safari
+on the available iPhone reference device. Android Chrome remains a compatibility
+target; physical Android acceptance is deferred until hardware is available
+and does not block Phase 5. Report it as unverified, not passed.
+Chromium/Firefox/WebKit CI covers repeatable correctness and loading; WebKit CI
+and viewport emulation do not certify physical Safari on either desktop or
+iPhone, or Android hardware.
 
 Keep reference choices and access notes in
 [#89](https://github.com/nisarsyed/silk/issues/89), with actual validation status
@@ -429,16 +437,17 @@ scene reset; no silent state reconstruction or fabricated seamless recovery.
 ## Acceptance record
 
 Close #89 after the protocol and roadmap links are reviewed and merged. Its
-GitHub record owns the reference-device choices and the deferred physical iOS
-coverage; no checked-in inventory or advance browser installation is required.
+GitHub record owns the reference-device choices and the deferred physical
+Android coverage; no checked-in inventory or advance browser installation is required.
 The first baseline report records the merged contract revision. Renderer,
 worker, and build results do not belong here as unearned claims.
 
 Collect physical evidence and environment details during
-[#101](https://github.com/nisarsyed/silk/issues/101). Actual desktop and Android
-performance gates remain required; missing access to a required test environment
-blocks that validation, not completion of this documentation work. Describe
-unverified iOS coverage clearly in the release support statement.
+[#101](https://github.com/nisarsyed/silk/issues/101). Actual desktop and iPhone
+Safari performance gates remain required; missing access to a required test
+environment blocks that validation, not completion of this documentation work.
+Describe unverified Android Chrome coverage clearly in the release support
+statement.
 
 ## Sources and verification
 
