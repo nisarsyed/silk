@@ -101,6 +101,16 @@ def raf_before_callback(raf, callback, quantized_tenth):
     return quantized_tenth and raf == math.floor(callback*10+0.5)/10
 
 
+def quantized_raf_grid(intervals, measured_rafs):
+    # The first calibration interval can include a startup timestamp off the
+    # steady 0.1 ms grid. Require the other 239 intervals and every measured
+    # rAF timestamp to demonstrate that grid before allowing its round-off.
+    def on_grid(value):
+        return math.isclose(value*10, round(value*10), rel_tol=0, abs_tol=1e-8)
+    return all(on_grid(value) for value in intervals[1:]) and all(
+        on_grid(value) for value in measured_rafs)
+
+
 def validate_input(record, frames, body_capacity, time_origin):
     """Check input-to-C-step-to-submission links, never qualify latency here."""
     require(type(record) is dict and record['source'] == 'canvas PointerEvent', 'invalid input source')
@@ -221,8 +231,6 @@ def validate(report):
     require(type(intervals) is list and len(intervals) == 240, 'incomplete calibration')
     for value in intervals:
         number(value, 1e-30)
-    raf_quantized_tenth = all(math.isclose(value*10, round(value*10), rel_tol=0, abs_tol=1e-8)
-                              for value in intervals)
     refresh = sorted(intervals)[119]
     divisor = max(1, math.floor((1000 / 60) / refresh + .5))
     period = refresh * divisor
@@ -254,6 +262,8 @@ def validate(report):
     require(frame['pendingFrame'] is False, 'unfinished frame')
     for key, columns in [('numbers', 24), ('stats', 25), ('work', 26), ('known', 1), ('finished', 1)]:
         require(type(frame[key]) is list and len(frame[key]) == count * columns, 'invalid ' + key + ' length')
+    raf_quantized_tenth = quantized_raf_grid(
+        intervals, (number(frame['numbers'][24*i]) for i in range(count)))
     gpu = report['gpu']
     require(gpu['statusNames'] == GPU and gpu['attempts'] == count and gpu['pending'] == 0 and
             gpu['frameCapacity'] == capacity and len(gpu['statuses']) == count, 'GPU record dimensions differ')
