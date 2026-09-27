@@ -12,6 +12,8 @@ export class PresentationClock{
   #divisor=null;
   #nextMs=null;
   #lastSubmittedMs=null;
+  #phaseOriginMs=null;
+  #phaseSubmitted=0;
   #submitted=0;
   #skipped=0;
   #missed=0;
@@ -31,6 +33,7 @@ export class PresentationClock{
     this.#lastMs=rafMs;this.#count=0;this.#calibrated=false;
     this.#medianMs=null;this.#targetMs=null;this.#divisor=null;this.#nextMs=null;
     this.#lastSubmittedMs=null;
+    this.#phaseOriginMs=null;this.#phaseSubmitted=0;
     this.#targetSupported=null;
   }
 
@@ -80,7 +83,12 @@ export class PresentationClock{
     this.#lastSubmittedMs=rafMs;
     // Re-anchor after each accepted native refresh. A coarsened 8.3 ms median
     // cannot preserve the phase of an actual 8.333 ms display over long runs.
-    this.#nextMs=rafMs+this.#targetMs;
+    // The absolute slot ceiling also prevents an upward-rounded median from
+    // submitting faster than its calibrated target on 60/240 Hz displays.
+    if(this.#phaseOriginMs===null)this.#phaseOriginMs=rafMs;
+    ++this.#phaseSubmitted;
+    this.#nextMs=Math.max(rafMs+this.#targetMs,
+      this.#phaseOriginMs+this.#phaseSubmitted*this.#targetMs);
     ++this.#submitted;return true;
   }
 }

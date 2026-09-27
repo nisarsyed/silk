@@ -73,7 +73,9 @@ CPU submission proxies, not GPU completion or physical presentation times.
 Before stepping the world, each owner measures 240 idle animation intervals
 and schedules submissions at the nearest 60 Hz target deadline. Each accepted
 native refresh anchors the next deadline at the same calibrated period, so a
-coarsened median cannot accumulate phase drift against a 120 Hz display. It
+coarsened median cannot accumulate phase drift against a 120 Hz display. An
+absolute target-slot ceiling prevents an upward-rounded median from
+submitting faster than the calibrated cadence. It
 reports the median interval, target period, divisor, skipped/duplicate
 callbacks, target slots missed between accepted rAF callbacks, and timestamp
 discontinuities. The frame trace carries actual submission timestamps for the
