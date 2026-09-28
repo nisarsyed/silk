@@ -91,9 +91,14 @@ def budgets(summary, period, dropped, contacts, debt):
                 missedSlots=summary['missedTargetFraction'] is not None and summary['missedTargetFraction'] <= .01)
 
 
-def raf_before_callback(raf, callback, quantized_tenth):
+def raf_before_callback(raf, callback, quantized_tenth, quantized_callback_ms=False):
     if raf <= callback or math.isclose(raf, callback, rel_tol=0, abs_tol=1e-9):
         return True
+    # Firefox can expose rAF on a 0.02 ms grid while performance.now() reports
+    # whole milliseconds. A proven 1 ms callback grid leaves less than one
+    # tick of cross-API ordering uncertainty, including truncation.
+    if quantized_callback_ms:
+        return raf < callback + 1
     if not quantized_tenth:
         return False
     snapped = math.floor(callback*10+0.5)/10
@@ -115,6 +120,22 @@ def quantized_raf_grid(intervals, measured_rafs):
         return math.isclose(value*10, round(value*10), rel_tol=0, abs_tol=1e-8)
     return all(on_grid(value) for value in intervals[1:]) and all(
         on_grid(value) for value in measured_rafs)
+
+
+def quantized_callback_grid(intervals, frame_numbers):
+    # Infer Firefox's coarse performance.now() clock from the raw trace, not
+    # from a user-agent claim. Require a substantial run, integer callback,
+    # submission and end readings, and a distinct finer 0.02 ms rAF grid.
+    count = len(frame_numbers) // 24
+    if count < 16:
+        return False
+    def on_grid(value, quantum):
+        return abs(value - quantum*round(value / quantum)) <= 1e-6
+    return (all(on_grid(value, .02) for value in intervals[1:]) and
+            all(on_grid(frame_numbers[24*i], .02) for i in range(count)) and
+            sum(not on_grid(frame_numbers[24*i], .1) for i in range(count)) >= 8 and
+            all(on_grid(frame_numbers[24*i+j], 1) for i in range(count)
+                for j in (1, 3, 4)))
 
 
 def validate_input(record, frames, body_capacity, time_origin):
@@ -270,6 +291,7 @@ def validate(report):
         require(type(frame[key]) is list and len(frame[key]) == count * columns, 'invalid ' + key + ' length')
     raf_quantized_tenth = quantized_raf_grid(
         intervals, (number(frame['numbers'][24*i]) for i in range(count)))
+    callback_quantized_ms = quantized_callback_grid(intervals, frame['numbers'])
     gpu = report['gpu']
     require(gpu['statusNames'] == GPU and gpu['attempts'] == count and gpu['pending'] == 0 and
             gpu['frameCapacity'] == capacity and len(gpu['statuses']) == count, 'GPU record dimensions differ')
@@ -301,7 +323,7 @@ def validate(report):
             number(value, 0, 2**32-1, True)
         # Keep same-clock ordering exact. The only cross-API exception is a
         # proven 0.1 ms rAF grid or the prior 1e-9 ms conversion allowance.
-        require(raf_before_callback(n[0], n[1], raf_quantized_tenth) and
+        require(raf_before_callback(n[0], n[1], raf_quantized_tenth, callback_quantized_ms) and
                 n[1] <= n[3] <= n[4] and n[11] <= n[4]-n[1], 'invalid frame clocks')
         require(sum(n[5:12]) + n[23] <= n[4]-n[1]+1e-9, 'stage timings exceed the critical path')
         require(s[24] >= prior_steps and s[24]-prior_steps <= 8 and n[13] >= prior_drops and
