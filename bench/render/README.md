@@ -319,7 +319,12 @@ their reports; synthetic scheduling cannot authorize device acceptance.
 The offline auditor recognizes an observed 0.1 ms rAF timestamp grid only
 when the 239 steady calibration intervals and every measured rAF timestamp
 demonstrate it. Cross-clock order then accounts for adjacent quantized ticks
-only when the callback timestamp itself is on the same grid.
+only when the callback timestamp itself is on the same grid. Firefox can instead
+round `performance.now()` frame stages to whole milliseconds while exposing
+rAF on a finer 0.02 ms grid. The auditor recognizes that distinct grid only
+when at least 16 complete frames, all steady calibration intervals and all
+measured frame clocks demonstrate it; it then permits less than one millisecond
+of cross-API order uncertainty.
 Same-clock ordering, raw samples, fixed-step accounting and all performance
 budgets remain unchanged.
 
@@ -393,6 +398,13 @@ is itself grid-aligned and the 239 steady calibration intervals plus every
 measured rAF timestamp demonstrate the grid. It rejects off-grid callback or
 measured rAF timestamps, later off-grid calibration intervals and larger
 reversals. No CPU, cadence, quality or continuity budget changes.
+In headed Firefox 156.0.1 smoke and 60-second rain traces, every
+callback/submission/end reading was on the 1 ms grid while rAF and the 239
+steady calibration intervals were on a 0.02 ms grid. The rAF timestamp was up
+to 0.9 ms ahead of the coarse callback reading. The auditor accepts only the
+demonstrated grid and less than a 1 ms cross-API difference; it still rejects
+a full-tick reversal or any off-grid measured frame. This changes timestamp
+representation handling, not budgets.
 
 The audit reports each continuity/CPU/cadence budget separately, including empty
 windows. Diagnostic and synthetic-clock budgets are marked inapplicable; short correctness runs

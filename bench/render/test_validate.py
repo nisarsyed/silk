@@ -171,6 +171,33 @@ def main():
     assert not audit.raf_before_callback(42249.4, 42249.300000190735, False)
     assert not audit.raf_before_callback(42249.5, 42249.300000190735, True)
     assert not audit.raf_before_callback(42249.4, 42249.29, True)
+    firefox_intervals = [66.96] + [8.32]*239
+    firefox_numbers = []
+    for i in range(16):
+        raf = 10000 + (i+1)*16.66
+        callback = round(raf)
+        row = [0]*24
+        row[0], row[1], row[3], row[4] = raf, callback, callback+2, callback+3
+        firefox_numbers.extend(row)
+    assert audit.quantized_callback_grid(firefox_intervals, firefox_numbers)
+    assert audit.raf_before_callback(28738.4, 28738, False, True)
+    assert audit.raf_before_callback(28738.98, 28738, False, True)
+    assert not audit.raf_before_callback(28739, 28738, False, True)
+    assert not audit.raf_before_callback(28738.4, 28738, False, False)
+    for index, offset in ((0, .01), (1, .02), (3, .1), (4, .1)):
+        changed = firefox_numbers.copy()
+        changed[index] += offset
+        assert not audit.quantized_callback_grid(firefox_intervals, changed)
+    assert not audit.quantized_callback_grid([66.96, 8.33]+[8.32]*238, firefox_numbers)
+    assert not audit.quantized_callback_grid(firefox_intervals, firefox_numbers[:15*24])
+    integers = firefox_numbers.copy()
+    for i in range(16):
+        integers[24*i] = round(integers[24*i])
+    assert not audit.quantized_callback_grid(firefox_intervals, integers)
+    tenths = firefox_numbers.copy()
+    for i in range(16):
+        tenths[24*i] = round(tenths[24*i], 1)
+    assert not audit.quantized_callback_grid(firefox_intervals, tenths)
     # A startup interval can be off-grid while the 239 steady intervals and
     # every measured rAF timestamp demonstrate the 0.1 ms clock grid.
     steady = [8.268] + [8.3]*239
