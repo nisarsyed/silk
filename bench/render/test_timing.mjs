@@ -18,7 +18,23 @@ assert.throws(()=>calibrate60(new Float64Array(239)));
 for(const invalid of [0,-1,NaN,Infinity]){const intervals=new Float64Array(240).fill(16);intervals[100]=invalid;assert.throws(()=>calibrate60(intervals));}
 const mixed=new Float64Array(240);for(let i=0;i<240;++i)mixed[i]=i<120?16:17;
 assert.equal(calibrate60(mixed).refreshPeriodMs,16);assert.equal(mixed[120],17);
+for(const hz of [60,120,240]){
+  const coarse=new Float64Array(240);
+  for(let i=0;i<240;++i)coarse[i]=Math.round((i+1)*1000/hz)-Math.round(i*1000/hz);
+  const c=calibrate60(coarse);assert.equal(c.divisor,hz/60);assert.equal(c.supports60Hz,true);
+  assert.ok(c.effectiveHz>=59&&c.effectiveHz<=61);
+  coarse[10]+=Math.round(1000/hz);
+  assert.equal(calibrate60(coarse).supports60Hz,true);
+}
+assert.equal(calibrate60(new Float64Array(240).fill(17)).supports60Hz,false);
 assert.throws(()=>new StudyClock(calibration(60),1/60));
+const phased=new StudyClock(calibration(60),dt,false,8);
+assert.ok(phased.tick(1000/60,1000/60));assert.equal(phased.steps,0);
+assert.ok(phased.debtSeconds>0&&phased.debtSeconds<dt);
+assert.ok(phased.tick(2000/60,2000/60));assert.equal(phased.steps,1);
+assert.ok(Math.abs(phased.totalSteps*dt+phased.debtSeconds-phased.elapsedSeconds)<1e-12);
+assert.throws(()=>new StudyClock(calibration(60),dt,false,-1));
+assert.throws(()=>new StudyClock(calibration(60),dt,false,NaN));
 const stalled=new StudyClock(calibration(60),dt);assert.ok(stalled.tick(0,0));assert.ok(stalled.tick(1000,1000));
 assert.equal(stalled.steps,8);assert.ok(stalled.droppedSeconds>0);
 assert.ok(Math.abs(stalled.totalSteps*dt+stalled.debtSeconds+stalled.droppedSeconds-1)<1e-12);

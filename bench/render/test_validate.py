@@ -2,6 +2,7 @@
 """Mutation-check the independent auditor against preserved browser runs."""
 import copy
 import json
+import math
 from pathlib import Path
 import tempfile
 import subprocess
@@ -82,6 +83,14 @@ def main():
                 else:
                     rejects(rounded, lambda r: None)
                 checked += 1
+    # A coarse Safari clock alternates 16/17 ms at 60 Hz; a steady 17 ms
+    # display must still fail the unchanged 59–61 Hz gate.
+    for hz in (60, 120, 240):
+        ticks = [round(i * 1000 / hz) for i in range(241)]
+        period = audit.calibration_refresh([ticks[i + 1] - ticks[i] for i in range(240)])
+        divisor = max(1, math.floor((1000 / 60) / period + .5))
+        assert 59 <= 1000 / (period * divisor) <= 61
+    assert 1000 / audit.calibration_refresh([17] * 240) < 59
     for fault in ('duplicate', 'slow'):
         path = root / f'calibration-{fault}.json'
         if path.exists():

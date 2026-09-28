@@ -271,8 +271,11 @@ An explicitly named `correctnessSeconds` option (0.25–5 seconds) exercises the
 loop in CI and labels its output `correctness-only`. Every current output sets
 `acceptanceEligible: false` and lists the missing protocol evidence.
 
-The loop records 240 idle rAF intervals and applies the frozen median/divisor
-calibration and 59–61 Hz gate. It warms a disposable world for 120 steps and
+The loop records 240 idle rAF intervals and applies the contract's median/divisor
+calibration and unchanged 59–61 Hz gate. Whole-millisecond rAF timestamps use
+the median of ten 24-interval means; Safari otherwise rounds a real 60 Hz
+cadence to a 17 ms median and falsely rejects it. A steady 17 ms display still
+fails. The loop warms a disposable world for 120 steps and
 120 callbacks (60 seconds for sustained runs), then creates the exact initial
 world while retaining cached paths, shaders and GPU buffers within the fixed
 memory budget; allocation failure remains a failed run. Scheduling starts with zero debt, uses the original binary32
@@ -280,13 +283,17 @@ timestep, caps catch-up at eight steps and records discarded time. The clock's
 planned steps must match the authoritative C count. Raw frame storage is bounded
 from duration and calibrated target cadence, with no growth or discarded prefix.
 If the first rAF timestamp is stale, its deadline advances on the calibrated
-grid to the target nearest callback entry. Simulation still starts at zero debt
-at that entry. This prevents queued startup timestamps from producing a burst
+grid to the target nearest callback entry. The measured epoch starts midway
+between target submissions with zero initial debt. The first submitted frame
+still contains the exact initial world; its elapsed fraction is kept in debt
+and all ten-second windows. This prevents near-boundary callback jitter from
+alternating zero- and two-step frames without changing the fixed timestep or
+discarding elapsed time. It also prevents queued startup timestamps from producing a burst
 of overdue submissions. Each subsequent target uses the same calibrated period
 from the last accepted native refresh. That phase correction prevents an
 8.3 ms coarsened median on a real 120 Hz display from drifting across the
 8.333 ms callback cadence and alternating short/long submissions. It does not
-change the calibration formula, period, budgets or fixed physics dt. An
+change the calibrated period, budgets or fixed physics dt. An
 absolute calibrated-slot ceiling prevents that phase correction from
 outpacing the existing duration/target-period frame capacity when the median
 rounds upward. A full frame buffer fails before executing another simulation

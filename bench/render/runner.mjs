@@ -140,17 +140,26 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
     if(!world)throw new Error('Fixed allocation failed while rebuilding initial state');
     if(instances!==undefined)step(120);
     prepare();resetHud();initial=world.report();glCalls?.resetTotals();
-    clock=new StudyClock(calibration,world.configuration.timestep,instances!==undefined);
     recorder=new FrameRecorder(Math.ceil(duration*1000/calibration.targetPeriodMs)+2);
     gpu=new GpuTimer(candidate==='canvas'?null:canvas.getContext('webgl2'),recorder.capacity,
       Math.ceil(100/calibration.targetPeriodMs)+2);
+    // Begin the measured fixed-step epoch midway between target submissions.
+    // This is real elapsed foreground time with zero initial debt: the first
+    // submitted frame arrives about half a step later, leaving room for native
+    // callback jitter instead of alternating zero- and two-step frames.
+    let anchorRaf;
+    await frames(raf=>{anchorRaf=raf;return true;});
+    await new Promise(resolve=>setTimeout(resolve,calibration.targetPeriodMs/2));
+    check();measurementStart=performance.now();
+    clock=new StudyClock(calibration,world.configuration.timestep,instances!==undefined,measurementStart);
     if(interaction){input=new StudyInput(canvas,world,sceneRects[scene],fail);input.start();}
     setPhase('measurement');
     await frames((raf,now)=>{
+      if(recorder.count===0&&raf+calibration.refreshPeriodMs*.25<anchorRaf+calibration.targetPeriodMs)return false;
       if(recorder.count===recorder.capacity)throw new Error('Frame recording capacity exhausted');
       if(canvas.width!==width||canvas.height!==height)throw new Error('Drawing-buffer size changed');
       if(!clock.tick(raf,now))return false;
-      if(measurementStart===null)measurementStart=now;
+      if(recorder.count===0&&clock.steps!==0)throw new Error('First measured frame advanced the initial state');
       values.fill(0);values[0]=raf;values[1]=now;values[2]=clock.targetRafMs;
       let t=performance.now();gpu.poll(recorder,t);values[23]=performance.now()-t;
       t=performance.now();step(clock.steps);values[5]=performance.now()-t;
@@ -210,7 +219,7 @@ export async function runStudy({canvas,hudElement,candidate,scene='pyramid',copi
       warmup,rendererRecreatedAfterWarmup:initial?false:null,initial,final,moduleMemory:module?.memory,measurementStart,measurementEnd,
       elapsedSeconds:clock?.elapsedSeconds??0,debtSeconds:clock?.debtSeconds??0,droppedSeconds:clock?.droppedSeconds??0,
       summary:recorder?.summary(calibration.targetPeriodMs),frames:recorder?.report(world.frameCounters),
-      windows:recorder?.windows(calibration.targetPeriodMs,duration,initial.steps,initial.drops),
+      windows:recorder?.windows(calibration.targetPeriodMs,duration,initial.steps,initial.drops,measurementStart),
       gpu:gpu?.report(),glCalls:glCalls?.report()??null,
       input:input?.report()??null,
       missingEvidence:['device conditions',interaction?'input timestamp precision and qualification':'real input','memory profiling',
