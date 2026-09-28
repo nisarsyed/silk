@@ -2,14 +2,22 @@ export interface Calibration60 {
   readonly intervalCount:240;readonly refreshPeriodMs:number;readonly targetPeriodMs:number;
   readonly divisor:number;readonly effectiveHz:number;readonly supports60Hz:boolean;
 }
-/** Frozen mandatory 60 Hz calibration: exactly 240 idle rAF intervals,
- * nearest-rank median, integer refresh divisor, and unchanged 59–61 Hz gate.
- * Unsupported displays retain their measured result instead of being coerced.
+/** Exactly 240 idle rAF intervals, integer refresh divisor, and 59–61 Hz gate.
+ * Whole-millisecond rAF clocks quantize a 60 Hz interval to 16 or 17 ms.
+ * The median of ten nonoverlapping 24-interval means recovers their cadence
+ * without accepting a display whose actual period is a steady 17 ms.
  */
 export function calibrate60(intervals:Float64Array):Calibration60 {
   if(intervals.length!==240)throw new RangeError('Calibration requires 240 intervals');
   for(const value of intervals)if(!Number.isFinite(value)||value<=0)throw new RangeError('Invalid refresh interval');
-  const sorted=intervals.slice().sort(),refreshPeriodMs=sorted[119];
+  let refreshPeriodMs:number;
+  if(intervals.every(Number.isInteger)){
+    const blocks=new Float64Array(10);
+    for(let block=0;block<10;++block){let span=0;for(let i=0;i<24;++i)span+=intervals[block*24+i];blocks[block]=span/24;}
+    blocks.sort();refreshPeriodMs=blocks[4];
+  }else{
+    const sorted=intervals.slice().sort();refreshPeriodMs=sorted[119];
+  }
   const divisor=Math.max(1,Math.round((1000/60)/refreshPeriodMs)),targetPeriodMs=refreshPeriodMs*divisor;
   const effectiveHz=1000/targetPeriodMs;
   return Object.freeze({intervalCount:240,refreshPeriodMs,targetPeriodMs,divisor,effectiveHz,
@@ -25,16 +33,19 @@ export class StudyClock {
   private previousRaf=-1;private previousNow=-1;private renderedNow=0;private origin=0;private deadline=0;
   private targetOriginRaf=0;
   frameCount=0;steps=0;totalSteps=0;debtSeconds=0;droppedSeconds=0;elapsedSeconds=0;targetRafMs=0;
-  constructor(calibration:Calibration60,readonly timestepSeconds:number,readonly renderOnly=false){
+  constructor(calibration:Calibration60,readonly timestepSeconds:number,readonly renderOnly=false,
+      private readonly startNowMs?:number){
     if(!calibration.supports60Hz||!Number.isFinite(calibration.refreshPeriodMs)||calibration.refreshPeriodMs<=0||
         !Number.isFinite(calibration.targetPeriodMs)||calibration.targetPeriodMs<calibration.refreshPeriodMs||
         1000/calibration.targetPeriodMs<59||1000/calibration.targetPeriodMs>61||
-        timestepSeconds!==Math.fround(1/60)||typeof renderOnly!=='boolean')throw new RangeError('Unsupported study clock configuration');
+        timestepSeconds!==Math.fround(1/60)||typeof renderOnly!=='boolean'||
+        (startNowMs!==undefined&&(!Number.isFinite(startNowMs)||startNowMs<0)))throw new RangeError('Unsupported study clock configuration');
     this.refreshPeriodMs=calibration.refreshPeriodMs;this.targetPeriodMs=calibration.targetPeriodMs;
   }
   tick(rafMs:number,nowMs:number):boolean {
     if(!Number.isFinite(rafMs)||!Number.isFinite(nowMs)||rafMs<0||nowMs<0||
-        rafMs<this.previousRaf||nowMs<this.previousNow)throw new RangeError('Invalid or backwards clock');
+        rafMs<this.previousRaf||nowMs<this.previousNow||
+        (this.previousRaf<0&&this.startNowMs!==undefined&&nowMs<this.startNowMs))throw new RangeError('Invalid or backwards clock');
     const first=this.previousRaf<0;
     // Phase-locking must not submit faster than the calibrated target on a
     // coarsened 16.7/4.2 ms median. The absolute slot ceiling also preserves
@@ -59,7 +70,7 @@ export class StudyClock {
     // adjacent callbacks, yielding avoidable 8/25 ms submission gaps. The
     // calibrated target period and every acceptance budget stay unchanged.
     const next=(first?target:rafMs)+this.targetPeriodMs;
-    const origin=first?nowMs:this.origin,previous=first?nowMs:this.renderedNow;
+    const origin=first?(this.startNowMs??nowMs):this.origin,previous=first?origin:this.renderedNow;
     // Frozen render-only runs keep presentation deadlines and elapsed time but
     // execute no simulation. Their source's 120 preparation steps are separate.
     const accumulated=this.renderOnly?0:this.debtSeconds+(nowMs-previous)/1000;

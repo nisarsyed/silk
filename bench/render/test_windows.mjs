@@ -15,6 +15,9 @@ for(const [row,elapsed]of [0,9980,10040,19990,20000,20030].entries()){
   r.append(v,requiredNumbers,counters);r.finish(t+4);if(row===1||row===3)r.resolveGpu(row,.5);
 }
 const windows=r.windows(10,20),whole=r.summary(10);
+const offset=r.windows(10,20,0,0n,495);
+assert.equal(offset[0].observedFirstSeconds,.005);
+assert.equal(offset[1].observedLastSeconds,20.035);
 assert.equal(windows.length,2);assert.deepEqual(windows.map(w=>[w.firstRow,w.lastRow]),[[0,1],[2,5]]);
 assert.deepEqual(windows.map(w=>w.completeFrames),[2,4]);assert.ok(windows.every(w=>w.coverageReached));
 assert.equal(windows[1].observedLastSeconds,20.03);assert.equal(windows[1].submissionGapMs.max,9950);

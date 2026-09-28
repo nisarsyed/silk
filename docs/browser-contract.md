@@ -238,11 +238,18 @@ Use monotonic browser timing outside C. Measure local intervals in one clock
 domain; correlate input and worker timestamps using recorded time origins,
 never by subtracting unrelated raw clock values. Calibrate idle refresh from
 240 requestAnimationFrame intervals before warming the workload. Let `V` be
-their median and `T = V * max(1, round((1000/60)/V))` milliseconds be the target
+their nearest-rank median. When every interval is a whole number of milliseconds,
+use the nearest-rank median of ten consecutive, nonoverlapping 24-interval
+means instead: a 60 Hz display otherwise appears as a 17 ms (58.8 Hz) median
+on a coarsened clock. Let `T = V * max(1, round((1000/60)/V))` milliseconds be the target
 presentation period. Accept calibration only when it supports 59-61 Hz target
 presentation; otherwise fix/record the display prerequisite before the required
 60 Hz test. Recalibrate after display/refresh changes. Render at target
 deadlines even on a higher-refresh display; physics always uses the fixed dt.
+Start measured elapsed time with zero simulation debt midway between target
+submissions; the first submitted frame must still show the exact initial world
+and have elapsed time below one fixed step. Count the entire elapsed interval,
+including the time before that first submitted frame, in debt and window gates.
 
 The following are engineering acceptance budgets established before profiling,
 not measurements of current performance. Apply gates to **every** valid base

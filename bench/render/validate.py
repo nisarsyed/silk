@@ -74,6 +74,17 @@ def distribution(values):
                 p99=ordered[math.ceil(.99 * len(values)) - 1], max=ordered[-1])
 
 
+def calibration_refresh(intervals):
+    """Recompute the collector's 240-interval estimate without trusting its summary."""
+    require(len(intervals) == 240, 'incomplete calibration')
+    for value in intervals:
+        number(value, 1e-30)
+    if all(float(value).is_integer() for value in intervals):
+        blocks = sorted(sum(intervals[i:i + 24]) / 24 for i in range(0, 240, 24))
+        return number(blocks[4], 1e-30)
+    return sorted(intervals)[119]
+
+
 def cadence(gaps, period):
     # JS Math.round for nonnegative values; Python round uses ties-to-even.
     missed = sum(max(0, math.floor(gap / period + .5) - 1) for gap in gaps)
@@ -255,10 +266,8 @@ def validate(report):
     require(report['clock']['unit'] == 'milliseconds' and report['clock']['simulationEnabled'] is (not frozen), 'clock mismatch')
     number(report['clock']['timeOrigin'])
     intervals = report['calibrationIntervals']
-    require(type(intervals) is list and len(intervals) == 240, 'incomplete calibration')
-    for value in intervals:
-        number(value, 1e-30)
-    refresh = sorted(intervals)[119]
+    require(type(intervals) is list, 'incomplete calibration')
+    refresh = calibration_refresh(intervals)
     divisor = max(1, math.floor((1000 / 60) / refresh + .5))
     period = refresh * divisor
     require(59 <= 1000 / period <= 61, 'unsupported 60 Hz calibration')
@@ -285,6 +294,7 @@ def validate(report):
             and frame['workOrder'] == ['lastStep', 'cumulative'], 'unknown columns')
     count = number(frame['count'], 2, 72002, True)
     capacity = number(frame['capacity'], count, 72002, True)
+    measurement_start = number(report['measurementStart'])
     require(capacity == math.ceil(duration * 1000 / period) + 2 and frame['bytes'] == 505 * capacity, 'record capacity differs')
     require(frame['pendingFrame'] is False, 'unfinished frame')
     for key, columns in [('numbers', 24), ('stats', 25), ('work', 26), ('known', 1), ('finished', 1)]:
@@ -330,10 +340,11 @@ def validate(report):
                 w[25] >= prior_contact and all(w[13+j] >= prior_work[j] for j in range(13)), 'counters moved backwards or step cap exceeded')
         require([s[3], s[5], s[7]] == [initial['configuration'][k] for k in ('bodyCapacity', 'contactCapacity', 'jointCapacity')], 'world capacities differ')
         require(s[2] <= s[3] and s[4] <= s[5] and s[6] <= s[7] and s[8] <= s[9] and s[23] <= budget, 'capacity exceeded')
-        elapsed = (n[1]-frame['numbers'][1]) / 1000
+        elapsed = (n[1]-measurement_start) / 1000
         require(elapsed >= 0 and n[12] < DT, 'invalid debt or elapsed time')
         if i == 0:
-            require(s[24] == initial['steps'] and n[12] == n[13] == 0 and w[25] == initial_drops, 'first frame is not the initial state')
+            require(elapsed < DT and s[24] == initial['steps'] and n[13] == 0 and
+                    w[25] == initial_drops, 'first frame is not the initial state')
         if frozen:
             require(s[24] == 120 and n[12] == n[13] == n[6] == n[7] == 0, 'frozen source changed')
         else:
@@ -386,7 +397,7 @@ def validate(report):
     equal(report['elapsedSeconds'], last['elapsed'], 'elapsed')
     equal(report['debtSeconds'], last['n'][12], 'debt')
     equal(report['droppedSeconds'], last['n'][13], 'drops')
-    equal(report['measurementStart'], rows[0]['n'][1], 'measurement start')
+    require(measurement_start <= rows[0]['n'][1], 'measurement start follows first frame')
     equal(report['measurementEnd'], last['n'][4], 'measurement end')
     require(last['elapsed'] >= duration and rows[-2]['elapsed'] < duration, 'duration boundary differs')
     gl = report['glCalls']

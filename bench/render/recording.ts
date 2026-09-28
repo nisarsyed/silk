@@ -94,12 +94,13 @@ export class FrameRecorder {
    * boundary/overshoot frame stays in the final window. Empty/unfinished
    * windows never fabricate zero-valued distributions or complete coverage.
    */
-  windows(targetPeriodMs:number,durationSeconds:number,initialSteps=0,initialContactDrops=0n){
+  windows(targetPeriodMs:number,durationSeconds:number,initialSteps=0,initialContactDrops=0n,measurementStartMs?:number){
     if(!Number.isFinite(targetPeriodMs)||targetPeriodMs<=0||!Number.isFinite(durationSeconds)||
       durationSeconds<=0||durationSeconds>300||!Number.isInteger(initialSteps)||initialSteps<0||initialSteps>0xffffffff||
-      typeof initialContactDrops!=='bigint'||initialContactDrops<0n||initialContactDrops>0xffffffffffffffffn)
+      typeof initialContactDrops!=='bigint'||initialContactDrops<0n||initialContactDrops>0xffffffffffffffffn||
+      (measurementStartMs!==undefined&&(!Number.isFinite(measurementStartMs)||measurementStartMs<0)))
       throw new RangeError('Invalid window configuration');
-    const count=Math.ceil(durationSeconds/10),origin=this.rows?this.numbers[1]:0;
+    const count=Math.ceil(durationSeconds/10),origin=measurementStartMs??(this.rows?this.numbers[1]:0);
     const windows=Array.from({length:count},()=>({cpu:[] as number[],gaps:[] as number[],gpu:[] as number[],
       missing:0,firstRow:null as number|null,lastRow:null as number|null,pending:false,
       steps:0,dropped:0,contacts:0n,endDebt:null as number|null,allocatorMax:null as number|null}));
