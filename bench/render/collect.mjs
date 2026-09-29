@@ -1,4 +1,5 @@
 import {runStudy} from './runner.mjs';
+import {provenanceJson} from './provenance.mjs';
 
 const byId=id=>document.getElementById(id);
 const form=byId('controls'),start=byId('start'),download=byId('download');
@@ -69,6 +70,12 @@ form.addEventListener('submit',async event=>{
   hud.hidden=!choice.diagnostic;hud.textContent='';
   write('INITIALIZING','Keep this tab visible. Calibration and disposable warm-up precede measurement.');
   try{
+    // A reused Safari tab can retain old ESM modules after the output folder
+    // is rebuilt. Fetch the manifest through a fresh URL before any timed work
+    // so mixed-source trials fail visibly instead of recording false evidence.
+    const manifest=await fetch(`./provenance.json?check=${Date.now()}`,{cache:'no-store'});
+    if(!manifest.ok||(await manifest.text()).trim()!==provenanceJson)
+      throw new Error('Collector assets are stale; reopen the current build in a new tab');
     report=await runStudy({canvas,candidate,scene,layout,sleep,copies,instances,
       diagnostic:choice.diagnostic,sustained:choice.sustained,interaction:choice.interaction,
       memoryBytes,...(choice.diagnostic?{hudElement:hud}:{}),
