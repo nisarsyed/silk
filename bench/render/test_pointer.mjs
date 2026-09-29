@@ -41,5 +41,39 @@ try{
   const scaled=module.create('pyramid',{copies:2,steps:1});assert.ok(scaled);
   try{const before=scaled.report();assert.equal(scaled.pointer(0,0,0),false);assert.deepEqual(scaled.report(),before);}
   finally{scaled.dispose();}
+  for(const scene of ['pyramid','rain','chains']){
+    let user=module.create(scene,{user:true}),base=module.create(scene,{steps:3});
+    assert.ok(user&&base);
+    try{
+      assert.equal(user.configuration.userMode,true);
+      assert.deepEqual([user.configuration.bodyCapacity,user.configuration.contactCapacity,user.configuration.jointCapacity],
+        [4096,32768,96]);
+      assert.ok(user.refreshSnapshot());assert.ok(base.refreshSnapshot());
+      assert.equal(user.snapshot.bodyCount,base.snapshot.bodyCount);
+      for(let row=0;row<base.snapshot.bodyCount;++row){
+        assert.equal(user.snapshot.bodies.x[row],base.snapshot.bodies.x[row]);
+        assert.equal(user.snapshot.bodies.y[row],base.snapshot.bodies.y[row]);
+      }
+      assert.throws(()=>user.spawn(2,0,20));
+      assert.throws(()=>user.spawn(0,NaN,20));
+      assert.throws(()=>base.spawn(0,0,20),/Spawning requires/);
+      const initial=user.snapshot.bodyCount,before=module.memory.allocatorUsedBytes;
+      assert.equal(user.spawn(0,0,20),true);
+      assert.equal(user.spawn(1,1,20),true);
+      assert.ok(user.refreshSnapshot());assert.equal(user.snapshot.bodyCount,initial+2);
+      assert.ok(user.step());assert.ok(user.refreshSnapshot());
+      assert.equal(module.memory.allocatorUsedBytes,before);
+      const old=user;user=user.rebuild();assert.ok(user);
+      assert.equal(user.configuration.userMode,true);assert.ok(user.refreshSnapshot());
+      assert.equal(user.snapshot.bodyCount,initial);old.dispose();
+    }finally{user?.dispose();base?.dispose();}
+  }
+  const baseline=module.memory.allocatorUsedBytes;
+  for(let i=0;i<12;++i){
+    const world=module.create(['pyramid','rain','chains'][i%3],{user:true});assert.ok(world);
+    try{assert.ok(world.spawn(i%2,0,20));assert.ok(world.step());}
+    finally{world.dispose();}
+    assert.equal(module.memory.allocatorUsedBytes,baseline);
+  }
   console.log('Pointer owner: all default fixtures/sleep modes, exact replay, bounded coordinates, no step on input, misses, release/cancel and rebuild lifetime PASS');
 }finally{module.dispose();}

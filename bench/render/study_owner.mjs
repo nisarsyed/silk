@@ -22,12 +22,13 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
   const moduleOwner=Object.freeze({
     get memory(){live();return {linearMemoryBytes:memoryBytes,stackBytes:1048576,staticEnd:m._sl_wasm_static_end(),
       heapBase:m._sl_wasm_heap_base(),allocatorUsedBytes:m._sl_wasm_allocator_used()};},
-    create(scene,{copies=1,sleep=false,steps=stepLimit}={}) {
+    create(scene,{copies=1,sleep=false,user=false,steps=user?0xffffffff:stepLimit}={}) {
       live();
-      if(typeof scene!=='string'||!Object.hasOwn(fixtures,scene)||typeof sleep!=='boolean') throw new TypeError('Invalid fixture or sleep policy');
-      if(!physicsTiers.includes(copies))throw new RangeError('Invalid physics tier');
-      integer(steps,1,stepLimit,'step bound');
-      let ptr=m._sl_render_study_create(fixtures[scene],copies,sleep?1:0,steps);
+      if(typeof scene!=='string'||!Object.hasOwn(fixtures,scene)||typeof sleep!=='boolean'||typeof user!=='boolean') throw new TypeError('Invalid fixture or sleep policy');
+      if(!physicsTiers.includes(copies)||user&&copies!==1)throw new RangeError('Invalid physics tier');
+      integer(steps,1,user?0xffffffff:stepLimit,'step bound');
+      let ptr=user?m._sl_render_study_create_user(fixtures[scene],sleep?1:0,steps):
+        m._sl_render_study_create(fixtures[scene],copies,sleep?1:0,steps);
       if(!ptr)return null;
       try {
         const adapter=m._sl_render_study_adapter(ptr),buffer=m.HEAPU32.buffer;
@@ -37,7 +38,7 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
         const status=new Uint32Array(buffer,m._sl_render_study_status(ptr),10);
         const pointerStatus=new Uint32Array(buffer,m._sl_render_study_pointer_status(ptr),3);
         const settings=new Float32Array(buffer,m._sl_render_study_settings(ptr),21);
-        const configuration=Object.freeze({scene,copies,sleepEnabled:sleep,stepLimit:steps,
+        const configuration=Object.freeze({scene,copies,sleepEnabled:sleep,userMode:user,stepLimit:steps,
           bodyCapacity:status[5],contactCapacity:status[6],jointCapacity:status[7],substeps:status[8],seed:status[9],
           ...object(settingNames,settings)});
         const views=makeViews(m,io,configuration,()=>{throw new Error('Study queries return indices, not mutable handles');});
@@ -70,7 +71,7 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
           // freeing physics before allocation so two arenas never coexist.
           // On failure the old world is disposed and retained graphics close.
           rebuild(){valid();const retained=renderer;renderer=undefined;value.dispose();let next;
-            try{next=moduleOwner.create(scene,{copies,sleep,steps});
+            try{next=moduleOwner.create(scene,{copies,sleep,user,steps});
               if(!next){retained?.dispose();return null;}
               if(retained)rendererTargets.get(next)(retained,configuration);
               return next;
@@ -81,6 +82,13 @@ export function ownStudyModule(m,memoryBytes,attachRenderer) {
             if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>8192||Math.abs(y)>8192)
               throw new RangeError('Invalid pointer world coordinate');
             invalidate();return !!m._sl_render_study_pointer(ptr,action,Math.fround(x),Math.fround(y));
+          },
+          spawn(kind,x,y){
+            valid();if(!user)throw new Error('Spawning requires the user interaction profile');
+            integer(kind,0,1,'spawn kind');
+            if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>8192||Math.abs(y)>8192)
+              throw new RangeError('Invalid spawn world coordinate');
+            invalidate();return !!m._sl_render_study_spawn(ptr,kind,Math.fround(x),Math.fround(y));
           },
           get snapshot(){valid();return views.snapshot;},
           get steps(){valid();return status[4];},

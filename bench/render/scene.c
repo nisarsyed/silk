@@ -99,3 +99,38 @@ bool sl_render_scene_build(sl_world *world, sl_world_config *config,
     *config = resolved;
     return true;
 }
+bool sl_render_scene_build_user(sl_world *world, sl_world_config *config,
+                                uint32_t fixture, bool sleep_enabled)
+{
+    if (world == NULL || config == NULL ||
+        (fixture != 0u && fixture != 1u && fixture != 3u)) {
+        return false;
+    }
+    sl_bench_scene *source = calloc(1u, sizeof(*source));
+    if (source == NULL) {
+        return false;
+    }
+    sl_world original = { 0 };
+    bool ok = sl_bench_scene_build(source, &original, fixture, sleep_enabled);
+    sl_world_config resolved = { 0 };
+    if (ok) {
+        resolved = source->config;
+        resolved.body_capacity = 4096u;
+        resolved.contact_capacity = 32768u;
+        resolved.joint_capacity = 96u;
+        ok = sl_world_init(world, &resolved);
+    }
+    sl_body_handle handles[SL_BENCH_BODY_COUNT_MAX] = { 0 };
+    if (ok) {
+        ok = copy_bodies(world, source, handles, 0.0f) &&
+             copy_joints(world, source, handles);
+    }
+    sl_world_destroy(&original);
+    free(source);
+    if (!ok) {
+        sl_world_destroy(world);
+        return false;
+    }
+    *config = resolved;
+    return true;
+}

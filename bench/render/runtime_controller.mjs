@@ -113,8 +113,10 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
         if(kind==='pause')return owner.pause();
         if(kind==='resume')return owner.resume();
         if(kind==='single-step')return owner.singleStep();
+        if(kind==='spawn')return owner.spawn(...fields.args);
         if(kind==='reset')return owner.reset(...fields.args);
         if(kind==='resize')return owner.resize(fields.layout);
+        if(kind==='overlays')return owner.setOverlays(fields.flags);
         if(kind==='pointer')return owner.pointer(...fields.args);
         if(kind==='pointer-batch'){
           const counts={queued:0,coalesced:0,droppedMove:0,stale:0};
@@ -158,10 +160,12 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
         if(document.visibilityState!=='visible'){visibilityPaused=true;return false;}
         return control('resume');},
       singleStep(){return control('single-step');},
+      spawn(kind,x,y){return control('spawn',{args:[kind,x,y]});},
       async reset(scene,sleep){const changed=await control('reset',{args:[scene,sleep]});
         if(changed)currentScene=scene??currentScene;return changed;},
       async resize(layout){const changed=await control('resize',{layout});
         if(changed){currentLayout=layout;setCssFrame(layout);}return changed;},
+      setOverlays(flags){return control('overlays',{flags});},
       pointer(epoch,sequence,action,pointerId,x,y,eventMs=0){
         return control('pointer',{args:[epoch,sequence,action,pointerId,x,y,eventMs]});
       },
@@ -186,6 +190,7 @@ export async function startBrowserRuntime(canvas,profile={},{preferWorker=true,w
         replaceCanvas();mode='recovering';
         try{
           await startMain();
+          userPaused=false;visibilityPaused=false;
           fallbackReason='Explicit recovery restarted the source scene on the main thread';
           failureReason=null;
           return owner.report();

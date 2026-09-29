@@ -28,11 +28,14 @@ export class DrawScene {
   readonly frozen: boolean;
   readonly rect: Rect;
   revision = 0;
-  constructor(snapshot: SnapshotCopy, name: keyof typeof sceneRects, instances?: number, copies = 1) {
+  constructor(snapshot: SnapshotCopy, name: keyof typeof sceneRects, instances?: number, copies = 1,user = false) {
     if (!(name in sceneRects)) throw new Error('Unknown comparison scene');
     if (![1, 2, 4, 8, 16].includes(copies)) throw new RangeError('Invalid physics tier');
+    if(user&&(instances!==undefined||copies!==1))throw new RangeError('Invalid interaction scene');
     if (instances !== undefined && copies !== 1) throw new Error('Render-only tiers require the original rain snapshot');
-    if (snapshot.bodyCount !== ({ pyramid: 211, rain: 2003, chains: 104 }[name]) * copies) throw new Error('Snapshot does not match the declared physics tier');
+    const initial=({ pyramid: 211, rain: 2003, chains: 104 }[name])*copies;
+    if (user?(snapshot.bodyCount<initial||snapshot.bodyCount>4096):snapshot.bodyCount!==initial)
+      throw new Error('Snapshot does not match the declared physics tier');
     if (instances !== undefined && (name !== 'rain' || !renderTiers.includes(instances)))
       throw new RangeError('Render-only requires rain and a frozen contract tier');
     this.frozen = instances !== undefined;

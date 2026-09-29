@@ -14,4 +14,9 @@
 bool sl_render_scene_build(sl_world *world, sl_world_config *config,
                            uint32_t fixture, uint32_t copies,
                            bool sleep_enabled);
+/* Separate interactive profile. Copies the exact one-copy fixture into a
+ * fresh world with fixed 4096/32768/96 capacities before user spawning.
+ * Setup-only allocations are released before the first simulation step. */
+bool sl_render_scene_build_user(sl_world *world, sl_world_config *config,
+                                uint32_t fixture, bool sleep_enabled);
 #endif

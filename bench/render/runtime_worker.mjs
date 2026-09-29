@@ -39,8 +39,10 @@ self.onmessage=async event=>{
       else if(kind==='pause')result=owner.pause();
       else if(kind==='resume')result=owner.resume();
       else if(kind==='single-step')result=owner.singleStep();
+      else if(kind==='spawn')result=owner.spawn(...event.data.args);
       else if(kind==='reset')result=owner.reset(...event.data.args);
       else if(kind==='resize')result=owner.resize(event.data.layout);
+      else if(kind==='overlays')result=owner.setOverlays(event.data.flags);
       else if(kind==='report')result=owner.report();
       else if(kind==='input-trace')result=owner.inputTrace();
       else if(kind==='frame-trace')result=owner.frameTrace();

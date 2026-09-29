@@ -2,6 +2,7 @@ import {createStudyModule} from './physics/driver.mjs';
 import {DrawScene} from './geometry.js';
 import {CanvasCandidate} from './canvas.js';
 import {WebglCandidate} from './webgl.js';
+import {Overlay} from './overlay.js';
 import {FixedClock} from './host_clock.mjs';
 import {PointerQueue} from './host_input_queue.mjs';
 import {InputTrace} from './host_input_trace.mjs';
@@ -10,23 +11,29 @@ import {PresentationClock} from './host_presentation_clock.mjs';
 
 const active=new WeakSet();
 const layouts=Object.freeze({desktop:[1280,720],mobile:[720,1280]});
+const emptyOverlays=Object.freeze({contacts:false,proxies:false,joints:false,queries:false,islands:false});
+const validOverlays=value=>value&&typeof value==='object'&&!Array.isArray(value)&&
+  Object.keys(value).length===Object.keys(emptyOverlays).length&&
+  Object.keys(emptyOverlays).every(key=>typeof value[key]==='boolean');
 
 // One study owner per canvas. Main and worker instantiate the same code; no
 // state copy or second C world is used for rendering. This is a bounded host
 // path for the placement experiment, not a production renderer decision.
-export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep=false,
+export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep=false,userMode=false,
   layout='desktop',traceInput=false,traceFrames=false,onStatus}={}) {
   if (!((typeof HTMLCanvasElement!=='undefined'&&canvas instanceof HTMLCanvasElement) ||
         (typeof OffscreenCanvas!=='undefined'&&canvas instanceof OffscreenCanvas)) ||
       !['canvas','webgl'].includes(candidate) || !['pyramid','rain','chains'].includes(scene) ||
-      typeof sleep!=='boolean' || !Object.hasOwn(layouts,layout) ||
+      typeof sleep!=='boolean' || typeof userMode!=='boolean' || userMode&&candidate!=='canvas' ||
+      !Object.hasOwn(layouts,layout) ||
       typeof traceInput!=='boolean'||typeof traceFrames!=='boolean'||
       (onStatus!==undefined&&typeof onStatus!=='function'))
     throw new TypeError('Invalid browser runtime profile');
   if (active.has(canvas)) throw new Error('Canvas already has an authoritative owner');
   active.add(canvas);
-  let module,world,drawScene,renderer,frameId=0,disposed=false,failure=null;
+  let module,world,drawScene,renderer,overlay,frameId=0,disposed=false,failure=null;
   let state='initializing',sceneName=scene,sleepEnabled=sleep,layoutName=layout;
+  let overlays=emptyOverlays;
   const clock=new FixedClock(),presentation=new PresentationClock(),queue=new PointerQueue();
   const trace=traceInput?new InputTrace():null;
   const frames=traceFrames?new FrameTrace():null;
@@ -36,7 +43,7 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
   const stopped=()=>{live();if(state==='failed')throw new Error(`Browser runtime failed: ${failure}`);};
   const clearWorld=()=>{
     const oldRenderer=renderer,oldWorld=world;
-    renderer=undefined;world=undefined;drawScene=undefined;
+    renderer=undefined;world=undefined;drawScene=undefined;overlay=undefined;
     try{oldRenderer?.dispose();}finally{oldWorld?.dispose();}
   };
   const fail=error=>{
@@ -46,10 +53,15 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
   };
   const graphicsLost=event=>{event.preventDefault();fail('Graphics context lost; explicit recovery required');};
   const openWorld=()=>{
-    world=module.create(sceneName,{sleep:sleepEnabled,steps:21600});
-    if(!world||!world.refreshSnapshot())throw new Error('Runtime world creation failed');
-    drawScene=new DrawScene(world.snapshot,sceneName);
-    renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene):new WebglCandidate(canvas,drawScene);
+    world=module.create(sceneName,{sleep:sleepEnabled,user:userMode});
+    if(!world||!world.refreshSnapshot(Object.values(overlays).some(Boolean)))throw new Error('Runtime world creation failed');
+    drawScene=new DrawScene(world.snapshot,sceneName,undefined,1,userMode);
+    if(Object.values(overlays).some(Boolean)){
+      const c=world.configuration;
+      overlay=new Overlay(drawScene,c.bodyCapacity,c.contactCapacity,c.jointCapacity,canvas.width,canvas.height);
+      overlay.setFlags(overlays);overlay.refresh(world.snapshot,world.diagnostics);
+    }
+    renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene,overlay):new WebglCandidate(canvas,drawScene,overlay);
     renderer.draw();
   };
   const applyQueued=(action,_id,x,y,sequence,eventMs)=>{
@@ -73,8 +85,9 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         if(!world.step())throw new Error('Runtime step failed');
       }
       if(steps){
-        if(!world.refreshSnapshot())throw new Error('Runtime snapshot failed');
+        if(!world.refreshSnapshot(!!overlay))throw new Error('Runtime snapshot failed');
         drawScene.copyTransforms(world.snapshot);
+        overlay?.refresh(world.snapshot,world.diagnostics);
       }
       const stepEndMs=frames?performance.now():scheduleEndMs;
       renderer.draw();
@@ -112,6 +125,25 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         clock.setPaused(false,performance.now());presentation.reset();
         state='running';notify();return true;},
       singleStep(){stopped();return clock.requestSingleStep();},
+      spawn(kind,x,y){
+        stopped();if(!userMode)throw new Error('Spawning requires the user interaction profile');
+        if(!Number.isInteger(kind)||kind<0||kind>1||!Number.isFinite(x)||!Number.isFinite(y)||
+            Math.abs(x)>8192||Math.abs(y)>8192)throw new TypeError('Invalid spawn request');
+        if(world.snapshot.bodyCount>=world.configuration.bodyCapacity)return 'full';
+        try{
+          queue.reset(queue.epoch+1);
+          if(!world.pointer(3,0,0))throw new Error('Pointer cancellation failed');
+          if(!world.spawn(kind,x,y))throw new Error('Body creation failed');
+          if(!world.refreshSnapshot(!!overlay))throw new Error('Spawn snapshot failed');
+          renderer.dispose();
+          drawScene=new DrawScene(world.snapshot,sceneName,undefined,1,true);
+          if(overlay){const c=world.configuration;
+            overlay=new Overlay(drawScene,c.bodyCapacity,c.contactCapacity,c.jointCapacity,canvas.width,canvas.height);
+            overlay.setFlags(overlays);overlay.refresh(world.snapshot,world.diagnostics);}
+          renderer=new CanvasCandidate(canvas,drawScene,overlay);
+          renderer.draw();notify();return 'created';
+        }catch(error){fail(error);return 'failed';}
+      },
       reset(nextScene=sceneName,nextSleep=sleepEnabled){
         stopped();if(!['pyramid','rain','chains'].includes(nextScene)||typeof nextSleep!=='boolean')
           throw new TypeError('Invalid runtime reset profile');
@@ -129,11 +161,30 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
           renderer.dispose();renderer=undefined;
           const [width,height]=layouts[nextLayout];canvas.width=width;canvas.height=height;
           layoutName=nextLayout;
-          renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene):new WebglCandidate(canvas,drawScene);
+          if(overlay){const c=world.configuration;
+            overlay=new Overlay(drawScene,c.bodyCapacity,c.contactCapacity,c.jointCapacity,width,height);
+            overlay.setFlags(overlays);overlay.refresh(world.snapshot,world.diagnostics);}
+          renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene,overlay):new WebglCandidate(canvas,drawScene,overlay);
           renderer.draw();presentation.reset();notify();return true;
         }catch(error){fail(error);return false;}
       },
-      report(){live();return {state,reason:failure,candidate,scene:sceneName,sleep:sleepEnabled,
+      setOverlays(next){
+        stopped();if(!validOverlays(next))throw new TypeError('Invalid overlay flags');
+        const enabled=Object.values(next).some(Boolean);
+        try{
+          overlays={...next};
+          if(enabled){
+            if(!world.refreshSnapshot(true))throw new Error('Diagnostic snapshot failed');
+            if(!overlay){const c=world.configuration;
+              overlay=new Overlay(drawScene,c.bodyCapacity,c.contactCapacity,c.jointCapacity,canvas.width,canvas.height);}
+            overlay.setFlags(overlays);overlay.refresh(world.snapshot,world.diagnostics);
+          }else overlay=undefined;
+          renderer.dispose();
+          renderer=candidate==='canvas'?new CanvasCandidate(canvas,drawScene,overlay):new WebglCandidate(canvas,drawScene,overlay);
+          renderer.draw();return true;
+        }catch(error){fail(error);return false;}
+      },
+      report(){live();const worldReport=world?.report();return {state,reason:failure,candidate,scene:sceneName,sleep:sleepEnabled,
         layout:layoutName,bufferWidth:canvas.width,bufferHeight:canvas.height,
         steps:world?.steps??null,epoch:queue.epoch,
         pointerHeld:world?.pointerState.held??null,clock:{totalSteps:clock.totalSteps,
@@ -144,6 +195,10 @@ export async function createRuntimeOwner(canvas,{candidate,scene='pyramid',sleep
         inputTraceStorageBytes:trace?.storageBytes??0,
         frameTraceCount:frames?.count??null,
         frameTraceStorageBytes:frames?.storageBytes??0,
+        overlays:{...overlays},worldStats:worldReport?.stats??null,
+        worldWork:worldReport?.work??null,
+        bodyCapacity:world?.configuration.bodyCapacity??null,userMode,
+        contactDrops:world?.drops.toString()??null,
         memory:module?.memory??null};},
       inputTrace(){live();return trace?.copy(performance.timeOrigin)??null;},
       frameTrace(){live();return frames?.copy(performance.timeOrigin)??null;},

@@ -37,6 +37,17 @@ try{
       const hit=d.words[n+2];
       assert.equal(overlay.lineCount,4*proxies+contacts+snapshot.jointCount+5+hit);
       assert.equal(overlay.markerCount,contacts+2*snapshot.jointCount+1+hit);
+      overlay.setFlags({contacts:false,proxies:false,joints:false,queries:false,islands:false});
+      overlay.refresh(snapshot,d);
+      assert.equal(overlay.lineCount,0);
+      assert.equal(overlay.markerCount,0);
+      for(let i=0;i<draw.count;++i)assert.equal(colors[i],snapshot.bodies.type[draw.rows[i]]===2?0:1);
+      overlay.setFlags({contacts:true,proxies:false,joints:false,queries:false,islands:false});
+      overlay.refresh(snapshot,d);
+      assert.equal(overlay.lineCount,contacts);
+      assert.equal(overlay.markerCount,contacts);
+      overlay.setFlags({contacts:true,proxies:true,joints:true,queries:true,islands:true});
+      overlay.refresh(snapshot,d);
       for(let i=4*proxies;i<4*proxies+contacts;++i){
         const at=5*i;assert.equal(lines[at+4],12);
         assert.ok(Math.abs(Math.hypot(lines[at+2]-lines[at],lines[at+3]-lines[at+1])-12)<0.001,`${scene} copies=${copies} normal=${i-4*proxies} length=${Math.hypot(lines[at+2]-lines[at],lines[at+3]-lines[at+1])}`);

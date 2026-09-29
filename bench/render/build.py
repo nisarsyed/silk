@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble developer-only renderer correctness prototypes; no deployment."""
+"""Assemble renderer studies and the provisional browser sandbox; no deployment."""
 import argparse
 import json
 from pathlib import Path
@@ -70,6 +70,8 @@ def main():
                  'runtime_owner.mjs', 'runtime_worker.mjs', 'runtime_controller.mjs',
                  'pointer_adapter.mjs'):
         shutil.copyfile(ROOT/'bench/render'/name, output/name)
+    for name in ('sandbox.html', 'sandbox.css', 'sandbox.mjs'):
+        shutil.copyfile(ROOT/'examples/browser'/name, output/name)
     for name, target in (('clock.mjs', 'host_clock.mjs'), ('input_queue.mjs', 'host_input_queue.mjs'),
                          ('input_trace.mjs', 'host_input_trace.mjs'),
                          ('frame_trace.mjs', 'host_frame_trace.mjs'),

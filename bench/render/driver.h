@@ -14,6 +14,11 @@ typedef struct sl_render_study sl_render_study;
 sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
                                         uint32_t sleep_enabled,
                                         uint32_t step_limit);
+/* Separate user-interaction world with the contract's 4096/32768/96 capacity.
+ * Its step counter is bounded by the supplied nonzero uint32 limit. */
+sl_render_study *sl_render_study_create_user(uint32_t fixture,
+                                             uint32_t sleep_enabled,
+                                             uint32_t step_limit);
 void sl_render_study_destroy(sl_render_study *study);
 /* Invalid/finished input rejects without a step. Each successful call performs
  * one binary32(1/60) step at the fixture's four substeps. No
@@ -38,6 +43,11 @@ bool sl_render_study_pointer(sl_render_study *study, uint32_t action, float x,
 /* Borrowed private columns: held (including a miss), body slot, generation.
  * No selection uses UINT32_MAX/0. The JS owner exposes scalar getters only. */
 const uint32_t *sl_render_study_pointer_status(const sl_render_study *study);
+/* Add a 1 kg circle (kind 0) or box (kind 1) at a finite world position.
+ * Only the user-interaction profile accepts spawning. False means invalid
+ * input or exhausted fixed capacity; no step or allocation occurs. */
+bool sl_render_study_spawn(sl_render_study *study, uint32_t kind, float x,
+                           float y);
 /* Check evolving public state: transforms/velocities, proxy bounds, live
  * contact floats and joint impulses. Failure is latched; later steps reject.
  * step performs this check after each executed step (inside measured CPU
