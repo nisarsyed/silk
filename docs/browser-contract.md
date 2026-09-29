@@ -1,6 +1,6 @@
 # Phase 5 browser and performance contract
 
-Contract revision 1, prepared for [issue #89](https://github.com/nisarsyed/silk/issues/89).
+Contract revision 3, originating in [issue #89](https://github.com/nisarsyed/silk/issues/89).
 The [Phase 5 tracker](https://github.com/nisarsyed/silk/issues/88) and
 [milestone](https://github.com/nisarsyed/silk/milestone/3) own delivery toward
 0.5.0. This document specifies acceptance; it does not claim that a WASM build,
@@ -14,6 +14,20 @@ a candidate fail. Reference hardware, installed versions, access arrangements,
 and collection status live in GitHub issues and run artifacts, not this
 repository. Changing the test environment requires a new matched baseline,
 not an edit to a checked-in device inventory.
+
+Revision 2 clarifies frozen render-only diagnostics before their matched
+baselines: retain a contact when any dynamic endpoint is displayed, even if
+the other endpoint's shape is omitted, and draw shared contacts once per tile.
+The instance query and repeated source colors/proxies are specified below.
+Workloads, capacities, timing budgets, quality limits and Phase 5 scope are
+unchanged; collect matched results for this clarified diagnostic profile.
+
+Revision 3 replaces the previously named Android Chrome mobile reference with
+an available iPhone running Safari. Physical Android Chrome coverage is now
+unverified, not passed. Desktop browser coverage, frozen workloads, visual
+settings, capacities, timing budgets and quality limits are unchanged. This
+device change precedes matched physical baselines; collect fresh results under
+this revision rather than combining reports from different mobile references.
 
 ## Delivery and support
 
@@ -33,12 +47,13 @@ until the matched Canvas 2D/WebGL 2/raylib study in
 
 ### Browser coverage and test environments
 
-Required acceptance covers desktop Chrome, Firefox, and Safari, plus Chrome
-on the available Android reference device. iOS remains a compatibility target;
-physical iOS acceptance is deferred until hardware is available and does not
-block Phase 5. Report it as unverified, not passed. Chromium/Firefox/WebKit CI
-covers repeatable correctness and loading; WebKit CI and viewport emulation
-do not certify Safari/iOS or Android hardware.
+Required acceptance covers desktop Chrome, Firefox, and Safari, plus Safari
+on the available iPhone reference device. Android Chrome remains a compatibility
+target; physical Android acceptance is deferred until hardware is available
+and does not block Phase 5. Report it as unverified, not passed.
+Chromium/Firefox/WebKit CI covers repeatable correctness and loading; WebKit CI
+and viewport emulation do not certify physical Safari on either desktop or
+iPhone, or Android hardware.
 
 Keep reference choices and access notes in
 [#89](https://github.com/nisarsyed/silk/issues/89), with actual validation status
@@ -119,6 +134,17 @@ and trim the final tile to the requested count. All candidates consume the
 same copied snapshot after 120 fixed steps with sleep off. Rendering this
 frozen state isolates submission/fill cost; it is not a physics throughput or
 dynamic-upload claim. The end-to-end profiles below cover changing transforms.
+
+For frozen diagnostics, repeat the source proxy bounds and sleeping/island
+colors with each displayed dynamic row; island IDs/colors remain literal
+copies of the source snapshot. Within each tile, retain each source contact
+with at least one displayed dynamic endpoint, including contacts against
+omitted static shapes or bodies trimmed from the final tile. Draw it once,
+with its original point order and translated points/normals. Contacts with no
+points produce no glyphs. Run the single central point/AABB/ray query over the
+displayed instances using the union camera rectangle, all body types and full
+instance output capacity. Equal-fraction ray hits choose the first instance
+in draw order. The frozen source world is not stepped during rendering.
 
 | Profile | Nominal CSS frame | Fixed drawing buffer | Nominal render DPR |
 | --- | --- | --- | --- |
@@ -212,11 +238,18 @@ Use monotonic browser timing outside C. Measure local intervals in one clock
 domain; correlate input and worker timestamps using recorded time origins,
 never by subtracting unrelated raw clock values. Calibrate idle refresh from
 240 requestAnimationFrame intervals before warming the workload. Let `V` be
-their median and `T = V * max(1, round((1000/60)/V))` milliseconds be the target
+their nearest-rank median. When every interval is a whole number of milliseconds,
+use the nearest-rank median of ten consecutive, nonoverlapping 24-interval
+means instead: a 60 Hz display otherwise appears as a 17 ms (58.8 Hz) median
+on a coarsened clock. Let `T = V * max(1, round((1000/60)/V))` milliseconds be the target
 presentation period. Accept calibration only when it supports 59-61 Hz target
 presentation; otherwise fix/record the display prerequisite before the required
 60 Hz test. Recalibrate after display/refresh changes. Render at target
 deadlines even on a higher-refresh display; physics always uses the fixed dt.
+Start measured elapsed time with zero simulation debt midway between target
+submissions; the first submitted frame must still show the exact initial world
+and have elapsed time below one fixed step. Count the entire elapsed interval,
+including the time before that first submitted frame, in debt and window gates.
 
 The following are engineering acceptance budgets established before profiling,
 not measurements of current performance. Apply gates to **every** valid base
@@ -411,16 +444,17 @@ scene reset; no silent state reconstruction or fabricated seamless recovery.
 ## Acceptance record
 
 Close #89 after the protocol and roadmap links are reviewed and merged. Its
-GitHub record owns the reference-device choices and the deferred physical iOS
-coverage; no checked-in inventory or advance browser installation is required.
+GitHub record owns the reference-device choices and the deferred physical
+Android coverage; no checked-in inventory or advance browser installation is required.
 The first baseline report records the merged contract revision. Renderer,
 worker, and build results do not belong here as unearned claims.
 
 Collect physical evidence and environment details during
-[#101](https://github.com/nisarsyed/silk/issues/101). Actual desktop and Android
-performance gates remain required; missing access to a required test environment
-blocks that validation, not completion of this documentation work. Describe
-unverified iOS coverage clearly in the release support statement.
+[#101](https://github.com/nisarsyed/silk/issues/101). Actual desktop and iPhone
+Safari performance gates remain required; missing access to a required test
+environment blocks that validation, not completion of this documentation work.
+Describe unverified Android Chrome coverage clearly in the release support
+statement.
 
 ## Sources and verification
 
