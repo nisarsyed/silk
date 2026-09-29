@@ -20,7 +20,7 @@ def sources(root):
     # Include local untracked source edits, deleted tracked files, JS wrappers,
     # build scripts and the frozen contract. Ignore generated/private reports.
     names = git(root, 'ls-files', '-z', '-c', '--others', '--exclude-standard', '--',
-                'src', 'include', 'wasm', 'bench', 'cmake', 'CMakeLists.txt',
+                'src', 'include', 'wasm', 'bench', 'browser', 'cmake', 'CMakeLists.txt',
                 'CMakePresets.json', 'docs/browser-contract.md')
     result = {}
     for name in sorted(set(names.decode().split('\0')) - {''}):

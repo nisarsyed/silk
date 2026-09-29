@@ -47,7 +47,7 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           npm ci --prefix wasm --ignore-scripts --no-audit --no-fund
-          PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium
+          PLAYWRIGHT_SKIP_BROWSER_GC=1 node wasm/node_modules/@playwright/test/cli.js install --with-deps chromium firefox webkit
           node wasm/test_package.mjs build/wasm-${{ matrix.mode }}/package | tee build/wasm-${{ matrix.mode }}/package-consumers.txt
       - name: Verify benchmark phases and Node/browser smoke replay
         shell: bash
@@ -55,6 +55,11 @@ jobs:
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           node bench/wasm/test_driver.mjs build/wasm-${{ matrix.mode }}/benchmark/driver.mjs
           node bench/render/test_study.mjs build/wasm-${{ matrix.mode }}/render-physics
+          node browser/test_runtime.mjs
+          node browser/test_input_trace.mjs
+          node browser/test_frame_trace.mjs
+          node browser/test_presentation_clock.mjs
+          node browser/test_wasm_runtime.mjs build/wasm-${{ matrix.mode }}/render-physics
           for sleep in off on; do
             for host in node browser; do
               browser_args=()
@@ -80,6 +85,17 @@ jobs:
             --raylib "build/wasm-render-$mode/render-study" --output "build/render-study-$mode"
           python3 bench/render/test_metadata.py
           node bench/render/test_provenance.mjs "build/render-study-$mode"
+          node bench/render/test_placement_browser.mjs "build/render-study-$mode"
+          for engine in chromium firefox webkit; do
+            # Firefox and WebKit need an X display for WebGL 2 on GPU-less runners.
+            browser_command=(node)
+            if [[ "$engine" != chromium ]]; then browser_command=(xvfb-run -a node); fi
+            "${browser_command[@]}" bench/render/test_presentation_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_runtime_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode" "$engine"
+          done
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"
           node bench/render/test_pointer.mjs "build/render-study-$mode"

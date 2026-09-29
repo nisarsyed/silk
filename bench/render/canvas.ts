@@ -12,7 +12,7 @@ export const frozenPathEdgeLimit=8192;
  * Browser-internal Canvas allocations and GPU work are not observable here.
  */
 export class CanvasCandidate {
-  private readonly context: CanvasRenderingContext2D;
+  private readonly context: CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D;
   private readonly paths: Path2D[];
   private readonly frozenPaths: {path:Path2D;color:number}[]=[];
   private readonly frozenOverlay: {path:Path2D;color:number}[]=[];
@@ -23,8 +23,8 @@ export class CanvasCandidate {
   submissionCalls=0;
   private disposed = false;
   private readonly markerPath=new Path2D();
-  constructor(readonly canvas: HTMLCanvasElement, readonly scene: DrawScene,readonly overlay?:Overlay) {
-    const ctx=canvas.getContext('2d',{alpha:false});
+  constructor(readonly canvas: HTMLCanvasElement|OffscreenCanvas, readonly scene: DrawScene,readonly overlay?:Overlay) {
+    const ctx=canvas.getContext('2d',{alpha:false}) as CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D|null;
     if (!ctx) throw new Error('Canvas 2D unavailable');
     this.markerPath.moveTo(3*markerVertices[0],3*markerVertices[1]);
     for(let i=2;i<markerVertices.length;i+=2)this.markerPath.lineTo(3*markerVertices[i],3*markerVertices[i+1]);

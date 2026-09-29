@@ -38,8 +38,8 @@ export class WebglCandidate {
   uploadBytes=0;
   readonly gpuBytes: number;
   drawCalls: number;
-  constructor(readonly canvas: HTMLCanvasElement, readonly scene: DrawScene,readonly overlay?:Overlay) {
-    const gl=canvas.getContext('webgl2',{antialias:true,depth:false,stencil:false,preserveDrawingBuffer:false});
+  constructor(readonly canvas: HTMLCanvasElement|OffscreenCanvas, readonly scene: DrawScene,readonly overlay?:Overlay) {
+    const gl=canvas.getContext('webgl2',{antialias:true,depth:false,stencil:false,preserveDrawingBuffer:false}) as WebGL2RenderingContext|null;
     if (!gl) throw new Error('WebGL 2 unavailable');
     this.gl=gl;
     const program=gl.createProgram();
