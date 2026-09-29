@@ -53,7 +53,8 @@ try{
         executedSteps:Array.from(trace.steps).reduce((sum,steps)=>sum+steps,0)};
     });
     const timing=result.report.presentation;
-    assert.equal(result.report.state,'running',JSON.stringify(result.report));
+    assert.equal(result.report.state,'running',
+      JSON.stringify(result.report,(_key,value)=>typeof value==='bigint'?String(value):value));
     assert.equal(timing.calibrated,true);
     assert.equal(timing.calibratedIntervals,240);
     assert.equal(timing.divisor,2);
