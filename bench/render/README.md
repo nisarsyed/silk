@@ -224,6 +224,9 @@ latency gate evaluable without qualified timestamp precision and physical
 device conditions.
 
 `collect.html` is the local field-recorder page for physical comparison runs.
+Before each trial it fetches the current build manifest without using the
+browser cache and rejects an older tab's modules, which would otherwise produce
+mixed-revision measurements after rebuilding the served directory.
 It selects base, diagnostic, frozen render-only, frozen diagnostic, sustained
 mobile or interaction profiles through the same `runStudy` collector. The page
 locks the contract-specific scene, copies, sleep and layout fields where

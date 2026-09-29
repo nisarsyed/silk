@@ -81,6 +81,12 @@ try{
     await page.goto(`http://127.0.0.1:${server.address().port}/collect.html?smoke=1`);
     await page.locator('#device').fill('reference desktop');
     await page.locator('#power').selectOption('plugged');
+    await page.route('**/provenance.json?check=*',route=>route.fulfill({status:200,body:'{}'}));
+    await page.locator('#start').click();
+    await page.waitForFunction(()=>document.getElementById('phase').textContent==='SETUP ERROR');
+    assert.match(await page.locator('#detail').textContent(),/Collector assets are stale/);
+    assert.equal(await page.locator('#start').isEnabled(),true);
+    await page.unroute('**/provenance.json?check=*');
     const rotations=[['canvas','webgl','raylib'],['webgl','raylib','canvas'],
       ['raylib','canvas','webgl'],['canvas','raylib','webgl'],['raylib','webgl','canvas']];
     const choices=[
