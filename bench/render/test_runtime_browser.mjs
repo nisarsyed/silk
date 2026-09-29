@@ -54,6 +54,12 @@ try{
           await wait(()=>owner.report().steps===held+1);
           if(!owner.reset('chains',true))throw new Error('Reset failed');
           const reset=owner.report();
+          for(let i=0;i<8;++i){
+            if(!owner.reset('pyramid',false)||!owner.reset('chains',true))
+              throw new Error('Repeated reset failed');
+            if(owner.report().memory.allocatorUsedBytes!==reset.memory.allocatorUsedBytes)
+              throw new Error('Repeated reset retained native allocation');
+          }
           if(!owner.resize('mobile'))throw new Error('Resize failed');
           const mobile=[canvas.width,canvas.height];
           if(!owner.resume())throw new Error('Resume failed');

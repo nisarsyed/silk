@@ -195,7 +195,82 @@ static void force_rejection_stops_before_step(void)
     sl_render_study_destroy(study);
 }
 
+static void user_spawn_profile(void)
+{
+    const uint32_t fixtures[] = { 0u, 1u, 3u };
+    SL_EXPECT(sl_render_study_create_user(2u, 0u, 1u) == NULL);
+    SL_EXPECT(sl_render_study_create_user(0u, 2u, 1u) == NULL);
+    SL_EXPECT(sl_render_study_create_user(0u, 0u, 0u) == NULL);
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        sl_render_study *user =
+            sl_render_study_create_user(fixtures[i], 0u, UINT32_MAX);
+        sl_render_study *base = sl_render_study_create(fixtures[i], 1u, 0u, 4u);
+        SL_EXPECT(user != NULL && base != NULL);
+        if (user == NULL || base == NULL) {
+            sl_render_study_destroy(user);
+            sl_render_study_destroy(base);
+            continue;
+        }
+        const uint32_t *status = sl_render_study_status(user);
+        SL_EXPECT_INT_EQ(status[5], 4096u);
+        SL_EXPECT_INT_EQ(status[6], 32768u);
+        SL_EXPECT_INT_EQ(status[7], 96u);
+        sl_world *world = sl_render_study_world(user);
+        const sl_world *original = sl_render_study_world(base);
+        const uint32_t initial = sl_world_body_count(original);
+        SL_EXPECT_INT_EQ(sl_world_body_count(world), initial);
+        SL_EXPECT_INT_EQ(sl_world_joint_count(world),
+                         sl_world_joint_count(original));
+        for (uint32_t row = 0u; row < initial; ++row) {
+            const sl_vec2 a = sl_world_body_get_position(
+                original, sl_world_body_at(original, row));
+            const sl_vec2 b =
+                sl_world_body_get_position(world, sl_world_body_at(world, row));
+            SL_EXPECT(a.x == b.x && a.y == b.y);
+        }
+        SL_EXPECT(!sl_render_study_spawn(base, 0u, 0.0f, 20.0f));
+        SL_EXPECT(!sl_render_study_spawn(user, 2u, 0.0f, 20.0f));
+        SL_EXPECT(!sl_render_study_spawn(user, 0u, NAN, 20.0f));
+        SL_EXPECT(!sl_render_study_spawn(user, 0u, 0.0f, INFINITY));
+        SL_EXPECT_INT_EQ(sl_world_body_count(world), initial);
+        SL_EXPECT(sl_render_study_spawn(user, 0u, 0.0f, 20.0f));
+        SL_EXPECT(sl_render_study_spawn(user, 1u, 1.0f, 20.0f));
+        SL_EXPECT_INT_EQ(sl_world_body_count(world), initial + 2u);
+        const sl_shape *circle =
+            sl_world_body_get_shape(world, sl_world_body_at(world, initial));
+        const sl_shape *box = sl_world_body_get_shape(
+            world, sl_world_body_at(world, initial + 1u));
+        SL_EXPECT_INT_EQ(circle->kind, SL_SHAPE_CIRCLE);
+        SL_EXPECT_NEAR(circle->circle.radius, 0.18f, 1e-6f);
+        SL_EXPECT_INT_EQ(box->kind, SL_SHAPE_POLYGON);
+        SL_EXPECT_NEAR(box->polygon.vertices[0].x,
+                       -0.5f * sqrtf(SL_PI * 0.18f * 0.18f), 1e-6f);
+        SL_EXPECT(sl_render_study_step(user));
+        SL_EXPECT(sl_render_study_validate(user));
+        sl_render_study_destroy(user);
+        sl_render_study_destroy(base);
+    }
+    sl_render_study *full = sl_render_study_create_user(0u, 0u, 2u);
+    SL_EXPECT(full != NULL);
+    if (full != NULL) {
+        sl_world *world = sl_render_study_world(full);
+        while (sl_world_body_count(world) < 4096u) {
+            const float x = (float)sl_world_body_count(world) * 0.5f;
+            const bool made = sl_render_study_spawn(full, 0u, x, 20.0f);
+            SL_EXPECT(made);
+            if (!made) {
+                break;
+            }
+        }
+        SL_EXPECT(!sl_render_study_spawn(full, 0u, 0.0f, 20.0f));
+        SL_EXPECT_INT_EQ(sl_world_body_count(world), 4096u);
+        sl_render_study_destroy(full);
+    }
+}
+
 static const sl_test_case k_cases[] = {
+    { "user interaction preserves fixtures and stops at fixed body capacity",
+      user_spawn_profile },
     { "force rejection is latched before simulation mutation",
       force_rejection_stops_before_step },
     { "tether matches public force/torque once per step in all default "

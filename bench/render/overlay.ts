@@ -10,6 +10,9 @@ export const markerTriangles=new Float32Array((circleSides-2)*6);
 for(let i=1;i<circleSides-1;++i) markerTriangles.set([markerVertices[0],markerVertices[1],
   markerVertices[2*i],markerVertices[2*i+1],markerVertices[2*i+2],markerVertices[2*i+3]],(i-1)*6);
 export interface DiagnosticColumns {readonly valid:boolean;readonly floats:Float32Array;readonly words:Uint32Array}
+export interface OverlayFlags {readonly contacts:boolean;readonly proxies:boolean;readonly joints:boolean;
+  readonly queries:boolean;readonly islands:boolean}
+export const allOverlayFlags:OverlayFlags=Object.freeze({contacts:true,proxies:true,joints:true,queries:true,islands:true});
 
 /** Developer comparison commands in drawing-buffer pixels. Fixed payload:
  * 20 bytes/line, 12 bytes/marker, 4 bytes/body color. Capacities cover all
@@ -21,6 +24,7 @@ export class Overlay {
   readonly markers:Float32Array;
   readonly bodyColors:Float32Array;
   private readonly rows:Uint32Array;
+  private flags:OverlayFlags=allOverlayFlags;
   readonly view;
   lineCount=0;markerCount=0;revision=0;
   constructor(readonly scene:DrawScene,readonly bodyCapacity:number,readonly contactCapacity:number,
@@ -31,6 +35,11 @@ export class Overlay {
     this.lines=new Float32Array(5*(4*bodyCapacity+2*contactCapacity+jointCapacity+6));
     this.markers=new Float32Array(3*(2*contactCapacity+2*jointCapacity+2));
     this.rows=new Uint32Array(bodyCapacity);this.bodyColors=new Float32Array(scene.count);this.view=camera(scene.rect,width,height);
+  }
+  setFlags(flags:OverlayFlags):void {
+    if(!flags||Object.keys(allOverlayFlags).some(key=>typeof flags[key as keyof OverlayFlags]!=='boolean'))
+      throw new TypeError('Invalid overlay flags');
+    this.flags={...flags};
   }
   protected line(ax:number,ay:number,bx:number,by:number,color:number):void {
     const at=this.lineCount*5;
@@ -66,13 +75,13 @@ export class Overlay {
     for(let row=0;row<snapshot.bodyCount;++row)this.rows[b.index[row]]=row;
     for(let i=0;i<this.scene.count;++i) {
       const row=this.scene.rows[i],slot=b.index[row];
-      this.bodyColors[i]=b.type[row]===2?0:!b.awake[row]?2:b.island[row]===0xffffffff?1:3+b.island[row]%8;
-      if(w[slot]&8) {
+      this.bodyColors[i]=b.type[row]===2?0:!this.flags.islands?1:!b.awake[row]?2:b.island[row]===0xffffffff?1:3+b.island[row]%8;
+      if(this.flags.proxies&&(w[slot]&8)) {
         const lx=d[slot],ly=d[n+slot],ux=d[2*n+slot],uy=d[3*n+slot],code=w[slot]&7?15:13;
         this.line(lx,ly,ux,ly,code);this.line(ux,ly,ux,uy,code);this.line(ux,uy,lx,uy,code);this.line(lx,uy,lx,ly,code);
       }
     }
-    for(let row=0;row<snapshot.contactCount;++row) {
+    for(let row=0;this.flags.contacts&&row<snapshot.contactCount;++row) {
       if(c.pointCount[row]>2)throw new Error('Invalid contact point count');
       for(let p=0;p<c.pointCount[row];++p) {
         const x=p===0?c.pointX0[row]:c.pointX1[row],y=p===0?c.pointY0[row]:c.pointY1[row];
@@ -81,7 +90,7 @@ export class Overlay {
         this.marker(x,y,11);
       }
     }
-    for(let row=0;row<snapshot.jointCount;++row) {
+    for(let row=0;this.flags.joints&&row<snapshot.jointCount;++row) {
       const a=this.rows[j.bodyAIndex[row]],z=this.rows[j.bodyBIndex[row]];
       if(a===0xffffffff||z===0xffffffff||b.generation[a]!==j.bodyAGeneration[row]||b.generation[z]!==j.bodyBGeneration[row])
         throw new Error('Joint endpoint missing from snapshot');
@@ -91,7 +100,8 @@ export class Overlay {
       const by=b.y[z]+b.sin[z]*j.anchorBX[row]+b.cos[z]*j.anchorBY[row];
       this.line(ax,ay,bx,by,14);this.marker(ax,ay,14);this.marker(bx,by,14);
     }
-    this.queries(diagnostics);this.complete();
+    if(this.flags.queries)this.queries(diagnostics);
+    this.complete();
   }
   protected queries(diagnostics:DiagnosticColumns):void {
     const d=diagnostics.floats,w=diagnostics.words,n=this.bodyCapacity;

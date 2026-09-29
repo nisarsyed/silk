@@ -4,6 +4,9 @@ This directory belongs to [#95](https://github.com/nisarsyed/silk/issues/95).
 It currently contains three **base and diagnostic correctness prototypes** and
 their shared geometry checks. No renderer is selected. This is developer tooling,
 excluded from the independent package and from any production sandbox.
+The provisional Canvas 2D/main-thread sandbox is also assembled here while the
+renderer and worker comparisons are deferred. It uses a distinct user-spawning
+profile and does not change any frozen benchmark configuration or quality gate.
 The frozen [browser contract](../../docs/browser-contract.md) remains binding.
 
 ## Build and verify
@@ -35,6 +38,7 @@ node bench/render/test_gl_stats.mjs
 node bench/render/test_windows.mjs
 node bench/render/test_runner.mjs
 node bench/render/test_input_browser.mjs
+node bench/render/test_sandbox_browser.mjs build/render-study chromium
 node bench/render/test_hud.mjs
 node bench/render/test_browser.mjs
 ```

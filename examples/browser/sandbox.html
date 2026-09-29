@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./sandbox.css">
+<title>Silk — Motion lab</title>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./sandbox.html" aria-label="Silk motion lab home"><span class="brand-mark">S<span>/</span></span><span>silk<span class="brand-dot">.</span></span></a>
+    <span class="topbar-label">A SMALL PHYSICS LAB <span aria-hidden="true">/</span> WEBASSEMBLY</span>
+    <span id="connection" class="connection" role="status"><span class="status-light"></span> Loading engine</span>
+  </header>
+  <main class="workspace">
+    <section class="intro" aria-labelledby="title">
+      <p class="eyebrow">01 / PLAYGROUND</p>
+      <h1 id="title">Make room<br>for motion<span>.</span></h1>
+      <p class="intro-copy">A live 2D world, running in WebAssembly. Drag a body, switch the scene, or step through a moment of motion.</p>
+      <div class="engine-note"><span class="rule"></span><span>FIXED STEP&nbsp; 1/60 S<br>FOUR SOLVER SUBSTEPS</span></div>
+    </section>
+    <section class="lab" aria-label="Interactive physics canvas">
+      <div class="lab-head"><span><span class="lab-live"></span> LIVE VIEW</span><span id="scene-label">PYRAMID / 01</span></div>
+      <div class="viewport"><canvas id="world" aria-label="Drag dynamic bodies in the Silk physics world"></canvas><div class="viewport-corner top-left" aria-hidden="true"></div><div class="viewport-corner bottom-right" aria-hidden="true"></div></div>
+      <div class="mobile-spawn"><button type="button" data-spawn="0" aria-pressed="false">Circle</button><button type="button" data-spawn="1" aria-pressed="false">Box</button><small id="mobile-spawn-hint">Choose a shape, then tap the world.</small></div>
+      <div class="lab-foot"><span>DRAG TO INTERACT</span><span id="layout-label">1280 × 720</span></div>
+    </section>
+    <aside class="desk" aria-label="Simulation controls">
+      <section class="desk-section scene-section">
+        <div class="section-head"><span>01</span><h2>World</h2></div>
+        <div class="scene-list" role="group" aria-label="Scene">
+          <button class="scene-choice active" type="button" data-scene="pyramid" aria-pressed="true"><span class="scene-index">01</span><span>Pyramid<small>A resting stack</small></span><span class="scene-arrow" aria-hidden="true">↗</span></button>
+          <button class="scene-choice" type="button" data-scene="rain" aria-pressed="false"><span class="scene-index">02</span><span>Rain<small>Two thousand falling bodies</small></span><span class="scene-arrow" aria-hidden="true">↗</span></button>
+          <button class="scene-choice" type="button" data-scene="chains" aria-pressed="false"><span class="scene-index">03</span><span>Chains<small>Linked movement</small></span><span class="scene-arrow" aria-hidden="true">↗</span></button>
+        </div>
+      </section>
+      <section class="desk-section transport-section">
+        <div class="section-head"><span>02</span><h2>Motion</h2></div>
+        <div class="transport"><button id="toggle" class="transport-primary" type="button" disabled>Pause</button><button id="step" type="button" disabled>Step once</button><button id="reset" type="button" disabled>Reset</button></div>
+        <div class="spawn"><span>PLACE A BODY</span><div class="spawn-buttons"><button type="button" data-spawn="0" aria-pressed="false">Circle</button><button type="button" data-spawn="1" aria-pressed="false">Box</button></div><small id="spawn-hint">Choose a shape, then tap the world.</small></div>
+        <label class="switch-row" for="sleep"><span>Let bodies sleep<small>Quieter when still</small></span><input id="sleep" type="checkbox"><span class="switch-track" aria-hidden="true"></span></label>
+      </section>
+      <section class="desk-section telemetry-section">
+        <div class="section-head"><span>03</span><h2>Telemetry</h2></div>
+        <dl class="telemetry"><div><dt>SIMULATION STEPS</dt><dd id="steps">0</dd></div><div><dt>BODIES / CONTACTS</dt><dd id="counts">—</dd></div><div><dt>PAIR PROBES</dt><dd id="work">0</dd></div><div><dt>TIME DROPPED</dt><dd id="dropped">0.00 s</dd></div><div><dt>WASM MEMORY</dt><dd id="memory">—</dd></div></dl>
+        <p id="mode-note" class="mode-note">Canvas 2D · main thread<br>Fixed-step WebAssembly physics.</p>
+      </section>
+      <details class="desk-section diagnostics-section"><summary><span>04</span><strong>View details</strong><span class="detail-toggle">OPEN +</span></summary>
+        <p>These overlays show the engine’s current state. Each layer adds work to the frame.</p>
+        <div class="diagnostic-grid">
+          <label><input type="checkbox" data-overlay="contacts"> Contacts</label>
+          <label><input type="checkbox" data-overlay="proxies"> Bounds</label>
+          <label><input type="checkbox" data-overlay="joints"> Joints</label>
+          <label><input type="checkbox" data-overlay="queries"> Queries</label>
+          <label><input type="checkbox" data-overlay="islands"> Islands &amp; sleep</label>
+        </div>
+      </details>
+    </aside>
+  </main>
+  <div id="notice" class="notice" role="alert" hidden><strong id="notice-title"></strong><span id="notice-detail"></span><button id="recover" type="button" hidden>Restart world</button></div>
+  <footer class="footer"><span>SILK / EXPERIMENT 05</span><span id="revision">BUILD —</span><span>FINITE WORLDS, OPEN QUESTIONS</span></footer>
+  <script type="module" src="./sandbox.mjs"></script>
+</body>
+</html>

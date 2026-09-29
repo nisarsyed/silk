@@ -95,6 +95,7 @@ jobs:
             "${browser_command[@]}" bench/render/test_runtime_controller_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_input_trace_browser.mjs "build/render-study-$mode" "$engine"
             "${browser_command[@]}" bench/render/test_pointer_adapter_browser.mjs "build/render-study-$mode" "$engine"
+            "${browser_command[@]}" bench/render/test_sandbox_browser.mjs "build/render-study-$mode" "$engine"
           done
           node bench/render/test_geometry.mjs "build/render-study-$mode"
           node bench/render/test_overlay.mjs "build/render-study-$mode"

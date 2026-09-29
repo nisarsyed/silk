@@ -17,14 +17,16 @@ struct sl_render_study {
     uint32_t pointer_status[3];
     sl_vec2 grab_local;
     sl_vec2 grab_target;
+    bool user_mode;
     bool failed;
 };
-sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
-                                        uint32_t sleep_enabled,
-                                        uint32_t step_limit)
+static sl_render_study *create_study(uint32_t fixture, uint32_t copies,
+                                     uint32_t sleep_enabled,
+                                     uint32_t step_limit, bool user_mode)
 {
     if (sleep_enabled > 1u || step_limit == 0u ||
-        step_limit > SL_RENDER_STEP_COUNT_MAX) {
+        (!user_mode && step_limit > SL_RENDER_STEP_COUNT_MAX) ||
+        (user_mode && copies != 1u)) {
         return NULL;
     }
     sl_render_study *study = calloc(1u, sizeof(*study));
@@ -32,10 +34,15 @@ sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
         return NULL;
     }
     study->pointer_status[1] = UINT32_MAX;
+    study->user_mode = user_mode;
     sl_wasm_context *adapter = &study->adapter;
-    if (!sl_render_scene_build(&adapter->world, &adapter->config, fixture,
-                               copies, sleep_enabled != 0u) ||
-        !sl_wasm_storage_init(adapter)) {
+    const bool built =
+        user_mode
+            ? sl_render_scene_build_user(&adapter->world, &adapter->config,
+                                         fixture, sleep_enabled != 0u)
+            : sl_render_scene_build(&adapter->world, &adapter->config, fixture,
+                                    copies, sleep_enabled != 0u);
+    if (!built || !sl_wasm_storage_init(adapter)) {
         sl_render_study_destroy(study);
         return NULL;
     }
@@ -97,6 +104,18 @@ sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
         return NULL;
     }
     return study;
+}
+sl_render_study *sl_render_study_create(uint32_t fixture, uint32_t copies,
+                                        uint32_t sleep_enabled,
+                                        uint32_t step_limit)
+{
+    return create_study(fixture, copies, sleep_enabled, step_limit, false);
+}
+sl_render_study *sl_render_study_create_user(uint32_t fixture,
+                                             uint32_t sleep_enabled,
+                                             uint32_t step_limit)
+{
+    return create_study(fixture, 1u, sleep_enabled, step_limit, true);
 }
 void sl_render_study_destroy(sl_render_study *study)
 {
@@ -395,4 +414,33 @@ bool sl_render_study_pointer(sl_render_study *study, uint32_t action, float x,
 const uint32_t *sl_render_study_pointer_status(const sl_render_study *study)
 {
     return study != NULL ? study->pointer_status : NULL;
+}
+bool sl_render_study_spawn(sl_render_study *study, uint32_t kind, float x,
+                           float y)
+{
+    if (study == NULL || study->failed || !study->user_mode || kind > 1u ||
+        study->status[4] >= study->status[3] || !isfinite(x) || !isfinite(y) ||
+        fabsf(x) > SL_POSITION_ABS_MAX || fabsf(y) > SL_POSITION_ABS_MAX ||
+        sl_world_body_count(&study->adapter.world) >=
+            study->adapter.config.body_capacity) {
+        return false;
+    }
+    sl_shape shape = sl_shape_none();
+    // Match the native sandbox's 1 kg areal density: a 0.18 m circle and
+    // an equal-area box with half-side sqrt(pi * radius^2) / 2.
+    const float radius = 0.18f;
+    const float half_side = 0.5f * sqrtf(SL_PI * radius * radius);
+    const bool made = kind == 0u
+                          ? sl_shape_make_circle(radius, &shape)
+                          : sl_shape_make_box(half_side, half_side, &shape);
+    if (!made) {
+        return false;
+    }
+    const sl_body_desc desc = { .position = { x, y },
+                                .mass = 1.0f,
+                                .friction = 0.6f,
+                                .restitution = 0.1f,
+                                .shape = &shape };
+    return !sl_body_handle_is_null(
+        sl_world_body_create(&study->adapter.world, &desc));
 }
