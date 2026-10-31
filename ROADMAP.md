@@ -97,9 +97,12 @@ Make what exists fast, in a form the future core can reuse.
 ### Milestone 4 — Core and rigid bodies
 
 Rigid bodies are the backbone of a general-purpose engine and the second
-module that defines the core.
+module that defines the core. Threading (Milestone 3) lands first, so the
+rigid solver is designed against it.
 
-- [ ] Research: survey rigid-body solvers that fit the block-descent core, with Augmented VBD (SIGGRAPH 2025) as the lead candidate, and prototype the close calls head to head
+- [x] Research: rigid-body solvers surveyed, with claims checked against independent evidence ([docs/rigid.md](docs/rigid.md)). AVBD is not adopted on the evidence alone: its joints and coupling are strong, but its paper parameters are tuned to one set of units and its contact stability on a CPU is unproven against Soft Step.
+- [ ] Collision foundation shared by either solver: convex contact generation (box first), contacts persisting across steps, and a broad phase over bodies
+- [ ] Head-to-head at equal CPU time: VBD-family rigid bodies (compliant augmented Lagrangian) against Soft Step, decided by the rule in [docs/rigid.md](docs/rigid.md#proposed-experiment). If Soft Step wins, rigid bodies are a second solver coupled to cloth by staggering.
 - [ ] Split the code into the core and a cloth module, with rigid bodies as the second consumer
 - [ ] Rigid bodies: box, sphere, capsule, and convex-hull shapes; mass properties; contact with friction; stable stacking
 - [ ] Joints: ball, hinge, prismatic, and fixed, with limits and motors
