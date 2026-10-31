@@ -45,8 +45,8 @@ SANDBOX = (
     'src/CMakeLists.txt',
 )
 
-# Changes to CI itself run the full tier, so the new configuration is
-# exercised everywhere before it guards main.
+# Changes to CI itself run the full tier and the sandbox builds, so every job
+# of the new configuration runs before it guards main.
 CI = (
     '.github/workflows/*',
     'tools/ci_changes.py',
@@ -63,8 +63,9 @@ def plan(files, full):
         code, sandbox, full = True, True, True
     else:
         code = any(not matches(path, DOCS) for path in files)
-        sandbox = any(matches(path, SANDBOX) for path in files)
-        full = full or any(matches(path, CI) for path in files)
+        ci = any(matches(path, CI) for path in files)
+        sandbox = ci or any(matches(path, SANDBOX) for path in files)
+        full = full or ci
     if not code:
         sandbox = False
     return {
@@ -108,7 +109,8 @@ def self_test():
         (['examples/sandbox/main.c'], True,
          dict(full=True, sandbox=['sandbox', 'sandbox-release'])),
         (['.github/workflows/ci.yml'], False,
-         dict(code=True, full=True, linux_release=['gcc', 'clang'])),
+         dict(code=True, full=True, linux_release=['gcc', 'clang'],
+              sandbox=['sandbox', 'sandbox-release'])),
         (['tools/check_format.py'], False, dict(code=True, full=False)),
         (['bench/new_kind_of_file.xyz'], False, dict(code=True)),
         (['docs/solver.md'], True, dict(code=False, full=False)),

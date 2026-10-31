@@ -108,6 +108,12 @@ request templates, `.gitignore`) skip every build. Any other file triggers the
 builds, so a new kind of file is checked by default. The `CI result` job
 aggregates the others and is the only required check.
 
+CI's debug builds are optimized with assertions kept: `-O1` for GCC and Clang,
+and `/O2` for MSVC's Debug configuration. Unoptimized, the physics tests and
+benchmark run 14–17 times slower, and no check depends on `-O0`. The local
+`debug` preset stays at `-O0` for debugging. The `sanitize` preset builds at
+`-O1`, as AddressSanitizer recommends.
+
 Add the `full-ci` label to a pull request whose risk is platform-specific:
 threading, floating-point or determinism changes, compiler-sensitive code, or
 anything that touches the Windows or macOS build. A failure on `main` from the
