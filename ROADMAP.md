@@ -91,7 +91,7 @@ Make what exists fast, in a form the future core can reuse.
 - [ ] Deterministic threading within a color, with results identical to the serial order
 - [ ] Cheaper dense piles: fewer redetections and parallel detection
 - [ ] SIMD for the membrane and bending kernels, kept only if measurement shows a gain
-- [ ] Shorter MSVC CI runs (about 15 minutes, against 3–6 minutes elsewhere)
+- [x] Faster CI: change-aware quick and full tiers, and optimized debug and sanitizer builds
 - [ ] Contact debug drawing in the sandbox
 
 ### Milestone 4 — Core and rigid bodies
