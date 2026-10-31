@@ -93,6 +93,26 @@ Use this verification matrix:
 | Sandbox or public headers affecting it | `sandbox` and `sandbox-release` builds |
 | Documentation only | Check links, commands, and consistency with source files |
 
+### Continuous integration
+
+CI runs in two tiers, chosen per run by `tools/ci_changes.py` from the changed
+files:
+
+| Tier | When | Jobs |
+| --- | --- | --- |
+| Quick | Pull requests | clang-format; gcc debug tests, consumer checks, and benchmark determinism; clang release tests; asan+ubsan; an MSVC `/W4 /WX` build; the `sandbox-release` build when the sandbox, public headers, or build files change |
+| Full | Pushes to `main`, manual runs, pull requests labelled `full-ci`, and changes to CI itself | All of the above, plus clang debug and gcc release on Linux, macOS, the MSVC test run, and the `sandbox` build |
+
+Changes limited to documentation (`*.md`, `docs/`, the license, issue and pull
+request templates, `.gitignore`) skip every build. Any other file triggers the
+builds, so a new kind of file is checked by default. The `CI result` job
+aggregates the others and is the only required check.
+
+Add the `full-ci` label to a pull request whose risk is platform-specific:
+threading, floating-point or determinism changes, compiler-sensitive code, or
+anything that touches the Windows or macOS build. A failure on `main` from the
+full tier is fixed before other work lands.
+
 Record the exact checks and results in the pull request.
 
 ## Test framework

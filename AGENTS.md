@@ -88,6 +88,12 @@ Run checks in proportion to the change:
   `sandbox` and `sandbox-release`. The sandbox requires network access while
   configuring raylib and is compile-checked rather than executed in CI.
 
+On pull requests, CI runs a quick tier that skips macOS, the MSVC test run,
+and some compiler and build-type combinations; pushes to `main` run
+everything (see CONTRIBUTING.md, Continuous integration). Label a pull request
+`full-ci` when the change is platform-, compiler-, or determinism-sensitive.
+Do not rely on CI in place of the local checks above.
+
 Never weaken assertions, tests, warnings, tolerances, or explicit limits to
 make a change pass. If a check is wrong, fix it explicitly and explain why.
 

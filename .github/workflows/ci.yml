@@ -1,17 +1,67 @@
 name: CI
 
+# Two tiers, chosen by tools/ci_changes.py (see CONTRIBUTING.md):
+#
+# - quick, on pull requests: clang-format, gcc debug tests, clang release
+#   tests, asan+ubsan, an MSVC /W4 /WX build, and the release sandbox when
+#   the sandbox or public headers change.
+# - full, on pushes to main, manual runs, pull requests labelled `full-ci`,
+#   and changes to CI itself: everything above plus clang debug, gcc
+#   release, macOS, the MSVC test run, and the debug sandbox.
+#
+# Documentation-only changes skip every build. `CI result` aggregates the
+# jobs and is the only required check, so skipped jobs never block a merge.
+
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  # Superseded pull request runs are cancelled; every main commit is checked.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.plan.outputs.code }}
+      full: ${{ steps.plan.outputs.full }}
+      linux_debug: ${{ steps.plan.outputs.linux_debug }}
+      linux_release: ${{ steps.plan.outputs.linux_release }}
+      sandbox: ${{ steps.plan.outputs.sandbox }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: python3 tools/ci_changes.py --self-test
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+        run: |
+          case "$EVENT" in
+            pull_request)
+              flags=""
+              [ "$FULL_LABEL" = "true" ] && flags="--full"
+              python3 tools/ci_changes.py --base "$PR_BASE" --head "$PR_HEAD" $flags ;;
+            push)
+              python3 tools/ci_changes.py --base "$PUSH_BASE" --head "$GITHUB_SHA" --full ;;
+            *)
+              python3 tools/ci_changes.py --all ;;
+          esac
+
   format:
     name: clang-format
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -22,11 +72,13 @@ jobs:
 
   linux:
     name: ${{ matrix.cc }} / ubuntu
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        cc: [gcc, clang]
+        cc: ${{ fromJSON(needs.changes.outputs.linux_debug) }}
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cc == 'gcc' && 'g++' || 'clang++' }}
@@ -53,11 +105,13 @@ jobs:
 
   linux-release:
     name: ${{ matrix.cc }} / release / ubuntu
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        cc: [gcc, clang]
+        cc: ${{ fromJSON(needs.changes.outputs.linux_release) }}
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cc == 'gcc' && 'g++' || 'clang++' }}
@@ -83,8 +137,54 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+  sanitize:
+    name: asan+ubsan / ubuntu
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --preset sanitize
+      - run: cmake --build --preset sanitize
+      - run: ctest --preset sanitize
+
+  windows:
+    name: msvc / windows
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      # The quick tier builds with /W4 /WX, which catches MSVC-only
+      # warnings in a few minutes; the full tier also runs the tests,
+      # which take about 15 minutes under MSVC Debug.
+      - run: cmake --preset windows -DSL_BUILD_BENCH=ON
+      - run: cmake --build --preset windows
+      - if: needs.changes.outputs.full == 'true'
+        run: ctest --preset windows
+      - if: needs.changes.outputs.full == 'true'
+        run: python tools/check_consumer.py --output build/consumer-reports --config Debug
+      - if: needs.changes.outputs.full == 'true'
+        run: build/windows/bin/Debug/sl_bench.exe --warmup 2 --steps 8
+      - uses: actions/upload-artifact@v7
+        if: always() && needs.changes.outputs.full == 'true'
+        with:
+          name: consumer-reports-${{ github.job }}-${{ github.sha }}
+          path: |
+            build/consumer-reports/checks.log
+            build/consumer-reports/summary.json
+          retention-days: 14
+          if-no-files-found: warn
+
   macos:
     name: clang / macos
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -107,53 +207,21 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  windows:
-    name: msvc / windows
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
-      - run: cmake --preset windows -DSL_BUILD_BENCH=ON
-      - run: cmake --build --preset windows
-      - run: ctest --preset windows
-      - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
-      - run: build/windows/bin/Debug/sl_bench.exe --warmup 2 --steps 8
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: consumer-reports-${{ github.job }}-${{ github.sha }}
-          path: |
-            build/consumer-reports/checks.log
-            build/consumer-reports/summary.json
-          retention-days: 14
-          if-no-files-found: warn
-
-  sanitize:
-    name: asan+ubsan / ubuntu
-    runs-on: ubuntu-latest
-    env:
-      CC: clang
-    steps:
-      - uses: actions/checkout@v7
-      - run: cmake --preset sanitize
-      - run: cmake --build --preset sanitize
-      - run: ctest --preset sanitize
-
   sandbox:
     name: sandbox / ubuntu (${{ matrix.preset }})
+    needs: changes
+    if: needs.changes.outputs.sandbox != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # Both build types, because they compile different code. SL_ASSERT
-        # vanishes under NDEBUG, so a debug-only job cannot see a call left
-        # inside one -- the side effect silently stops happening -- nor a
-        # parameter or local the assert was its only reader, which
-        # -Werror=unused-parameter then rejects. Neither shows up in the
-        # library jobs above: this compiles the interactive example.
-        preset: [sandbox, sandbox-release]
+        # Both build types on the full tier, because they compile different
+        # code. SL_ASSERT vanishes under NDEBUG, so a debug-only job cannot
+        # see a call left inside one -- the side effect silently stops
+        # happening -- nor a parameter or local the assert was its only
+        # reader, which -Werror=unused-parameter then rejects. The quick
+        # tier builds the release one, which is where those break.
+        preset: ${{ fromJSON(needs.changes.outputs.sandbox) }}
     steps:
       - uses: actions/checkout@v7
       # Raylib's GLFW build needs the X11/GL dev headers even for a
@@ -166,3 +234,20 @@ jobs:
           libxi-dev
       - run: cmake --preset ${{ matrix.preset }}
       - run: cmake --build --preset ${{ matrix.preset }}
+
+  result:
+    name: CI result
+    needs: [changes, format, linux, linux-release, sanitize, windows, macos, sandbox]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+          CODE: ${{ needs.changes.outputs.code }}
+          FULL: ${{ needs.changes.outputs.full }}
+        run: |
+          echo "code changed: $CODE, full tier: $FULL"
+          if [ "$FAILED" = "true" ]; then
+            echo "a required job failed or was cancelled"
+            exit 1
+          fi
