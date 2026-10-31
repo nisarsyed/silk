@@ -1,39 +1,46 @@
-/* Verify the existing extern-C boundary; this is not a C++ engine wrapper. */
+/* Verify the extern-C boundary from C++; this is not a C++ engine wrapper. */
 #include <silk/assert.h>
-#include <silk/body.h>
-#include <silk/contact.h>
-#include <silk/joint.h>
 #include <silk/math.h>
-#include <silk/query.h>
-#include <silk/shape.h>
+#include <silk/mesh.h>
 #include <silk/silk.h>
 #include <silk/step.h>
 #include <silk/world.h>
 
 int main()
 {
-    sl_world world = {};
+    sl_vec3 positions[4] = {};
+    uint32_t indices[6] = {};
+    if (!sl_mesh_grid(sl_vec3_make(0.0f, 1.0f, 0.0f),
+                      sl_vec3_make(1.0f, 0.0f, 0.0f),
+                      sl_vec3_make(0.0f, -1.0f, 0.0f), 1u, 1u, positions, 4u,
+                      indices, 6u)) {
+        return 1;
+    }
     sl_world_config config = {};
-    config.body_capacity = 1u;
+    config.vertex_capacity = 4u;
+    config.triangle_capacity = 2u;
+    config.cloth_capacity = 1u;
+    config.gravity = sl_vec3_make(0.0f, -9.81f, 0.0f);
+    sl_world world = {};
     if (sl_version() != ((SL_VERSION_MAJOR << 16) | (SL_VERSION_MINOR << 8) |
                          SL_VERSION_PATCH) ||
         !sl_world_init(&world, &config)) {
         return 1;
     }
-    sl_shape shape = sl_shape_none();
-    const bool made = sl_shape_make_circle(0.25f, &shape);
-    sl_body_desc desc = {};
-    desc.mass = 1.0f;
-    desc.shape = &shape;
-    const sl_body_handle body = sl_world_body_create(&world, &desc);
+    sl_cloth_desc cloth = {};
+    cloth.positions = positions;
+    cloth.vertex_count = 4u;
+    cloth.indices = indices;
+    cloth.triangle_count = 2u;
+    cloth.density = 0.2f;
+    cloth.membrane_mu = 1000.0f;
+    cloth.membrane_lambda = 1000.0f;
+    cloth.thickness = 0.005f;
+    uint32_t id = 0;
+    const bool added = sl_world_cloth_add(&world, &cloth, &id);
     sl_world_step(&world, 1.0f / 60.0f);
-    sl_query_result matches = {};
-    sl_body_handle found = sl_body_handle_null();
     const bool valid =
-        made && !sl_body_handle_is_null(body) &&
-        sl_world_query_point(&world, sl_vec2_make(0.0f, 0.0f), SL_QUERY_DYNAMIC,
-                             &found, 1u, &matches) &&
-        matches.count == 1u;
+        added && sl_world_cloth_positions(&world, id)[3].y < 0.0f;
     sl_world_destroy(&world);
     return valid ? 0 : 1;
 }

@@ -8,9 +8,12 @@ Project direction and non-goals live in [ROADMAP.md](ROADMAP.md).
 ## Repository map
 
 `include/silk/` contains public headers, `src/` the implementation, `tests/`
-the self-contained test framework and suites, and `examples/sandbox/` the
-optional raylib demo. The root `CMakeLists.txt` defines the static library
-target `silk::silk`.
+the self-contained test framework and suites, `bench/` the deterministic
+benchmark, `examples/headless/` the minimal consumer, and `examples/sandbox/`
+the optional raylib 3D demo. The root `CMakeLists.txt` defines the static
+library target `silk::silk`. `docs/solver.md` records the measured evidence
+behind the solver's design. Read it before changing the initial guess,
+damping, friction, or substep rules.
 
 ## Non-negotiable engine constraints
 
@@ -44,9 +47,9 @@ Apply [TigerStyle](https://tigerstyle.dev/) through these repository rules:
   the expected memory/compute cost when a change materially affects layout or
   complexity.
 - Prefix public APIs with `sl_` and use `snake_case`. Use established domain
-  abbreviations only (`vec2`, `mat2`). Give related names equal-length words
+  abbreviations only (`vec3`, `mat3`). Give related names equal-length words
   where practical so they align. Use big-endian naming:
-  `connection_count_max`, `vec2_length_sq`, and `SL_BODY_COUNT_MAX`.
+  `connection_count_max`, `vec3_length_sq`, and `SL_VERTEX_COUNT_MAX`.
 - Comments document contracts the type system cannot express: units, frames,
   sign conventions, valid ranges, NaN behavior, lifetimes, and invariants.
   Tuned constants need a derivation, source, or test that pins them.

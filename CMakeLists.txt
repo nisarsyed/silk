@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(silk VERSION 0.4.0 LANGUAGES C)
+project(silk VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -52,7 +52,7 @@ if(SL_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# Deterministic rigid-body performance harness: an off-by-default developer
+# Deterministic cloth performance harness: an off-by-default developer
 # executable, never a CTest entry. Wall-clock timing remains outside silk.
 option(SL_BUILD_BENCH "Build the deterministic benchmark executable" OFF)
 if(SL_BUILD_BENCH)

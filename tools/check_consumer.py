@@ -4,10 +4,20 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+
+
+def project_version(root):
+    """Return (major, minor, patch) from project(silk VERSION ...)."""
+    text = (root / 'CMakeLists.txt').read_text()
+    match = re.search(r'project\(silk VERSION (\d+)\.(\d+)\.(\d+)', text)
+    if not match:
+        raise ValueError('project(silk VERSION x.y.z) not found in CMakeLists.txt')
+    return tuple(int(part) for part in match.groups())
 
 
 def main():
@@ -100,9 +110,16 @@ def main():
             # Consumers now have only copied app sources and installed headers.
             options = ['-DCMAKE_PREFIX_PATH=' + str(relocated),
                        '-DSILK_PUBLIC_HEADERS=' + str(relocated / 'include/silk-sdk')]
-            configure(work / 'installed', project, *options, '-DSILK_REQUESTED_VERSION=0.4.0')
+            major, minor, patch = project_version(root)
+            configure(work / 'installed', project, *options,
+                      f'-DSILK_REQUESTED_VERSION={major}.{minor}.{patch}')
             build_consumer(work / 'installed')
-            for version in ('0.3.0', '0.4.1', '0.5.0'):
+            # ExactVersion: an older minor, a newer patch and a newer minor
+            # must all be rejected.
+            rejected = [f'{major}.{minor}.{patch + 1}', f'{major}.{minor + 1}.0']
+            if minor > 0:
+                rejected.insert(0, f'{major}.{minor - 1}.0')
+            for version in rejected:
                 configure(work / ('reject-' + version), project, *options,
                           '-DSILK_REQUESTED_VERSION=' + version, expected=1)
             summary.update({'passed': True, 'headers': headers, 'installed_files': installed,

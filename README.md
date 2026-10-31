@@ -1,47 +1,52 @@
 # silk
 
-A portable, data-oriented physics and simulation engine written in C.
-The core is renderer-independent and has no third-party dependencies.
+A portable, data-oriented 3D cloth simulation engine written in C. The core is
+renderer-independent, deterministic, and has no third-party dependencies.
 
-Silk provides:
+silk simulates triangle-mesh cloth with **Vertex Block Descent** (VBD; Chen et
+al., SIGGRAPH 2024). VBD solves each implicit-Euler step as an energy
+minimization through per-vertex Newton steps, run color by color, so a color
+can be split across workers without changing the result. See
+[docs/solver.md](docs/solver.md) for how the method was chosen, the departures
+from the paper, and the measurements behind them.
 
-- 2D vectors, matrices, rotations, transforms, and AABBs
-- circles and convex polygons with mass, bounds, point, and ray queries
-- a bounded SoA world with generational body and joint handles, with runtime
-  storage allocated at initialization and allocation-free stepping
-- dynamic, kinematic, and static bodies with linear and angular state
-- force, torque, gravity, drag, and substepped semi-implicit Euler integration
-- a deterministic fixed-step API and bounded accumulator helper
-- circle and polygon contact manifolds with stable feature IDs and speculative
-  contacts, backed by a dynamic AABB-tree broad phase and persistent contact pool
-- Soft Step sequential impulses with warm starting, an unbiased relax pass,
-  per-body Coulomb friction, and restitution
-- distance and revolute joints with optional connected-body collision suppression
-- deterministic constraint islands, opt-in whole-island sleeping and wake propagation
-- bounded world queries and copied work/memory diagnostics
-- a raylib collision sandbox and deterministic seven-fixture benchmark executable
+silk provides:
 
-See [ROADMAP.md](ROADMAP.md) for the merged implementation trail and next phase.
+- 3D vectors and 3×3 matrices with a guarded linear solve.
+- Cloth from any manifold triangle mesh: StVK membrane, quadratic isometric
+  bending calibrated to the plate modulus, and lumped mass from areal density.
+- Pinned (kinematic) vertices with targets that move smoothly across substeps,
+  for grabbing, attaching, and animating.
+- Analytic plane, sphere, and capsule colliders with penalty contact and
+  Coulomb friction.
+- Penetration-free self contact and cloth-cloth contact using Offset
+  Geometric Contact (Chen et al., SIGGRAPH 2025), without continuous
+  collision detection. Turn it on with `self_contact_capacity`.
+- Gravity, wind, and quadratic aerodynamic drag, plus edge stretch damping
+  that never damps rigid motion.
+- Automatic substepping from each cloth's stiffness, with the substep count
+  reported in the world stats.
+- A bounded world allocated once at initialization; stepping never allocates.
+- A deterministic fixed-step API and a bounded accumulator helper.
+- A raylib 3D sandbox, a deterministic benchmark, and a headless example.
 
-## Version 0.4.0
+See [ROADMAP.md](ROADMAP.md) for direction and next milestones.
 
-Phase 4 completes replay regression coverage, private world ownership, spatial
-queries, work/memory diagnostics, deterministic islands, opt-in sleeping,
-sandbox inspection, and a relocatable static CMake package. The measured
-optimization skips empty joint stages; experimental query compaction, explicit
-SIMD, and alternative solver ordering were not adopted. See the
-[benchmark decisions](docs/benchmarks.md) for evidence and limitations.
+## Version 0.1.0
+
+0.1.0 is the first development version of silk as a 3D cloth engine. It was
+rewritten from scratch over an earlier 2D rigid-body engine that reached
+0.4.0 in git history but was never released, so numbering restarts. Nothing
+from the 2D API remains. Until 1.0, the API may change between versions.
 
 ## Requirements
 
-- CMake 3.28 or newer
-- A C17 compiler
-- Git and network access only when configuring the optional sandbox, which
-  fetches raylib 6.0
+- CMake 3.28 or newer.
+- A C17 compiler.
+- Git and network access, only to configure the optional sandbox, which
+  fetches raylib 6.0.
 
 ## Build and test
-
-Configure, build, and test a debug build:
 
 ```sh
 cmake --preset debug
@@ -49,26 +54,9 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
-The release, sanitizer, and Windows presets use the same workflow:
-
-```sh
-cmake --preset release
-cmake --build --preset release
-ctest --preset release
-
-cmake --preset sanitize
-cmake --build --preset sanitize
-ctest --preset sanitize
-
-cmake --preset windows
-cmake --build --preset windows
-ctest --preset windows
-```
-
-Executables are written to `build/<preset>/bin`. The test binary can also be
-run directly as `./build/debug/bin/sl_tests`.
-
-Available CMake options:
+The `release`, `sanitize`, and `windows` presets use the same three commands.
+Executables are written to `build/<preset>/bin`; the test binary can also run
+directly as `./build/debug/bin/sl_tests`.
 
 | Option | Default | Purpose |
 | --- | --- | --- |
@@ -76,63 +64,43 @@ Available CMake options:
 | `SL_SANITIZERS` | `OFF` | Enable AddressSanitizer and UndefinedBehaviorSanitizer |
 | `SL_SANDBOX` | `OFF` | Fetch raylib and build the interactive sandbox |
 | `SL_BUILD_EXAMPLE` | `OFF` | Build the public headless example |
-| `SL_INSTALL` | top-level only | Install the static library, headers and CMake package |
-| `SL_BUILD_BENCH` | `OFF` | Build `sl_bench`, separate from CTest |
+| `SL_INSTALL` | On at the top level only | Install the static library, headers, and CMake package |
+| `SL_BUILD_BENCH` | `OFF` | Build `sl_bench`, kept separate from CTest |
 
 ## Interactive sandbox
 
-The sandbox is a raylib debug playground for the current engine features. It
-uses metres for simulation, renders at 100 pixels per metre, and steps at 60 Hz.
-On Linux, raylib also needs the platform OpenGL and window-system development
-packages.
-
 ```sh
-cmake --preset sandbox
-cmake --build --preset sandbox
-./build/sandbox/bin/sandbox
+cmake --preset sandbox-release
+cmake --build --preset sandbox-release
+./build/sandbox-release/bin/sandbox
 ```
 
-Use `sandbox-release` in place of `sandbox` to compile the example with release
-settings.
+On Linux, raylib also needs the OpenGL and window-system development packages.
+
+The sandbox has five scenes, all with self contact on: a pleated curtain
+gathered on rings, a sheet draped over a sphere, a flag on a pole, a towel on a rail, and
+a pile of three sheets dropped on a sphere.
 
 Controls:
 
-- Left-drag empty space to spawn and launch a body.
-- Press `B` to switch between circles and boxes.
-- Left-hold a body to wake and tether it; exact shape containment selects the
-  nearest center, with body-slot ties. Off-center grabs apply torque.
-- Press `C` to toggle contact points and normals; gold points are speculative
-  contacts with positive separation.
-- Press `A` to toggle tight shape bounds (yellow) and fat proxies (blue).
-- Press `1`–`4` for playground, settled piles, moving support, or joint chain.
-- Press `S` to toggle sleeping and rebuild the selected scene; sleeping starts on.
-- Press `M` in the support scene to start/stop its fixed-step motion.
-- Press `I` for last-build island colors; sleeping bodies are dim in both modes.
-- Press `Q` to cycle point, closest-ray, and AABB inspection. Right-drag defines
-  rays/boxes; release selects the first result without waking it. Queries show
-  up to eight handles and explicitly report truncation. Picking uses a separate
-  full-capacity buffer, so demo truncation does not restrict selection.
-- Press `J` to spawn a bounded six-link revolute chain anchored at the cursor;
-  joint anchors and connections are drawn automatically.
-- Press `Space` to pause or resume, `.` to step while paused, and `R` to rebuild the selected scene.
+- `1`–`5`: switch scene.
+- `Space`: pause or resume. `S`: single-step while paused. `R`: reset.
+- `W`: toggle wind (magenta arrow).
+- `C`: toggle self contact (reloads the scene).
+- Left-drag: grab and pull the cloth. Releasing it throws it.
+- Right-drag: orbit. Wheel: zoom.
 
-The deterministic default scene combines falling bodies with a ten-row box
-pyramid on colliding static ground. Shapes use friction 0.6 and restitution
-0.1, with four solver substeps per fixed step. The HUD reports body, contact,
-and joint counts/capacities, awake/asleep counts, last-step work and island
-counts, cumulative work/drops, and exact allocated memory plus the owning shell.
-Selected-body values and island diagnostics use copied public accessors. Island
-IDs describe the last completed build and may reflect topology before a mutation;
-they are not persistent handles. Query inspection does not wake bodies.
+The HUD shows the substep count the stiffness rule chose, the milliseconds
+per step, and the self-contact pairs and detections per step. The sandbox
+runs at most one 1/60 s step per rendered frame, so a scene that costs more
+than real time (the pile, about 60 ms per step) plays in slow motion,
+flagged in the HUD, while the window stays responsive. Use the
+`sandbox-release` build: the debug build is 10–17 times slower.
 
-The piles/support fixtures use restitution zero; the scene geometry and seed are
-fixed in the sandbox source. Pause and single-step apply support motion and
-tether forces only when a simulation step executes. Reset rebuilds the selected
-fixture and clears all old handles, queries, and interaction state.
+For a scripted capture, `sandbox --scene 2 --frames 150 --screenshot drape.png`
+runs 150 fixed steps, saves the frame, and exits.
 
 ## Deterministic benchmark
-
-Build and run the optional benchmark in release mode:
 
 ```sh
 cmake --preset release -DSL_BUILD_BENCH=ON
@@ -140,39 +108,72 @@ cmake --build --preset release
 ./build/release/bin/sl_bench
 ```
 
-`sl_bench` runs seven fixed fixtures: pyramid, rain, disconnected piles,
-chains, churn, a table and an inverted-mass stack. Each uses 120 warm-up steps
-and 600 measured steps at 1/60 s with four substeps. JSON reports include step
-timing, work/memory diagnostics, physical-quality metrics and a semantic digest
-of public body, contact and joint state.
+`sl_bench` runs five scenes: a 32×32 and a 64×64 curtain, a 64×64 sphere
+drape, a 48×48 flag, and a pile of three 30×30 sheets with self contact. For each it reports milliseconds per step,
+nanoseconds per vertex-sweep, contacts, and a hash of the final state. Every
+scene runs twice, and the process exits nonzero if the hashes differ. Use
+`--scene`, `--warmup`, and `--steps` to choose a smaller workload.
 
-Use `--scene`, `--warmup` and `--steps` to select a bounded workload.
-The standard-library `bench/report.py` tool repeats runs and validates reports.
-Digests check determinism within the same platform and build; physical-quality
-limits assess cross-build results. See [benchmark documentation](docs/benchmarks.md)
-for the schema, fixtures, quality limits and profiling commands.
+Single-threaded on an Apple M4 Pro, a vertex-sweep costs about 140 ns.
+Substeps scale with resolution under the stability rule, so cost grows
+faster than the vertex count:
+
+| Scene | Substeps | Time per 1/60 s step |
+| --- | --- | --- |
+| 32×32 curtain | 34 | about 5 ms |
+| 64×64 curtain | 68 | about 40 ms |
+
+Real-time use at high resolution waits on the threading and convergence work
+in the roadmap.
+
+The same build also produces `sl_compare`, which runs VBD, XPBD, and SIPD
+head to head on shared scenes. Results and the decision they support are in
+[docs/solver.md](docs/solver.md#head-to-head-comparison-october-2026).
 
 ## Use from C
 
-Build the public headless example, which checks initialization and pool failure,
-creates bodies and a joint, steps, inspects contacts, queries sleeping bodies,
-wakes a component, resets and cleans up:
+```c
+sl_world world = { 0 };
+sl_world_config config = { 0 };
+config.vertex_capacity = 4096;
+config.triangle_capacity = 8192;
+config.cloth_capacity = 1;
+config.gravity = sl_vec3_make(0.0f, -9.81f, 0.0f);
+sl_world_init(&world, &config);
 
-```sh
-cmake --preset debug -DSL_BUILD_EXAMPLE=ON
-cmake --build --preset debug
-./build/debug/bin/silk_headless
+sl_cloth_desc cloth = { 0 };
+cloth.positions = positions;   /* your mesh, meters */
+cloth.vertex_count = vertex_count;
+cloth.indices = indices;
+cloth.triangle_count = triangle_count;
+cloth.density = 0.2f;          /* kg/m^2 */
+cloth.membrane_mu = 2000.0f;   /* N/m */
+cloth.membrane_lambda = 2000.0f;
+cloth.bending_stiffness = 1e-4f;
+cloth.damping = 20.0f;         /* 1/s */
+cloth.thickness = 0.005f;      /* m */
+uint32_t id;
+sl_world_cloth_add(&world, &cloth, &id);
+sl_world_vertex_pin_set(&world, id, 0, true);
+
+sl_stepper stepper;
+sl_stepper_init(&stepper, 1.0f / 60.0f);
+sl_world_advance(&world, &stepper, frame_seconds);
+const sl_vec3 *p = sl_world_cloth_positions(&world, id);
 ```
 
-An existing CMake project can embed Silk without enabling its tests, examples
-or installation rules:
+`examples/headless/main.c` is a complete program. Build it with
+`-DSL_BUILD_EXAMPLE=ON`.
+
+An existing CMake project can embed silk without enabling its tests,
+examples, or install rules:
 
 ```cmake
 add_subdirectory(path/to/silk)
 target_link_libraries(my_app PRIVATE silk::silk)
 ```
 
-For an installed static package:
+To use an installed, relocatable static package:
 
 ```sh
 cmake --preset release -DSL_INSTALL=ON
@@ -180,116 +181,26 @@ cmake --build --preset release
 cmake --install build/release --prefix "$PWD/build/silk-prefix"
 ```
 
-In the consuming project:
-
 ```cmake
-cmake_minimum_required(VERSION 3.28)
-project(my_app LANGUAGES C)
-find_package(silk 0.4.0 CONFIG REQUIRED)
-add_executable(my_app main.c)
+find_package(silk 0.1.0 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE silk::silk)
 ```
 
-Configure that project with `-DCMAKE_PREFIX_PATH=/path/to/silk-prefix`. The
-prefix can be moved before configuring a fresh consumer. The target supplies
-public include paths, the required C standard and platform math linkage; Silk's
-first-party warnings do not become consumer warnings. Install includes only
-the archive, public headers and CMake metadata. `SL_INSTALL` defaults on for a
-top-level build and off when embedded; `SL_BUILD_EXAMPLE` defaults off.
-
-The package uses exact version matching when a version is requested.
-Version 0.4.0 does not promise a stable binary ABI. Rebuild applications
-against matching headers and
-archive. Public headers are independently compiled, with an additional C++
-linkage smoke check for the existing `extern "C"` guards; no C++ wrapper API is
-provided.
-
-Run the same external checks used in compiler CI with:
-
-```sh
-python3 tools/check_consumer.py --output build/consumer-checks --config Debug
-python3 tools/check_consumer.py --output build/consumer-release --config Release
-```
-
-The check copies a clean source tree and consumer, builds both integration
-paths, moves the installation and removes the original source/build paths from
-reach before rebuilding the installed consumer. It checks every public header,
-linkage, version rejection and downstream compile options without fetching
-any dependencies.
-
-A world is a zero-initialized owning shell: call `sl_world_init` and
-`sl_world_destroy`, and never copy it while initialized. Storage is private;
-inspect bodies, joints and diagnostics through the public accessors. Handles
-belong to the world lifetime that created them. Reset invalidates old handles;
-numerical handle collisions across worlds or after destroy/reinitialize are
-possible. Walk packed rows with `sl_world_body_at()` when removing bodies during
-traversal, as documented in the header.
-
-Include the subsystem headers you use, such as `<silk/math.h>`,
-`<silk/shape.h>`, `<silk/contact.h>`, `<silk/joint.h>`, `<silk/world.h>`,
-`<silk/step.h>`, and `<silk/query.h>`. `<silk/silk.h>` exposes the version macros
-and `sl_version()`.
-The core chooses no timestep: call `sl_world_step` with one fixed value
-throughout a run, or initialize `sl_stepper` with your application's fixed
-value. The sandbox's 1/60-second timestep is an example policy, not a library
-default.
-
-World queries provide tight-AABB overlap, shape point containment and closest
-ray hits through `<silk/query.h>`. Buffer queries return ascending body slots,
-total matches and truncation; they accept zero capacity for counting. Queries
-preserve snapshots and simulation state but share scratch, so same-world
-operations must not run concurrently. See the header for type masks and ray bounds.
-
-`sl_world_config.substep_count` defaults to four and accepts one through eight.
-Gravity and drag default to zero; sleeping defaults off. Enabling sleep selects
-0.02 units/s, 0.01 radians/s and 0.5 seconds when its thresholds are zero.
-Choose consistent length/mass/time units; angles and angular speeds use radians.
-Body friction and restitution default to zero; joint storage is opt-in through
-a nonzero `joint_capacity`. Size body, contact, and joint pools at initialization
-for the workload. Zero contact capacity selects up to four times body capacity,
-bounded by `SL_CONTACT_COUNT_MAX`. Initialization validates before allocating;
-body/joint creation returns a null handle on capacity failure. Recoverable
-invalid input returns failure without partial mutation. Contact-pool exhaustion
-drops new pairs and is observable
-through `sl_world_contact_drop_count()`.
-
-For source migration from the original 0.3.0 release to 0.4.0,
-replace direct world-storage access with public accessors, scoped handles and
-copied statistics. Do not copy the owning world or depend on packed addresses.
-Query results contain handles, not retained body pointers. Shape pointers last
-until the next create/destroy/reset/shape replacement; contact pointers last
-until the next non-const world operation. Consume or copy snapshots before those
-operations. Queries reuse scratch, so serialize all operations on the same world.
-There are no compatibility aliases for the removed public storage layout.
+The package matches versions exactly. `tools/check_consumer.py` checks the
+embedded, installed, and relocated consumers.
 
 ## Current limits
 
-- No continuous collision detection (CCD) or bullet bodies; fast objects can
-  tunnel despite speculative contacts and free-integration speed caps.
-- No sensors or contact callbacks. Islands and opt-in sleeping are supported.
-- Distance and revolute joints have no limits, motors, or user-facing springs.
-- The CPU solver remains portable and single-threaded. Explicit SIMD and
-  solver-order experiments were evaluated and rejected; compiler vectorization
-  remains enabled. Threading feasibility was assessed; implementation is deferred.
-- Contacts are read-only snapshots. A pointer returned by
-  `sl_world_contact_at()` is valid only until the next non-const world operation,
-  as specified in [world.h](include/silk/world.h); consume or copy it before
-  stepping or mutating the world.
-
-Simulation is deterministic for a fixed call sequence on a given platform and
-build. Cross-platform numerical comparisons require explicit tolerances;
-bitwise equivalence across compilers or platforms is not promised.
-
-## Acknowledgments
-
-Erin Catto's [Solver2D article](https://box2d.org/posts/2024/02/solver2d/)
-describes the substepping, soft-constraint, and relaxation techniques used in
-this solver family, including Ross Nordby's mass-independent softness
-parameters. Silk's solver design and its local two-point contact solve are
-documented in [PR #49](https://github.com/nisarsyed/silk/pull/49).
-
-## Contributing
-
-Engineering principles, verification requirements, and repository workflow are
-in [CONTRIBUTING.md](CONTRIBUTING.md). Instructions for coding agents are in
-[AGENTS.md](AGENTS.md). Silk is available under the [MIT License](LICENSE).
+- **Self-contact cost.** Self contact costs 1.3× to 4× the contact-free
+  step, rising with how many layers touch: three piled sheets take about
+  50 ms per step. Pinned vertices are moved by the caller and are not
+  bounded, so a pin dragged through cloth can still cross it. See
+  [docs/solver.md](docs/solver.md#self-contact-offset-geometric-contact).
+- **Analytic colliders only.** Colliders are planes, spheres, and capsules,
+  treated as static within a step.
+- **Stretch error.** One sweep per substep leaves some long-wavelength stretch,
+  about 3% on a hanging sheet at the automatic substep count. Raise
+  `substep_count` or `iteration_count` to reduce it.
+- **Flat rest bending.** Bending assumes the rest surface is flat.
+- **Single-threaded scalar code.** The color ordering keeps threading and SIMD
+  open without changing results.
