@@ -214,10 +214,16 @@ static void test_pin_targets_interpolate_over_substeps(void)
     sl_world_destroy(&world);
 }
 
-static uint64_t sl_scene_hash(uint32_t steps)
+/* A pinned sheet with damping, drag, wind and a sphere collider: every
+ * substep phase runs. With a scramble, through sl_test_scrambled_for. */
+static uint64_t sl_scene_hash(uint32_t steps, sl_test_scramble *scramble)
 {
     sl_world world = { 0 };
     sl_world_config c = sl_test_config(500u, 1000u);
+    if (scramble != NULL) {
+        c.parallel_for = sl_test_scrambled_for;
+        c.parallel_context = scramble;
+    }
     c.wind = sl_vec3_make(0.0f, 0.0f, 3.0f);
     sl_cloth_desc d = sl_test_cloth_desc();
     d.damping = 20.0f;
@@ -236,9 +242,22 @@ static uint64_t sl_scene_hash(uint32_t steps)
 
 static void test_simulation_is_deterministic(void)
 {
-    const uint64_t a = sl_scene_hash(60u);
-    SL_EXPECT(a == sl_scene_hash(60u));
-    SL_EXPECT(a != sl_scene_hash(59u));
+    const uint64_t a = sl_scene_hash(60u, NULL);
+    SL_EXPECT(a == sl_scene_hash(60u, NULL));
+    SL_EXPECT(a != sl_scene_hash(59u, NULL));
+}
+
+static void test_parallel_matches_serial(void)
+{
+    /* Any partition and order of the per-vertex and per-edge tasks gives
+     * the serial result bit for bit (sl_parallel_for_fn's contract). */
+    const uint64_t serial = sl_scene_hash(60u, NULL);
+    const uint32_t seeds[3] = { 0x9E3779B9u, 0x2545F491u, 7u };
+    for (uint32_t k = 0; k < 3u; k++) {
+        sl_test_scramble scramble = { seeds[k], 0u };
+        SL_EXPECT(sl_scene_hash(60u, &scramble) == serial);
+        SL_EXPECT(scramble.calls > 1000u);
+    }
 }
 
 static void test_ground_contact_rests_on_thickness(void)
@@ -328,9 +347,13 @@ static void test_sphere_drape_stays_outside(void)
     const double initial = sl_total_energy(&world, &d);
     double peak = initial;
     float depth_max = 0.0f;
+    float late_speed = 0.0f;
     for (uint32_t step = 0; step < 180u; step++) {
         sl_world_step(&world, SL_TEST_DT);
         peak = fmax(peak, sl_total_energy(&world, &d));
+        if (step >= 120u) {
+            late_speed = sl_max(late_speed, sl_speed_max_of(&world, 0u));
+        }
         const sl_vec3 *p = sl_world_cloth_positions(&world, 0u);
         for (uint32_t i = 0; i < sl_world_cloth_vertex_count(&world, 0u); i++) {
             const float depth = 0.3f + d.thickness - sl_vec3_length(p[i]);
@@ -338,6 +361,12 @@ static void test_sphere_drape_stays_outside(void)
         }
     }
     SL_EXPECT(peak <= initial + 1e-3);
+    /* The skirt settles: under 1.5 m/s over the last second with or without
+     * fused multiply-add. Edge damping in color order instead of ascending
+     * order (see sl_solver_damp) let unconverged substeps pump it to
+     * 24 m/s, within the energy bound above, since the drop releases more
+     * potential energy than the skirt gained. */
+    SL_EXPECT(late_speed < 4.0f);
     /* Penalty contact lets cloth tension compress the thickness shell; the
      * midsurface must stay at least half a thickness off the sphere. */
     SL_EXPECT(depth_max < 0.5f * d.thickness);
@@ -567,6 +596,7 @@ static const sl_test_case k_cases[] = {
     { "hanging_sheet_settles", test_hanging_sheet_settles_with_small_stretch },
     { "pin_targets_interpolate", test_pin_targets_interpolate_over_substeps },
     { "deterministic", test_simulation_is_deterministic },
+    { "parallel_matches_serial", test_parallel_matches_serial },
     { "ground_contact_rests", test_ground_contact_rests_on_thickness },
     { "sphere_drape_outside", test_sphere_drape_stays_outside },
     { "swing_never_gains_energy", test_swinging_sheet_never_gains_energy },

@@ -52,6 +52,7 @@ static size_t sl_world_layout(sl_world_state *s, unsigned char *base)
     SL_TAKE(bend_weight, 4u * b);
     SL_TAKE(bend_scale, b);
     SL_TAKE(edge_index, 2u * (size_t)s->edge_capacity);
+
     SL_TAKE(cloths, s->cloth_capacity);
     /* Self contact: nothing when the capacity is 0. */
     const size_t pc = s->pair_capacity;
@@ -74,6 +75,7 @@ static size_t sl_world_layout(sl_world_state *s, unsigned char *base)
     SL_TAKE(stage_order, pc);
     SL_TAKE(owner_offset, on * ((size_t)s->edge_capacity + 1u));
     SL_TAKE(position_safe, on * v);
+    SL_TAKE(position_next, on * v);
     SL_TAKE(triangle_bvh.node_lo, 2u * tri_bvh);
     SL_TAKE(triangle_bvh.node_hi, 2u * tri_bvh);
     SL_TAKE(triangle_bvh.node_first, 2u * tri_bvh);
@@ -164,6 +166,8 @@ bool sl_world_init(sl_world *world, const sl_world_config *config)
     s.edge_capacity = 3u * config->triangle_capacity;
     s.cloth_capacity = config->cloth_capacity;
     s.pair_capacity = config->self_contact_capacity;
+    s.parallel_for = config->parallel_for;
+    s.parallel_context = config->parallel_context;
 
     const size_t bytes = sl_world_layout(&s, NULL);
     sl_world_state *state = malloc(sizeof(*state));

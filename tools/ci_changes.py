@@ -37,7 +37,8 @@ DOCS = (
 # Paths that can change how the sandbox compiles: its source, the public
 # headers it includes, and the build configuration.
 SANDBOX = (
-    'examples/sandbox/*',
+        'examples/sandbox/*',
+    'examples/pool/*',
     'include/*',
     'CMakeLists.txt',
     'CMakePresets.json',

@@ -10,8 +10,13 @@
  * scene that is costlier than real time runs in slow motion (shown in the
  * HUD) instead of freezing the window.
  *
+ * --threads N runs the solver on N threads (default 4) through the example
+ * pool (examples/pool); use the number of performance cores at most, since
+ * a step waits for the slowest thread at every color.
+ *
  * For visual checks without interaction:
- *   sandbox [--scene 1-5] [--wind] [--frames N --screenshot FILE.png]
+ *   sandbox [--scene 1-5] [--wind] [--threads N]
+ *           [--frames N --screenshot FILE.png]
  * runs N frames, saves a screenshot (raylib writes it relative to the
  * working directory) and exits.
  *
@@ -30,6 +35,8 @@
 #include "silk/silk.h"
 #include "silk/step.h"
 #include "silk/world.h"
+
+#include "pool.h"
 
 #define SB_WIDTH 1280
 #define SB_HEIGHT 800
@@ -92,6 +99,7 @@ typedef struct sb_app {
     float distance;
     Vector3 focus;
     double step_ms;
+    sp_pool *pool; /* shared by every scene */
 } sb_app;
 
 static Vector3 sb_v(sl_vec3 v)
@@ -163,6 +171,8 @@ static bool sb_scene_layers(sb_app *app, sl_vec3 origin, sl_vec3 u, sl_vec3 v,
     config.cloth_capacity = layers;
     config.gravity = sl_vec3_make(0.0f, -9.81f, 0.0f);
     config.self_contact_capacity = app->self_contact ? 8u * n * layers : 0u;
+    config.parallel_for = (app->pool != NULL) ? sp_pool_parallel_for : NULL;
+    config.parallel_context = app->pool;
     bool ok = positions != NULL && app->indices != NULL &&
               app->normals != NULL && sl_world_init(&app->world, &config);
     const sl_vec3 center =
@@ -592,10 +602,11 @@ static void sb_draw_hud(const sb_app *app)
                         (int)app->scene + 1, k_scene_names[app->scene]),
              12, 10, SB_TEXT, k_held);
     DrawText(TextFormat("%d vertices  %d triangles  %d substeps%s  %.2f "
-                        "ms/step",
+                        "ms/step  %d thread(s)",
                         (int)stats.vertex_count, (int)stats.triangle_count,
                         (int)stats.substep_count,
-                        stats.substep_limited ? " (capped)" : "", app->step_ms),
+                        stats.substep_limited ? " (capped)" : "", app->step_ms,
+                        (int)sp_pool_thread_count(app->pool)),
              12, 36, SB_TEXT, GRAY);
     DrawText(TextFormat("%d collider contacts  %d self-contact pairs  %d "
                         "detections/step",
@@ -659,6 +670,7 @@ int main(int argc, char **argv)
     bool wind = false;
     uint32_t frames = 0;
     const char *screenshot = NULL;
+    uint32_t threads = 4u;
     for (int a = 1; a < argc; a++) {
         if (strcmp(argv[a], "--wind") == 0) {
             wind = true;
@@ -671,6 +683,8 @@ int main(int argc, char **argv)
             frames = sb_arg_count(argv[++a]);
         } else if (a + 1 < argc && strcmp(argv[a], "--screenshot") == 0) {
             screenshot = argv[++a];
+        } else if (a + 1 < argc && strcmp(argv[a], "--threads") == 0) {
+            threads = sb_arg_count(argv[++a]);
         }
     }
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
@@ -684,6 +698,11 @@ int main(int argc, char **argv)
     app.distance = 4.0f;
     app.wind_on = wind;
     app.self_contact = true;
+    app.pool = sp_pool_create(threads);
+    if (app.pool == NULL) {
+        CloseWindow();
+        return 1;
+    }
     (void)sb_scene_load(&app, first);
 
     uint32_t frame = 0;
@@ -751,6 +770,7 @@ int main(int argc, char **argv)
         }
     }
     sb_scene_free(&app);
+    sp_pool_destroy(app.pool);
     CloseWindow();
     return 0;
 }

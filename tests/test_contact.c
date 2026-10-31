@@ -377,11 +377,15 @@ static void test_bounds_allow_rigid_motion(void)
     SL_EXPECT_NEAR(sl_fall_speed(4096u), free_fall, 1e-3f * free_fall);
 }
 
-static uint64_t sl_stack_hash(void)
+static uint64_t sl_stack_hash(sl_test_scramble *scramble)
 {
     sl_world world = { 0 };
     sl_world_config c = sl_test_config(400u, 800u);
     c.self_contact_capacity = 4096u;
+    if (scramble != NULL) {
+        c.parallel_for = sl_test_scrambled_for;
+        c.parallel_context = scramble;
+    }
     (void)sl_world_init(&world, &c);
     sl_add_flat(&world, 0.4f, 0.8f, 8u);
     sl_add_flat(&world, 0.45f, 0.7f, 8u);
@@ -399,7 +403,75 @@ static uint64_t sl_stack_hash(void)
 
 static void test_self_contact_is_deterministic(void)
 {
-    SL_EXPECT(sl_stack_hash() == sl_stack_hash());
+    SL_EXPECT(sl_stack_hash(NULL) == sl_stack_hash(NULL));
+}
+
+/* One 0.6 m sheet folded in half along z: the far half lies mirrored 6 mm
+ * above the near half, inside the 8 mm contact radius, so the cloth
+ * touches itself from the first step and contact pairs join vertices of
+ * one cloth, some of the same color (up to 90 pairs; bending reopens the
+ * fold within 30 steps). It falls onto the ground. Solving the
+ * self-contact sweep in place makes the scrambled run differ. */
+static uint64_t sl_fold_hash(sl_test_scramble *scramble)
+{
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(400u, 800u);
+    c.self_contact_capacity = 4096u;
+    if (scramble != NULL) {
+        c.parallel_for = sl_test_scrambled_for;
+        c.parallel_context = scramble;
+    }
+    (void)sl_world_init(&world, &c);
+    sl_cloth_desc d = sl_test_cloth_desc();
+    d.thickness = 0.004f;
+    d.damping = 20.0f;
+    sl_test_grid g = sl_test_grid_make(
+        sl_vec3_make(-0.3f, 0.2f, -0.3f), sl_vec3_make(0.6f, 0.0f, 0.0f),
+        sl_vec3_make(0.0f, 0.0f, 0.6f), 12u, 12u);
+    for (uint32_t i = 0; i < g.vertex_count; i++) {
+        if (g.positions[i].z > 0.001f) {
+            g.positions[i].z = -g.positions[i].z;
+            g.positions[i].y += 0.006f;
+        }
+    }
+    d.positions = g.positions;
+    d.vertex_count = g.vertex_count;
+    d.indices = g.indices;
+    d.triangle_count = g.triangle_count;
+    uint32_t cloth = 0;
+    SL_EXPECT(sl_world_cloth_add(&world, &d, &cloth));
+    sl_test_grid_free(&g);
+    const sl_collider ground = { SL_COLLIDER_PLANE, sl_vec3_zero(),
+                                 sl_vec3_make(0.0f, 1.0f, 0.0f), 0.0f, 0.5f };
+    uint32_t id = 0;
+    (void)sl_world_collider_add(&world, &ground, &id);
+    uint32_t pairs_max = 0;
+    for (uint32_t k = 0; k < 30u; k++) {
+        sl_world_step(&world, 1.0f / 60.0f);
+        const uint32_t pairs = sl_world_stats_get(&world).self_contact_count;
+        pairs_max = (pairs > pairs_max) ? pairs : pairs_max;
+    }
+
+    SL_EXPECT(pairs_max > 50u);
+    const uint64_t hash = sl_test_world_hash(&world);
+    sl_world_destroy(&world);
+    return hash;
+}
+
+static void test_self_contact_parallel_matches_serial(void)
+{
+    /* Same-color contact partners read start-of-color positions
+     * (solver_self.c), so any partition and order gives the serial
+     * result: for contact within one folded cloth, and between cloths. */
+    const uint64_t fold = sl_fold_hash(NULL);
+    const uint64_t stack = sl_stack_hash(NULL);
+    const uint32_t seeds[2] = { 0x9E3779B9u, 11u };
+    for (uint32_t k = 0; k < 2u; k++) {
+        sl_test_scramble scramble = { seeds[k], 0u };
+        SL_EXPECT(sl_fold_hash(&scramble) == fold);
+        SL_EXPECT(sl_stack_hash(&scramble) == stack);
+        SL_EXPECT(scramble.calls > 1000u);
+    }
 }
 
 static void test_capacity_and_validation(void)
@@ -443,6 +515,7 @@ static const sl_test_case k_cases[] = {
     { "stacked_sheets_never_intersect", test_stacked_sheets_never_intersect },
     { "bounds_allow_rigid_motion", test_bounds_allow_rigid_motion },
     { "self_contact_deterministic", test_self_contact_is_deterministic },
+    { "self_contact_parallel", test_self_contact_parallel_matches_serial },
     { "capacity_and_validation", test_capacity_and_validation },
 };
 

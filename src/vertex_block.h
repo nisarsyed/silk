@@ -20,10 +20,12 @@ static inline sl_vec3 sl_position_clamp(sl_vec3 p)
 }
 
 /* One VBD block update of vertex i: a Newton step on the incremental
- * potential restricted to x_i. */
-static inline void sl_vertex_block(sl_world_state *s,
-                                   const sl_cloth_record *rec, uint32_t i,
-                                   float h, bool self)
+ * potential restricted to x_i. Returns the new position (x_i itself when
+ * the block is singular); the caller stores it. Writes only s->contact[i],
+ * so blocks of one color may run concurrently. */
+static inline sl_vec3 sl_vertex_block(sl_world_state *s,
+                                      const sl_cloth_record *rec, uint32_t i,
+                                      float h, bool self)
 {
     const float inertia = s->mass[i] / (h * h);
     const sl_vec3 x = s->position[i];
@@ -85,8 +87,17 @@ static inline void sl_vertex_block(sl_world_state *s,
 
     sl_vec3 step;
     if (sl_mat3_solve(hessian, force, 0.0f, &step)) {
-        s->position[i] = sl_position_clamp(sl_vec3_add(x, step));
+        return sl_position_clamp(sl_vec3_add(x, step));
     }
+    return x;
 }
+
+/* One color of one cloth, as a parallel task over its vertices. */
+typedef struct sl_sweep_task {
+    sl_world_state *state;
+    const sl_cloth_record *rec;
+    const uint32_t *order; /* the color's vertices, ascending */
+    float h;
+} sl_sweep_task;
 
 #endif /* SILK_VERTEX_BLOCK_H */

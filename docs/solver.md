@@ -361,6 +361,119 @@ The pile cost rose from 48.6 ms when edge pairs began pushing both edges.
 - The force jumps where a point enters a block through an open boundary on
   a concave side, as the paper's own limitation notes.
 
+## Threading
+
+A world given a `parallel_for` callback (`sl_world_config`) runs its
+independent work through it. silk never creates threads: the host supplies
+the callback, and `examples/pool` is a small pool for the benchmark and
+sandbox. Portable C17 has no thread API the core may use (POSIX is excluded,
+and macOS has no `<threads.h>`), which is also how Box2D and Box3D handle
+it. The contract: results are bitwise identical for any partition, order,
+and thread count, including running everything on the calling thread.
+
+### What runs in parallel
+
+- **The sweep, one color at a time.** The mesh coloring separates vertices
+  that share a triangle or bending stencil, so without self contact a block
+  reads no vertex its color writes, and a color can be solved concurrently
+  in place with exactly the serial result. Contact-free hashes did not
+  change.
+- **The self-contact sweep, buffered per color.** A contact pair can join
+  two vertices of the same color, which the mesh coloring cannot prevent.
+  In place, one block would read a partner while another thread writes it.
+  Each color is solved into a buffer and committed afterwards, so
+  same-color contact partners see start-of-color positions (a Jacobi step
+  within the color) while mesh neighbours see the latest positions as
+  before. This changed self-contact results once, by design. A test folds
+  one sheet onto itself so same-color pairs exist; solving in place makes
+  its scrambled run differ.
+
+- **Drag, gathered per vertex.** Drag scatters each triangle's force to its
+  corners. With threads, each vertex sums its incident triangles in
+  ascending order instead, receiving the same additions in the same order,
+  so results are identical. That evaluates each triangle three times (10%
+  slower on one thread), so the serial path keeps the loop over triangles.
+- **Per-vertex substep loops:** the inertial targets, initial guess,
+  velocities, collider friction, and speed clamp.
+
+Still serial: edge damping (below), self-contact detection, bounds and
+contact friction, and the detection-time BVH work. In the pile scene,
+detection is about 70% of the step, so threading gains little there (issue
+#117).
+
+### Edge damping stays serial
+
+Damping applies impulses edge by edge in ascending order, each seeing the
+velocities earlier edges changed. Edge coloring (edges of one color share no
+vertex) would let a color run in parallel, and it was tried: greedy coloring
+at cloth add, at most 65 colors, 7 on a grid. It was reverted.
+
+- **Effect:** in color order, damping got much weaker. Consecutive edges in
+  ascending order share vertices, so one pass carries the damping along
+  chains across the sheet and suppresses long waves; in color order a pass
+  reaches only a few edges. Each impulse still removed energy, but far less
+  overall.
+- **Measured:** the stiff 1.2 m drape onto a sphere (`sphere_drape_outside`,
+  μ = 10⁴ N/m) then gained kinetic energy from unconverged substeps faster
+  than damping removed it. Its hanging skirt flapped at up to 24 m/s instead
+  of settling under 1.5 m/s.
+- **How it slipped through:** the test's energy bound still passed (the drop
+  releases more potential energy than the skirt gained), and its final
+  contact count failed only on x86-64, where the arithmetic differs from
+  arm64's fused multiply-adds. The test now also bounds the skirt's speed
+  over the last second.
+
+Parallel coloring had looked like the biggest win (curtain 3.5× on 8
+threads, against 2.5× without it), and it made the single-threaded path
+faster too. Damping that keeps its strength under a parallel order needs a
+different formulation, which is future work.
+
+### Granularity
+
+The engine passes a grain hint: 32 vertices per range for block solves
+(about 5 µs), and 2048 vertices for plain loops. On
+the 64×64 curtain, a grain of 128 left most of 8 threads idle (1.85×); 16 to
+64 performed alike.
+
+Each step issues hundreds of short dispatches (colors × substeps), so the
+pool's dispatch latency matters:
+
+- Workers that slept on a condition variable between dispatches spent most
+  of their time waking up.
+- Workers now spin for about a quarter of a millisecond, longer than the
+  serial work between dispatches (drag and damping took about 100 µs per
+  substep on the 64×64 curtain before drag was parallel).
+- The pool's first version also made the caller wait for every worker to
+  check in after each dispatch. One descheduled thread then stalled every
+  color, and runs varied from 1.07× to 2.19×. Claims now carry the dispatch
+  generation, so the caller waits only for its own ranges.
+
+### Results
+
+Best of three runs, Apple M4 Pro (8 performance and 4 efficiency cores),
+release build, ms per 1/60 s step:
+
+| Scene | 1 thread | 4 threads | 8 threads |
+| --- | ---: | ---: | ---: |
+| 32×32 curtain | 5.0 | 2.6 (1.9×) | 2.8 (1.8×) |
+| 64×64 curtain | 40.6 | 18.5 (2.2×) | 16.1 (2.5×) |
+| 64×64 drape | 36.0 | 16.1 (2.2×) | 13.9 (2.6×) |
+| 48×48 flag | 15.1 | 7.3 (2.1×) | 6.3 (2.4×) |
+| three 30×30 sheets (self contact) | 57.8 | 49.2 (1.2×) | 49.9 (1.2×) |
+
+Single-threaded times and contact-free hashes are unchanged from before
+threading. The threaded hash matches the serial one in every scene and at
+every thread count tried (2–12). Beyond the performance cores, speed falls:
+the 64×64 curtain runs at 1.85× on 10 threads and 1.7× on 12, because every
+color waits for its slowest range and efficiency cores are slower. Use at
+most the number of performance cores.
+
+`tests/` checks the contract without threads: a `parallel_for` that cuts
+ranges unevenly and runs them back to front must reproduce the serial hash,
+both without self contact and with a self-folded sheet. CI also runs the
+benchmark on four threads against the serial hashes, and ThreadSanitizer
+found no races in the pool.
+
 ## Known limits
 
 - **Stretch error.** One sweep per substep leaves long-wavelength stretch
