@@ -20,6 +20,7 @@
     "silk.wasm",
     "index.d.ts",
     "README.md",
+    "build.json",
     "LICENSE",
     "licenses"
   ],

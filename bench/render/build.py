@@ -44,6 +44,10 @@ def main():
         if not source.is_file():
             parser.error(f'Build prerequisite missing: {source}')
     source = source_record(ROOT)
+    version = re.search(r'^project\(silk VERSION (\d+\.\d+\.\d+)',
+                        (ROOT/'CMakeLists.txt').read_text(), re.MULTILINE)
+    if version is None:
+        parser.error('Cannot read the engine version')
     try:
         modules = {kind: module_record(directory, kind, source)
                    for kind, directory in (('physics', physics), ('raylib', args.raylib))}
@@ -87,7 +91,8 @@ def main():
     # Inventory the delivered files, including glue, copied wrappers, notices
     # and the original benchmark's separate build record. Exclude only these
     # generated manifest files to avoid a recursive checksum.
-    value = {'schema': 1, 'verification': 'assembly-time', 'source': source,
+    value = {'schema': 1, 'verification': 'assembly-time', 'version': version.group(1),
+             'source': source,
              'contract': {'path': 'docs/browser-contract.md',
                           'declaredRevision': int(re.search(r'^Contract revision (\d+),',
                               (ROOT/'docs/browser-contract.md').read_text(), re.MULTILINE).group(1)),

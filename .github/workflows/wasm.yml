@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      redeploy_run_id:
+        description: "Optional successful main WebAssembly run ID to redeploy without rebuilding its artifact"
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 concurrency:
   group: wasm-${{ github.ref }}
@@ -118,6 +127,20 @@ jobs:
           python3 bench/render/test_validate.py "build/reports/render-$mode/runner" "build/render-study-$mode" "build/reports/render-$mode/input"
           python3 bench/render/test_protocol.py
           node bench/render/test_browser.mjs "build/render-study-$mode" "build/reports/render-$mode"
+      - name: Build and verify downloadable browser distribution
+        if: matrix.mode == 'release'
+        shell: bash
+        run: |
+          python3 browser/build_distribution.py --assembled build/render-study-release \
+            --package build/wasm-release/package --output build/browser-site
+          node browser/test_distribution.mjs build/browser-site
+      - uses: actions/upload-artifact@v7
+        if: matrix.mode == 'release'
+        with:
+          name: browser-site-${{ github.sha }}
+          path: build/browser-site/
+          retention-days: 90
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -141,3 +164,54 @@ jobs:
             build/wasm-${{ matrix.mode }}/Testing/Temporary/
           retention-days: 14
           if-no-files-found: warn
+
+  pages:
+    name: Deploy verified browser artifact
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: core
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select a verified main artifact
+        id: selected
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_RUN_ID: ${{ inputs.redeploy_run_id }}
+        run: |
+          if [[ -z "$REQUESTED_RUN_ID" ]]; then
+            echo "run_id=${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            [[ "$REQUESTED_RUN_ID" =~ ^[0-9]+$ ]] || { echo 'Run ID must be numeric' >&2; exit 1; }
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REQUESTED_RUN_ID" > "$RUNNER_TEMP/selected-run.json"
+            jq -e '.name == "WebAssembly" and .head_branch == "main" and .conclusion == "success"' \
+              "$RUNNER_TEMP/selected-run.json" >/dev/null
+            echo "run_id=$REQUESTED_RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "sha=$(jq -r .head_sha "$RUNNER_TEMP/selected-run.json")" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v8
+        with:
+          name: browser-site-${{ steps.selected.outputs.sha }}
+          path: site
+          run-id: ${{ steps.selected.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify the selected artifact before publishing
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.selected.outputs.sha }}
+        run: python3 browser/verify_distribution.py site "$EXPECTED_SHA"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

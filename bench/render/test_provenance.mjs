@@ -9,6 +9,7 @@ const value=JSON.parse(await fs.readFile(path.join(build,'provenance.json'),'utf
 const {provenanceJson}=await import(pathToFileURL(path.join(build,'provenance.mjs')));
 assert.deepEqual(JSON.parse(provenanceJson),value);
 assert.equal(value.schema,1);assert.equal(value.verification,'assembly-time');
+assert.match(value.version,/^\d+\.\d+\.\d+$/);
 assert.match(value.source.revision,/^[a-f0-9]{40}$/);assert.equal(typeof value.source.dirty,'boolean');
 assert.match(value.source.sha256,/^[a-f0-9]{64}$/);
 assert.equal(value.contract.sha256,value.source.files[value.contract.path]);

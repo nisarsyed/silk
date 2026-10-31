@@ -50,13 +50,16 @@ def main():
     parser.add_argument('--build', type=Path, required=True)
     parser.add_argument('--compiler', required=True)
     parser.add_argument('--mode', required=True)
-    parser.add_argument('--kind', choices=('physics', 'raylib'), required=True)
+    parser.add_argument('--kind', choices=('physics', 'raylib', 'package'), required=True)
     parser.add_argument('--raylib-source', type=Path)
     args = parser.parse_args()
     root, build = args.root.resolve(), args.build.resolve()
-    target, relative = (('silk_wasm_study', 'wasm') if args.kind == 'physics'
-                        else ('silk_render_raylib', 'bench/render'))
-    output = build / ('render-physics' if args.kind == 'physics' else 'render-study')
+    target, relative, output_name = {
+        'physics': ('silk_wasm_study', 'wasm', 'render-physics'),
+        'raylib': ('silk_render_raylib', 'bench/render', 'render-study'),
+        'package': ('silk_wasm', 'wasm', 'package'),
+    }[args.kind]
+    output = build / output_name
     link = build / relative / 'CMakeFiles' / (target + '.dir') / 'link.txt'
     if not link.is_file():
         parser.error('Study provenance requires the configured Makefile link.txt')

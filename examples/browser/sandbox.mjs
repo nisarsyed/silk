@@ -10,7 +10,7 @@ const spawnButtons=[...document.querySelectorAll('[data-spawn]')];
 const sceneNames=Object.freeze({pyramid:'PYRAMID / 01',rain:'RAIN / 02',chains:'CHAINS / 03'});
 const layouts=Object.freeze({desktop:'1280 × 720',mobile:'720 × 1280'});
 const provenance=JSON.parse(provenanceJson);
-byId('revision').textContent=`BUILD ${provenance.source.revision.slice(0,7)}`;
+byId('revision').textContent=`SILK ${provenance.version} · BUILD ${provenance.source.revision.slice(0,7)}`;
 
 let runtime=null,pointer=null,busy=true,failed=false,full=false,paused=false,scene='pyramid',sleep=false;
 let place=null,placementCanvas=null;

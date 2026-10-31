@@ -69,6 +69,12 @@ if(EMSCRIPTEN)
             --compiler "${CMAKE_C_COMPILER}" --mode "$<CONFIG>" --kind physics
         DEPENDS silk_wasm_study
         VERBATIM)
+    add_custom_target(silk_wasm_package_metadata ALL
+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/bench/render/metadata.py"
+            --root "${PROJECT_SOURCE_DIR}" --build "${CMAKE_BINARY_DIR}"
+            --compiler "${CMAKE_C_COMPILER}" --mode "$<CONFIG>" --kind package
+        DEPENDS silk_wasm
+        VERBATIM)
     foreach(SL_WASM_TARGET silk_wasm silk_wasm_bench silk_wasm_study)
         target_link_libraries(${SL_WASM_TARGET} PRIVATE silk silk_warnings)
         target_link_options(${SL_WASM_TARGET} PRIVATE
