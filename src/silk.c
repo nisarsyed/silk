@@ -1,4 +1,4 @@
-#include <silk/silk.h>
+#include "silk/silk.h"
 
 int sl_version(void)
 {

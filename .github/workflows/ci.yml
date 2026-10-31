@@ -39,16 +39,13 @@ jobs:
       - run: cmake --build --preset debug
       - run: ctest --preset debug
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
-      - run: build/debug/bin/sl_bench_check
-      - run: python bench/test_report.py --executable build/debug/bin/sl_bench
-      - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
-      - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports/sleep-on --repeat 2 --warmup 2 --steps 8 --sleep on
+      # Each scene runs twice; differing state hashes fail the job.
+      - run: build/debug/bin/sl_bench --warmup 2 --steps 8
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: developer-tools-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
+          name: consumer-reports-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
           path: |
-            build/bench-reports/
             build/consumer-reports/checks.log
             build/consumer-reports/summary.json
           retention-days: 14
@@ -75,16 +72,12 @@ jobs:
       - run: cmake --build --preset release
       - run: ctest --preset release
       - run: python tools/check_consumer.py --output build/consumer-reports --config Release
-      - run: build/release/bin/sl_bench_check
-      - run: python bench/test_report.py --executable build/release/bin/sl_bench
-      - run: python bench/report.py run build/release/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
-      - run: python bench/report.py run build/release/bin/sl_bench --output build/bench-reports/sleep-on --repeat 2 --warmup 2 --steps 8 --sleep on
+      - run: build/release/bin/sl_bench --warmup 2 --steps 8
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: developer-tools-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
+          name: consumer-reports-${{ github.job }}-${{ matrix.cc }}-${{ github.sha }}
           path: |
-            build/bench-reports/
             build/consumer-reports/checks.log
             build/consumer-reports/summary.json
           retention-days: 14
@@ -102,16 +95,13 @@ jobs:
       - run: cmake --build --preset debug
       - run: ctest --preset debug
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
-      - run: build/debug/bin/sl_bench_check
-      - run: python bench/test_report.py --executable build/debug/bin/sl_bench
-      - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports --repeat 2 --warmup 2 --steps 8
-      - run: python bench/report.py run build/debug/bin/sl_bench --output build/bench-reports/sleep-on --repeat 2 --warmup 2 --steps 8 --sleep on
+      # Each scene runs twice; differing state hashes fail the job.
+      - run: build/debug/bin/sl_bench --warmup 2 --steps 8
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: developer-tools-${{ github.job }}-${{ github.sha }}
+          name: consumer-reports-${{ github.job }}-${{ github.sha }}
           path: |
-            build/bench-reports/
             build/consumer-reports/checks.log
             build/consumer-reports/summary.json
           retention-days: 14
@@ -129,16 +119,12 @@ jobs:
       - run: cmake --build --preset windows
       - run: ctest --preset windows
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
-      - run: build/windows/bin/Debug/sl_bench_check.exe
-      - run: python bench/test_report.py --executable build/windows/bin/Debug/sl_bench.exe
-      - run: python bench/report.py run build/windows/bin/Debug/sl_bench.exe --output build/bench-reports --repeat 2 --warmup 2 --steps 8
-      - run: python bench/report.py run build/windows/bin/Debug/sl_bench.exe --output build/bench-reports/sleep-on --repeat 2 --warmup 2 --steps 8 --sleep on
+      - run: build/windows/bin/Debug/sl_bench.exe --warmup 2 --steps 8
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: developer-tools-${{ github.job }}-${{ github.sha }}
+          name: consumer-reports-${{ github.job }}-${{ github.sha }}
           path: |
-            build/bench-reports/
             build/consumer-reports/checks.log
             build/consumer-reports/summary.json
           retention-days: 14

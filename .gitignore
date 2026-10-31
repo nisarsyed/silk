@@ -13,3 +13,7 @@ compile_commands.json
 
 # Package / dependency artifacts
 .cache/
+
+# Tool caches
+__pycache__/
+node_modules/

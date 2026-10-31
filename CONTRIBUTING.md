@@ -45,13 +45,13 @@ Operational guidance for coding agents is in [AGENTS.md](AGENTS.md).
 - Call the project language C in ordinary prose. Mention C17 only when the
   specific standard matters, such as compiler requirements or compatibility.
 - Prefix public APIs with `sl_` and use `snake_case`. Use abbreviations only
-  when established in the domain, such as `vec2` and `mat2`. Prefer fixed-width
+  when established in the domain, such as `vec3` and `mat3`. Prefer fixed-width
   integers such as `uint32_t` over `int` or `long` for stored state and counts.
 - Give related names equal-length words where practical so declarations and
   uses align visually.
 - Use big-endian naming, with the most significant word first:
-  `connection_count_max`, not `max_connection_count`; `vec2_length_sq`, not
-  `sq_length`; `SL_BODY_COUNT_MAX`, not `SL_MAX_BODIES`.
+  `connection_count_max`, not `max_connection_count`; `vec3_length_sq`, not
+  `sq_length`; `SL_VERTEX_COUNT_MAX`, not `SL_MAX_VERTICES`.
 - Keep interfaces small and deterministic. Prefer explicit control flow and
   simple success/failure results over generic containers, dispatch layers, or
   indirection without a concrete need.
@@ -127,14 +127,14 @@ The version is intentionally duplicated. Update both locations together:
 Use Conventional Commits, optionally scoped by subsystem:
 
 ```text
-feat(math): add rotation composition
-fix(collision): preserve manifold ordering
-test(world): cover stale handle reuse
+feat(solver): add offset geometric self-contact
+fix(mesh): reject edges shared by three triangles
+test(energy): pin bending against the plate energy
 chore(build): update sanitizer configuration
 ```
 
-Work on a short-lived `<type>/<topic>` branch, such as `feat/collision` or
-`fix/shape-ray-cast`, and open it against `main`. Pull requests follow
+Work on a short-lived `<type>/<topic>` branch, such as `feat/self-contact` or
+`fix/collider-friction`, and open it against `main`. Pull requests follow
 `.github/PULL_REQUEST_TEMPLATE.md`; explain the motivation, important design
 decisions, limitations, and exact verification performed. Issues should use the
 forms under `.github/ISSUE_TEMPLATE/`.

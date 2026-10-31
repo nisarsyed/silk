@@ -5,461 +5,261 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "silk/body.h"
-#include "silk/contact.h"
-#include "silk/joint.h"
 #include "silk/math.h"
-#include "silk/shape.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Bound packed ownership arrays. The exact maximum world allocation,
- * including opt-in joints, contacts, and pair storage, is pinned by tests.
- * Raise only on profiling evidence together with that budget. */
-#define SL_BODY_COUNT_MAX 65536u
+/* Units are SI throughout: meters, kilograms, seconds, newtons. The world
+ * frame is right-handed; gravity is a configuration value, so "up" is
+ * whatever the caller makes it. */
 
-/* Soft Step defaults to four substeps; callers can explicitly choose one
- * through eight. Linear motion is capped before it feeds integration or a
- * later constraint stage. Angular motion is capped to a quarter turn over
- * the complete world step, independent of the substep count. */
+/* Storage bounds, fixed at init. Raise only with a measured memory budget. */
+#define SL_VERTEX_COUNT_MAX (1u << 20)
+#define SL_TRIANGLE_COUNT_MAX (1u << 21)
+#define SL_CLOTH_COUNT_MAX 256u
+#define SL_COLLIDER_COUNT_MAX 32u
+
+/* Per-vertex topology bounds. They cap the work of one vertex solve and the
+ * greedy coloring; a regular grid uses 6 triangles and 7 colors.
+ * Meshes exceeding either bound are rejected. Pinned by tests/test_mesh.c. */
+#define SL_VERTEX_TRIANGLE_COUNT_MAX 32u
+#define SL_CLOTH_COLOR_COUNT_MAX 64u
+
+/* Solver work bounds. At equal cost (substeps x iterations), many
+ * substeps of one sweep each stretch a hanging sheet least ("small steps",
+ * Macklin et al. 2019): a sweep cannot remove low-frequency error, while a
+ * smaller h makes each vertex block better conditioned. */
+/* 128 covers mu = 2e3 N/m cloth down to 1.5 cm edges at 60 Hz (a 1 m,
+ * 64 x 64 sheet needs 68 substeps under SL_STIFFNESS_STEP_MAX). */
+#define SL_SUBSTEP_COUNT_MAX 128u
+#define SL_ITERATION_COUNT_MAX 64u
 #define SL_SUBSTEP_COUNT_DEFAULT 4u
-#define SL_SUBSTEP_COUNT_MAX 8u
-#define SL_LINEAR_SPEED_MAX_DEFAULT 400.0f
-#define SL_ROTATION_PER_STEP_MAX (0.25f * SL_PI)
+#define SL_ITERATION_COUNT_DEFAULT 1u
 
-/* Implicit contact regularization, pinned by solver behavior and stress
- * benchmarks. Zero-valued config fields select these defaults; hertz is
- * capped at one quarter of the substep rate at runtime. */
-#define SL_CONTACT_HERTZ_DEFAULT 30.0f
-#define SL_CONTACT_DAMPING_RATIO_DEFAULT 10.0f
-#define SL_CONTACT_PUSH_VELOCITY_MAX_DEFAULT 3.0f
-#define SL_RESTITUTION_THRESHOLD_DEFAULT 1.0f
+/* Stability bound on h^2 * sigma, where sigma (1/s^2) is a vertex's rest
+ * elastic stiffness over its inertia: the trace of its elastic Hessian
+ * block at rest divided by 3 m. A sweep that starts from the inertial
+ * prediction behaves explicitly on mid-frequency stretch modes it cannot
+ * remove, so like a CFL limit it needs small h on stiff, fine cloth. On
+ * regular grids sigma_max = 8 mu / (density edge^2) for lambda = mu. A
+ * 1.2 m sheet dropped on a sphere (docs/solver.md) first gained energy at
+ * h^2 sigma_max = 30 for mu = 1e4 N/m and at 43 for mu = 2e3 N/m, from 24
+ * to 64 cells; 20 leaves a margin under the stiffer case. sl_world_step
+ * raises the substep count to meet it. Pinned by tests/test_solver.c. */
+#define SL_STIFFNESS_STEP_MAX 20.0f
 
-/* Implicit joint regularization. Zero-valued config fields select these
- * defaults; joint hertz is capped at one eighth of the substep rate. */
-#define SL_JOINT_HERTZ_DEFAULT 60.0f
-#define SL_JOINT_DAMPING_RATIO_DEFAULT 2.0f
+/* Velocity cap applied after every substep, m/s. A cloth vertex moving
+ * faster than this is almost certainly numerical, not physical. */
+#define SL_SPEED_MAX_DEFAULT 100.0f
 
-/* Maximum absolute body-center coordinate. IEEE-754 binary32 spacing at
- * 8192 is 0.0009765625; a shape adds at most SL_SHAPE_EXTENT_MAX, and the
- * largest delta between two resulting points is at most 18432, where
- * spacing is 0.001953125 -- under half the 0.005-unit contact slop planned
- * for Phase 3. Typical bodies should span 0.1-10 world units. Pinned by
- * tests/test_world.c and tests/test_step.c. */
-#define SL_POSITION_ABS_MAX 8192.0f
+/* Penalty contact stiffness, N/m. Contact is solved implicitly inside each
+ * vertex block, so stiffness trades penetration depth against conditioning,
+ * not stability. With 1e4 N/m a 1 g vertex resting under 9.81 m/s^2 sinks
+ * about 1 micrometer into its thickness shell. Pinned by tests/test_solver.c.
+ */
+#define SL_COLLISION_STIFFNESS_DEFAULT 1.0e4f
 
-/* Zero is dynamic so a zeroed sl_body_desc keeps its historical
- * meaning. Static bodies never move (inv_mass = inv_inertia = 0);
- * kinematic bodies move only by their velocities and ignore forces,
- * gravity, and drag. */
-typedef enum sl_body_type {
-    SL_BODY_DYNAMIC = 0,
-    SL_BODY_KINEMATIC = 1,
-    SL_BODY_STATIC = 2
-} sl_body_type;
+/* Self contact (Offset Geometric Contact; see sl_world_step).
+ *
+ * Two cloths, or two parts of one cloth, are kept at least a contact
+ * radius r = thickness_a + thickness_b apart, the sum of the two cloths'
+ * shell half-thicknesses. Keep r below the distance between non-adjacent
+ * edges of a flat patch (0.7 of an edge on a regular grid): edge-edge
+ * contact is defined on the wireframe and would push them apart; vertex
+ * contact never acts within a flat sheet, at any r. The stiffness default
+ * matches the paper's 1e4 N/m sphere-drape scenes; the barrier stage below r /
+ * 2 makes the force unbounded regardless. A vertex keeps at most
+ * SL_VERTEX_CONTACT_COUNT_MAX contact pairs (the closest), and an edge as
+ * many edge-edge pairs. */
+#define SL_SELF_CONTACT_COUNT_MAX (1u << 22)
+#define SL_SELF_CONTACT_STIFFNESS_DEFAULT 1.0e4f
+#define SL_VERTEX_CONTACT_COUNT_MAX 16u
 
-typedef struct sl_body_desc {
-    /* World units; each component in
-     * [-SL_POSITION_ABS_MAX, SL_POSITION_ABS_MAX]. */
-    sl_vec2 position;
-    sl_vec2 velocity; /* world units / second; {0, 0} for static */
-    /* Kilograms: > 0 with representable inverse for dynamic; exactly 0
-     * encodes infinite mass for static and kinematic. */
-    float mass;
-    /* Fields below zero-fill to: dynamic, upright, at rest, point
-     * particle. */
-    sl_body_type type;
-    /* Radians, CCW positive; any finite value is wrapped to [-pi, pi]
-     * before constructing the stored rotation. */
-    float angle;
-    /* Radians / second; must be 0 for static. */
-    float angular_velocity;
-    /* NULL or kind SL_SHAPE_NONE means a point particle. Rebuilt from
-     * its active fields into a zero-filled record at create; the pointer
-     * and inactive payload bytes are not retained. */
-    const sl_shape *shape;
-    /* Coulomb coefficient, finite >= 0; zero-fill is frictionless. */
-    float friction;
-    /* Bounce coefficient, finite in [0, 1]; zero-fill is inelastic. */
-    float restitution;
-} sl_body_desc;
-
-/* Conservative defaults pinned by settled pile/chain tests. */
-#define SL_SLEEP_SPEED_MAX_DEFAULT 0.02f
-#define SL_SLEEP_ANGULAR_SPEED_MAX_DEFAULT 0.01f
-#define SL_SLEEP_TIME_MIN_DEFAULT 0.5f
+/* Every stored and accepted coordinate lies in [-max, max] meters. float
+ * spacing at 1e4 is about 1 mm, the coarsest resolution we accept for cloth.
+ */
+#define SL_POSITION_ABS_MAX 1.0e4f
 
 typedef struct sl_world_config {
-    /* Opt-in whole-component sleeping. Zero thresholds select defaults;
-     * otherwise finite positive values. Surface speed includes radius * spin.
-     * Quiet travel is limited to one linear slop and 0.005 radians; constraint
-     * error to two linear slops. A valid fixed-dt change restarts settling.
-     * Required quiet intervals beyond UINT32_MAX steps keep bodies awake.
-     * Sleeping holds transforms, preserves query visibility and solver caches,
-     * and skips integration/constraint work. Changed body/support properties,
-     * nonzero forces/torques, joint edits and new contacts wake components. */
-    bool sleep_enabled;
-    float sleep_speed_max;         /* world units / second */
-    float sleep_angular_speed_max; /* radians / second */
-    float sleep_time_min;          /* seconds */
-    uint32_t body_capacity; /* in [1, SL_BODY_COUNT_MAX], fixed at init */
-    /* 0 selects min(4 * body_capacity, SL_CONTACT_COUNT_MAX). */
-    uint32_t contact_capacity;
-    /* 0 disables joints; otherwise in [1, SL_JOINT_COUNT_MAX]. */
-    uint32_t joint_capacity;
-    sl_vec2 gravity;    /* world units / second^2; default {0, 0} */
-    float linear_drag;  /* 1 / seconds, >= 0; default 0 */
-    float angular_drag; /* 1 / seconds, >= 0; default 0 */
-    /* 0 selects SL_SUBSTEP_COUNT_DEFAULT; otherwise [1, 8]. */
+    uint32_t vertex_capacity;   /* in [1, SL_VERTEX_COUNT_MAX] */
+    uint32_t triangle_capacity; /* in [1, SL_TRIANGLE_COUNT_MAX] */
+    uint32_t cloth_capacity;    /* in [1, SL_CLOTH_COUNT_MAX] */
+    sl_vec3 gravity;            /* m/s^2, finite */
+    sl_vec3 wind;               /* air velocity, m/s, finite */
+    /* 0 selects the defaults; otherwise within the matching maximum.
+     * substep_count is a minimum: each step uses at least enough substeps
+     * to satisfy SL_STIFFNESS_STEP_MAX, up to SL_SUBSTEP_COUNT_MAX. More
+     * substeps or iterations reduce stretch error. */
     uint32_t substep_count;
-    /* World units / second; 0 selects SL_LINEAR_SPEED_MAX_DEFAULT. */
-    float linear_speed_max;
-    /* Zero selects the documented defaults; otherwise finite and > 0. */
-    float contact_hertz;
-    float contact_damping_ratio;
-    float contact_push_velocity_max; /* world units / second */
-    float restitution_threshold;     /* world units / second */
-    float joint_hertz;               /* zero selects documented default */
-    float joint_damping_ratio;       /* zero selects documented default */
+    uint32_t iteration_count;
+    /* 0 selects the documented defaults; otherwise finite and > 0. */
+    float speed_max;           /* m/s */
+    float collision_stiffness; /* N/m */
+    /* Cloth-cloth and self contact (Offset Geometric Contact). The maximum
+     * number of contact pairs kept per detection, in
+     * [0, SL_SELF_CONTACT_COUNT_MAX]; 0 disables self contact and its
+     * storage. Pairs beyond capacity are dropped and counted. */
+    uint32_t self_contact_capacity;
+    /* Quadratic-stage stiffness of the contact energy, N/m. 0 selects
+     * SL_SELF_CONTACT_STIFFNESS_DEFAULT; otherwise finite and > 0. */
+    float self_contact_stiffness;
 } sl_world_config;
 
-/* Deterministic work: candidates are matching tree leaves before filtering;
- * visits include rejected query nodes. Probes count every inspected pair
- * bucket, including terminating empty buckets and deletion/reinsertion work.
- * Proxy counts record successful create/destroy/reinsert operations, not retry
- * marking. Drops count failed eligible contact candidates. Counters saturate
- * at UINT64_MAX; cumulative work includes mutations between steps. */
-typedef struct sl_world_work {
-    uint64_t tree_node_visits;
-    uint64_t pair_candidates;
-    uint64_t pair_probes;
-    /* Inspected wake queue, membership, boundary and adjacency entries,
-     * including clearing bounded visitation scratch. */
-    uint64_t wake_visits;
-    uint64_t body_wakes;  /* sleeping -> awake transitions */
-    uint64_t body_sleeps; /* awake -> sleeping transitions */
-    /* Actual inspected graph entries, including repeated construction passes
-     * and parent reads during union/find. Saturate with other work counters. */
-    uint64_t graph_body_visits;
-    uint64_t graph_constraint_visits;
-    uint64_t graph_parent_probes;
-    uint64_t proxy_creates;
-    uint64_t proxy_destroys;
-    uint64_t proxy_moves;
-    uint64_t contact_drops;
-} sl_world_work;
+/* Opaque storage owned by the world after a successful init. */
+typedef struct sl_world_state sl_world_state;
 
-/* Prepared constraint records, not scalar equations or successful impulses.
- * Each substep executes warm start and biased/relax contact/joint sweeps;
- * contact restitution executes once. Step work is independent of cumulative
- * saturation. Empty steps have no constraint workload; capacity-based graph
- * and wake scratch scans are still reported. */
-typedef struct sl_world_step_stats {
-    sl_world_work work;
-    uint32_t dynamic_body_count;
-    uint32_t kinematic_body_count;
-    uint32_t contact_constraint_count;
-    uint32_t joint_constraint_count;
-    uint32_t island_executed_count;
-    uint32_t island_skipped_count;
-    uint32_t island_count;
-    uint32_t island_body_count_max;
-    uint32_t substep_count;
-} sl_world_step_stats;
-
-typedef struct sl_world_stats {
-    sl_world_step_stats step; /* most recently completed valid step */
-    sl_world_work cumulative; /* since initialization/reset */
-    uint32_t awake_dynamic_count;
-    uint32_t sleeping_dynamic_count;
-    uint32_t body_count;
-    uint32_t body_capacity;
-    uint32_t contact_count;
-    uint32_t contact_capacity;
-    uint32_t joint_count;
-    uint32_t joint_capacity;
-    uint32_t pair_count; /* one occupied bucket per persistent contact */
-    uint32_t pair_capacity;
-    uint32_t body_count_high;
-    uint32_t contact_count_high; /* also pair occupancy high-water */
-    uint32_t joint_count_high;
-} sl_world_stats;
-
-/* Payload categories plus padding sum to arena_bytes, the exact allocation.
- * world_bytes is caller-owned sizeof(sl_world), not part of that sum.
- * Categories include internal struct padding; padding_bytes counts alignment
- * between arena slices. Joint bytes include solver scratch/body adjacency and
- * are zero when joints are disabled. */
-typedef struct sl_world_memory_breakdown {
-    size_t sleep_bytes;  /* 13 bytes/body capacity, excluding alignment gaps */
-    size_t island_bytes; /* bounded graph arrays, excluding alignment gaps */
-    size_t world_state_bytes; /* private metadata in the allocation */
-    size_t body_bytes;
-    size_t broadphase_bytes;
-    size_t contact_bytes;
-    size_t pair_bytes;
-    size_t contact_solver_bytes;
-    size_t joint_bytes;
-    size_t padding_bytes;
-    size_t arena_bytes;
-    size_t world_bytes;
-} sl_world_memory_breakdown;
-
-/* Owning shell: zero-initialize before init and never copy a live world.
- * The state is private; copying duplicates ownership and makes destroy unsafe.
- * Handles belong to this world lifetime, not to another world or a later init.
- */
-struct sl_world_state;
+/* Caller-owned handle. Zero-initialize, then pass to sl_world_init. */
 typedef struct sl_world {
-    struct sl_world_state *state;
+    sl_world_state *state;
 } sl_world;
 
-/* Exact bytes sl_world_init allocates for this configuration after resolving
- * zero defaults; 0 when a capacity or configuration value is invalid. */
-size_t sl_world_memory_bytes(const sl_world_config *config);
-/* False for invalid configuration/NULL output, leaving output untouched. */
-bool sl_world_memory_breakdown_get(const sl_world_config *config,
-                                   sl_world_memory_breakdown *out);
-/* Copied values; reads mutate no state or contact/shape snapshots. Current
- * counts reflect mutations; last-step values survive rejected steps and
- * mutations. Reset clears work/high-water/last-step values and retains
- * capacities. */
-sl_world_stats sl_world_get_stats(const sl_world *world);
+/* A triangle mesh added as one cloth. The rest shape is the given
+ * positions: each triangle's rest metric is taken from its own 3D shape and
+ * bending treats the rest surface as flat (see sl_world_cloth_add).
+ * Pointers are read during the call only. */
+typedef struct sl_cloth_desc {
+    const sl_vec3 *positions; /* vertex_count positions, meters */
+    uint32_t vertex_count;
+    /* 3 * triangle_count indices into positions. Winding is free. */
+    const uint32_t *indices;
+    uint32_t triangle_count;
+    /* Areal density, kg/m^2, finite > 0. Cotton shirting is ~0.15. */
+    float density;
+    /* St. Venant-Kirchhoff membrane Lame parameters, N/m, finite >= 0.
+     * mu resists shear and stretch; lambda resists area change. */
+    float membrane_mu;
+    float membrane_lambda;
+    /* Bending modulus, N*m (J), finite >= 0. */
+    float bending_stiffness;
+    /* Stretch damping rate, 1/s, finite >= 0: each substep removes the
+     * fraction 1 - exp(-damping * h) of every edge's relative velocity
+     * along the edge. Rigid motion is never damped. */
+    float damping;
+    /* Collision shell half-thickness, meters, finite > 0. */
+    float thickness;
+    /* Coulomb coefficient, finite >= 0, combined with a collider's as
+     * sqrt(cloth * collider). */
+    float friction;
+    /* Aerodynamic drag, kg/m^3 (half air density times the drag
+     * coefficient; about 0.6 for a flag in air), finite >= 0. */
+    float drag;
+} sl_cloth_desc;
 
-/* Copied diagnostic values from the last completed island build. IDs are
- * ephemeral indices, not handles. Between steps, counts can describe topology
- * from before a mutation. Static and kinematic boundaries are excluded from
- * dynamic_body_count and can participate in several islands. */
-typedef struct sl_island_stats {
-    uint32_t id;
-    uint32_t dynamic_body_count;
+typedef enum sl_collider_kind {
+    SL_COLLIDER_PLANE = 0,
+    SL_COLLIDER_SPHERE = 1,
+    SL_COLLIDER_CAPSULE = 2
+} sl_collider_kind;
+
+/* A static analytic collider. Moving one between steps is allowed; within a
+ * step it is treated as static, so friction sees no collider velocity. */
+typedef struct sl_collider {
+    sl_collider_kind kind;
+    /* PLANE: a point on the plane. SPHERE: center. CAPSULE: segment start.
+     */
+    sl_vec3 point_a;
+    /* PLANE: outward normal, non-zero, normalized on accept. CAPSULE:
+     * segment end. SPHERE: unused. */
+    sl_vec3 point_b;
+    /* SPHERE, CAPSULE: meters, finite > 0. PLANE: unused. */
+    float radius;
+    float friction; /* finite >= 0 */
+} sl_collider;
+
+typedef struct sl_world_stats {
+    uint32_t vertex_count;
+    uint32_t vertex_capacity;
+    uint32_t triangle_count;
+    uint32_t triangle_capacity;
+    uint32_t bend_count; /* interior-edge bending stencils */
+    uint32_t cloth_count;
+    uint32_t cloth_capacity;
+    uint32_t collider_count;
+    uint32_t color_count_max; /* largest per-cloth color count */
+    /* Vertices in contact during the final sweep of the last step. */
     uint32_t contact_count;
-    uint32_t joint_count;
-} sl_island_stats;
+    /* Substeps the last step used, and whether stability needed more than
+     * SL_SUBSTEP_COUNT_MAX (the step then ran the maximum anyway). */
+    uint32_t substep_count;
+    bool substep_limited;
+    /* Largest per-vertex rest stiffness rate over all cloths, 1/s^2. */
+    float stiffness_rate_max;
+    /* Self contact during the last step: pairs at its final detection,
+     * detections run, pairs dropped for capacity, and vertex moves cut
+     * short by their conservative displacement bounds. */
+    uint32_t self_contact_count;
+    uint32_t self_contact_capacity;
+    uint32_t self_detection_count;
+    uint32_t self_contact_dropped;
+    uint32_t self_bound_hits;
+    size_t arena_bytes; /* exact runtime allocation */
+} sl_world_stats;
 
-/* Returns false, leaving *out unchanged, for a missing output, invalid body,
- * static/kinematic body, or dynamic body not assigned by a completed build.
- * Destruction, slot reuse and reset clear assignment immediately. Reading
- * these copied values preserves diagnostics and all snapshot lifetimes. */
-bool sl_world_body_get_island_stats(const sl_world *world,
-                                    sl_body_handle handle,
-                                    sl_island_stats *out);
-
-/* *world must be zero-initialized or previously destroyed: re-initializing
- * a live world leaks its arena, so the assert fires in debug builds.
- * Returns false, leaving *world zeroed, when body_capacity or
- * contact_capacity or joint_capacity is outside its documented range,
- * gravity is non-finite,
- * linear_drag or angular_drag is non-finite or negative, substep_count is
- * above its cap, or a speed/solver tuning value is non-finite, negative, or
- * derives non-finite softness terms. Zero contact_capacity, substep_count,
- * speed, and solver tuning fields select their documented defaults; zero
- * joint_capacity disables joint storage.
- * The full arena, including inactive rows and alignment gaps, starts
- * zeroed. Everything is allocated here; nothing allocates during
- * simulation. */
+/* Allocates every runtime array once. Returns false without allocating when
+ * config is invalid or allocation fails. world must be zeroed or destroyed.
+ */
 bool sl_world_init(sl_world *world, const sl_world_config *config);
 
-/* Frees all engine-owned memory and zeroes *world; safe to repeat. */
+/* Releases storage and zeroes *world. Safe on a zeroed world. */
 void sl_world_destroy(sl_world *world);
 
-/* Destroys every body and joint and bumps both pools' generations, so handles
- * held from before a reset never validate afterwards. */
-void sl_world_reset(sl_world *world);
+/* Adds a cloth mesh, writing its index (0, 1, ...) to *cloth. Returns false
+ * without mutation when the desc is invalid or capacity is short. Rejects
+ * out-of-range indices, repeated corners, triangles with area below
+ * 1e-12 m^2, non-finite or out-of-domain positions, vertices referenced by
+ * no triangle, edges shared by more than two triangles, and vertices beyond
+ * the topology bounds. Vertex masses lump density * area / 3 per corner.
+ * Velocities start at zero and no vertex is pinned. */
+bool sl_world_cloth_add(sl_world *world, const sl_cloth_desc *desc,
+                        uint32_t *cloth);
 
-/* Returns the null handle -- leaving the world unchanged -- when any
- * descriptor rule fails: position outside SL_POSITION_ABS_MAX, velocity
- * non-finite, unknown type,
- * a mass violating its type's rule (positive with representable inverse
- * for dynamic, exactly 0 for static and kinematic), a static carrying
- * velocity or spin, a non-finite angle or angular velocity, friction outside
- * finite [0, infinity), restitution outside finite [0, 1], a shape
- * sl_shape_is_valid rejects, or a derived inertia whose inverse would
- * overflow; also when the world is full. */
-sl_body_handle sl_world_body_create(sl_world *world, const sl_body_desc *desc);
+/* Adds a collider, writing its index to *collider. Returns false without
+ * mutation when the desc is invalid or SL_COLLIDER_COUNT_MAX is reached. */
+bool sl_world_collider_add(sl_world *world, const sl_collider *desc,
+                           uint32_t *collider);
 
-/* Tolerant no-op for null, malformed, and stale handles. Attached joints are
- * destroyed eagerly before the body slot can be reused. */
-void sl_world_body_destroy(sl_world *world, sl_body_handle handle);
-
-/* True when handle names a live body in this world; safe on arbitrary
- * handles, where the accessors would assert. */
-/* Kinematics are awake, statics/invalid handles are not. Queries and these
- * reads do not wake bodies or invalidate snapshots. Explicit wake accepts
- * dynamics only, waking their affected component and restarting its quiet
- * interval even if already awake. */
-bool sl_world_body_is_awake(const sl_world *world, sl_body_handle handle);
-bool sl_world_body_wake(sl_world *world, sl_body_handle handle);
-bool sl_world_body_is_valid(const sl_world *world, sl_body_handle handle);
-
-uint32_t sl_world_body_count(const sl_world *world);
-uint32_t sl_world_body_capacity(const sl_world *world);
-
-/* Joint storage is opt-in: capacity zero disables creation without adding
- * per-step work. Creation validates the complete descriptor before mutation.
- * Bodies must be distinct and live, at least one must be dynamic, anchor
- * components must be finite and within SL_SHAPE_EXTENT_MAX, and distance
- * length must be in [SL_LINEAR_SLOP, 2 * SL_POSITION_ABS_MAX]. Destroy is a
- * tolerant no-op for null, malformed, and stale handles. */
-uint32_t sl_world_joint_count(const sl_world *world);
-uint32_t sl_world_joint_capacity(const sl_world *world);
-sl_joint_handle sl_world_joint_create(sl_world *world,
-                                      const sl_joint_desc *desc);
-void sl_world_joint_destroy(sl_world *world, sl_joint_handle handle);
-bool sl_world_joint_is_valid(const sl_world *world, sl_joint_handle handle);
-sl_joint_handle sl_world_joint_at(const sl_world *world, uint32_t row);
-sl_joint_desc sl_world_joint_get_desc(const sl_world *world,
-                                      sl_joint_handle handle);
-/* Constraint impulse applied to body_b during the most recently completed
- * step, in linear impulse units. Zero when skipped during a sleeping step;
- * warm-start caches remain retained. A transition step reports its work. */
-sl_vec2 sl_world_joint_get_linear_impulse(const sl_world *world,
-                                          sl_joint_handle handle);
-
-/* Contact-table snapshots are packed in deterministic processing order.
- * contact_at asserts row < contact_count. Its pointer is conservatively valid
- * only until the next non-const world operation. Const spatial queries reuse
- * scratch without invalidating these snapshots. */
-uint32_t sl_world_contact_count(const sl_world *world);
-uint32_t sl_world_contact_capacity(const sl_world *world);
-uint32_t sl_world_contact_drop_count(const sl_world *world);
-const sl_contact *sl_world_contact_at(const sl_world *world, uint32_t row);
-
-sl_vec2 sl_world_get_gravity(const sl_world *world);
-float sl_world_get_linear_drag(const sl_world *world);
-float sl_world_get_angular_drag(const sl_world *world);
-uint32_t sl_world_get_substep_count(const sl_world *world);
-float sl_world_get_linear_speed_max(const sl_world *world);
-
-/* Read-only walks visit live bodies in packed order: deterministic for
- * a given operation sequence, not creation order across destroys. Both
- * ends read as the null handle. Destroy is a swap-remove -- the last
- * packed body lands behind the cursor -- so handles cannot express
- * removal during such a walk; destroying walks use at() with a row
- * cursor instead, retesting the row a removal just refilled:
- *
- *     for (uint32_t row = 0u; row < sl_world_body_count(&world);) {
- *         sl_body_handle body = sl_world_body_at(&world, row);
- *         if (remove(&world, body)) {
- *             sl_world_body_destroy(&world, body);
- *         } else {
- *             row++;
- *         }
- *     }
+/* Replaces collider's shape. Same validation as add; false leaves it as is.
  */
-sl_body_handle sl_world_body_first(const sl_world *world);
-sl_body_handle sl_world_body_next(const sl_world *world,
-                                  sl_body_handle current);
+bool sl_world_collider_set(sl_world *world, uint32_t collider,
+                           const sl_collider *desc);
 
-/* Handle of the body at packed row; asserts row < body_count. Pairs
- * with destroy() for removal-during-traversal walks (see above). */
-sl_body_handle sl_world_body_at(const sl_world *world, uint32_t row);
+/* Returns false for an out-of-range index. */
+bool sl_world_collider_get(const sl_world *world, uint32_t collider,
+                           sl_collider *desc);
 
-/* Accessors assert handle validity. Setters return false -- leaving
- * state unchanged -- for values create() would reject, true otherwise. */
-sl_vec2 sl_world_body_get_position(const sl_world *world,
-                                   sl_body_handle handle);
-sl_vec2 sl_world_body_get_velocity(const sl_world *world,
-                                   sl_body_handle handle);
-/* 0 means infinite mass (static or kinematic body). */
-float sl_world_body_get_mass(const sl_world *world, sl_body_handle handle);
-float sl_world_body_get_inv_mass(const sl_world *world, sl_body_handle handle);
-sl_body_type sl_world_body_get_type(const sl_world *world,
-                                    sl_body_handle handle);
-/* Radians in [-pi, pi]. */
-float sl_world_body_get_angle(const sl_world *world, sl_body_handle handle);
-float sl_world_body_get_angular_velocity(const sl_world *world,
-                                         sl_body_handle handle);
-/* About the body origin; 0 for static, kinematic, and shapeless
- * bodies. */
-float sl_world_body_get_inertia(const sl_world *world, sl_body_handle handle);
-float sl_world_body_get_inv_inertia(const sl_world *world,
-                                    sl_body_handle handle);
-float sl_world_body_get_torque(const sl_world *world, sl_body_handle handle);
-float sl_world_body_get_friction(const sl_world *world, sl_body_handle handle);
-float sl_world_body_get_restitution(const sl_world *world,
-                                    sl_body_handle handle);
+/* Replace world-level forcing. Return false on non-finite input. */
+bool sl_world_gravity_set(sl_world *world, sl_vec3 gravity);
+bool sl_world_wind_set(sl_world *world, sl_vec3 wind);
 
-/* Points into packed storage: valid until the next create / destroy /
- * reset / set_shape. Never NULL; kind SL_SHAPE_NONE marks a point
- * particle. */
-const sl_shape *sl_world_body_get_shape(const sl_world *world,
-                                        sl_body_handle handle);
+/* Pinned vertices are kinematic: the solver never moves them and they carry
+ * infinite mass. Pinning holds the current position as the target;
+ * unpinning keeps the velocity of the last step. Returns false for an
+ * out-of-range cloth or vertex. */
+bool sl_world_vertex_pin_set(sl_world *world, uint32_t cloth, uint32_t vertex,
+                             bool pinned);
 
-/* Body-to-world transform copied directly from stored position and
- * rotation; no trigonometry. */
-sl_transform sl_world_body_get_transform(const sl_world *world,
-                                         sl_body_handle handle);
+/* Moves a pinned vertex to target over the next step, linearly across its
+ * substeps. Returns false for an unpinned or out-of-range vertex, or a
+ * non-finite or out-of-domain target. */
+bool sl_world_vertex_target_set(sl_world *world, uint32_t cloth,
+                                uint32_t vertex, sl_vec3 target);
 
-/* Copies the fat broad-phase AABB. Returns false and leaves *out unchanged
- * for a valid shapeless body. */
-bool sl_world_body_get_proxy_aabb(const sl_world *world, sl_body_handle handle,
-                                  sl_aabb *out);
+/* Read-only views of one cloth's vertices, in the order they were given.
+ * Pointers stay valid until sl_world_destroy; the contents change on every
+ * mutating call. NULL for an out-of-range cloth. */
+const sl_vec3 *sl_world_cloth_positions(const sl_world *world, uint32_t cloth);
+const sl_vec3 *sl_world_cloth_velocities(const sl_world *world, uint32_t cloth);
 
-bool sl_world_body_set_position(sl_world *world, sl_body_handle handle,
-                                sl_vec2 position);
-/* A static body accepts only the zero velocity. */
-bool sl_world_body_set_velocity(sl_world *world, sl_body_handle handle,
-                                sl_vec2 velocity);
-/* Any finite angle; wrapped before constructing the stored rotation. */
-bool sl_world_body_set_angle(sl_world *world, sl_body_handle handle,
-                             float angle);
-/* A static body accepts only zero. */
-bool sl_world_body_set_angular_velocity(sl_world *world, sl_body_handle handle,
-                                        float angular_velocity);
-/* Material mutation is atomic: friction must be finite >= 0 and restitution
- * finite in [0, 1]. All body types may carry materials. */
-bool sl_world_body_set_friction(sl_world *world, sl_body_handle handle,
-                                float friction);
-bool sl_world_body_set_restitution(sl_world *world, sl_body_handle handle,
-                                   float restitution);
-/* Dynamic bodies only; re-derives inertia from the attached shape.
- * Also false -- unchanged -- when the new mass or inertia would turn an
- * already-banked force or torque into an infinite acceleration: both
- * apply_force and apply_torque accepted those against the old
- * inverses, and lowering an inverse's denominator must not smuggle
- * infinity past the guard they enforced. */
-bool sl_world_body_set_mass(sl_world *world, sl_body_handle handle, float mass);
-/* Rebuilds shape from its active fields into a zero-filled record (NULL
- * or kind SL_SHAPE_NONE detaches, restoring a point particle) and
- * re-derives inertia. Inactive union bytes and polygon vertices past
- * count are not copied. Any body may carry a shape; only dynamic bodies
- * gain inertia from it. False -- unchanged -- for shapes
- * sl_shape_is_valid rejects, an inertia with no finite inverse, or a
- * new inertia that would make the banked torque overflow (see
- * sl_world_body_set_mass). */
-bool sl_world_body_set_shape(sl_world *world, sl_body_handle handle,
-                             const sl_shape *shape);
+/* 0 for an out-of-range cloth. */
+uint32_t sl_world_cloth_vertex_count(const sl_world *world, uint32_t cloth);
 
-/* Adds force to the body's accumulator; the stepper consumes and clears
- * it each step. Dynamic bodies only -- a force on a body that cannot
- * respond is rejected, not silently dropped. Returns false -- leaving
- * the accumulator unchanged -- for non-dynamic bodies, non-finite
- * force, an accumulation that would overflow to infinity, or an
- * accumulated acceleration that overflows at the body's current mass.
- * Rejection happens at application time; the step then applies its configured
- * velocity cap before motion or future constraints consume the result. */
-bool sl_world_body_apply_force(sl_world *world, sl_body_handle handle,
-                               sl_vec2 force);
-sl_vec2 sl_world_body_get_force(const sl_world *world, sl_body_handle handle);
+/* false for an out-of-range cloth or vertex. */
+bool sl_world_vertex_is_pinned(const sl_world *world, uint32_t cloth,
+                               uint32_t vertex);
 
-/* Dynamic bodies only. Mirrors apply_force: rejects non-finite torque,
- * an overflowing accumulation, or an angular acceleration that would
- * overflow at the body's current inertia. Torque units follow force
- * units times length. */
-bool sl_world_body_apply_torque(sl_world *world, sl_body_handle handle,
-                                float torque);
-
-/* Accumulates the force and the torque cross(point - position, force)
- * together: both accumulators change or neither does. Dynamic bodies
- * only, under the same overflow rules as apply_force and apply_torque.
- * Each point component must lie within SL_POSITION_ABS_MAX +
- * SL_SHAPE_EXTENT_MAX, the coordinate domain reachable by a point on a
- * valid body. */
-bool sl_world_body_apply_force_at_point(sl_world *world, sl_body_handle handle,
-                                        sl_vec2 force, sl_vec2 point);
+sl_world_stats sl_world_stats_get(const sl_world *world);
 
 #ifdef __cplusplus
 }
