@@ -101,8 +101,9 @@ jobs:
       - run: cmake --build --preset debug
       - run: ctest --preset debug
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
-      # Each scene runs twice; differing state hashes fail the job.
-      - run: build/debug/bin/sl_bench --warmup 2 --steps 8
+      # Each scene runs twice serially and once on 4 threads; any
+      # differing state hash fails the job.
+      - run: build/debug/bin/sl_bench --warmup 2 --steps 8 --threads 4
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -136,7 +137,7 @@ jobs:
       - run: cmake --build --preset release
       - run: ctest --preset release
       - run: python tools/check_consumer.py --output build/consumer-reports --config Release
-      - run: build/release/bin/sl_bench --warmup 2 --steps 8
+      - run: build/release/bin/sl_bench --warmup 2 --steps 8 --threads 4
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -181,7 +182,7 @@ jobs:
       - if: needs.changes.outputs.full == 'true'
         run: python tools/check_consumer.py --output build/consumer-reports --config Debug
       - if: needs.changes.outputs.full == 'true'
-        run: build/windows/bin/Debug/sl_bench.exe --warmup 2 --steps 8
+        run: build/windows/bin/Debug/sl_bench.exe --warmup 2 --steps 8 --threads 4
       - uses: actions/upload-artifact@v7
         if: always() && needs.changes.outputs.full == 'true'
         with:
@@ -206,8 +207,9 @@ jobs:
       - run: cmake --build --preset debug
       - run: ctest --preset debug
       - run: python tools/check_consumer.py --output build/consumer-reports --config Debug
-      # Each scene runs twice; differing state hashes fail the job.
-      - run: build/debug/bin/sl_bench --warmup 2 --steps 8
+      # Each scene runs twice serially and once on 4 threads; any
+      # differing state hash fails the job.
+      - run: build/debug/bin/sl_bench --warmup 2 --steps 8 --threads 4
       - uses: actions/upload-artifact@v7
         if: always()
         with:

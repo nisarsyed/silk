@@ -28,7 +28,7 @@ set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(raylib)
 
 add_executable(sandbox main.c)
-target_link_libraries(sandbox PRIVATE raylib silk silk_warnings)
+target_link_libraries(sandbox PRIVATE raylib silk silk_pool silk_warnings)
 
 # Raylib headers are third-party and not ours to lint: expose them as
 # SYSTEM so their internals stay outside the strict warning set, while

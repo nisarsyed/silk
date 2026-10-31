@@ -97,6 +97,9 @@ than real time (the pile, about 60 ms per step) plays in slow motion,
 flagged in the HUD, while the window stays responsive. Use the
 `sandbox-release` build: the debug build is 10–17 times slower.
 
+The sandbox solves on four threads by default. `--threads N` changes that;
+use at most the number of performance cores (8 on an M4 Pro).
+
 For a scripted capture, `sandbox --scene 2 --frames 150 --screenshot drape.png`
 runs 150 fixed steps, saves the frame, and exits.
 
@@ -111,20 +114,23 @@ cmake --build --preset release
 `sl_bench` runs five scenes: a 32×32 and a 64×64 curtain, a 64×64 sphere
 drape, a 48×48 flag, and a pile of three 30×30 sheets with self contact. For each it reports milliseconds per step,
 nanoseconds per vertex-sweep, contacts, and a hash of the final state. Every
-scene runs twice, and the process exits nonzero if the hashes differ. Use
-`--scene`, `--warmup`, and `--steps` to choose a smaller workload.
+scene runs twice, and the process exits nonzero if the hashes differ. With
+`--threads N`, each scene also runs on an N-thread pool, which must reproduce
+the serial hash. Use `--scene`, `--warmup`, and `--steps` to choose a smaller
+workload.
 
-Single-threaded on an Apple M4 Pro, a vertex-sweep costs about 140 ns.
+On an Apple M4 Pro, a vertex-sweep costs about 130 ns on one thread.
 Substeps scale with resolution under the stability rule, so cost grows
 faster than the vertex count:
 
-| Scene | Substeps | Time per 1/60 s step |
-| --- | --- | --- |
-| 32×32 curtain | 34 | about 5 ms |
-| 64×64 curtain | 68 | about 40 ms |
+| Scene | Substeps | 1 thread | 8 threads |
+| --- | --- | --- | --- |
+| 32×32 curtain | 34 | 5.0 ms | 2.8 ms |
+| 64×64 curtain | 68 | 40.6 ms | 16.1 ms |
 
-Real-time use at high resolution waits on the threading and convergence work
-in the roadmap.
+Edge damping and self-contact detection are still single-threaded, so the
+pile gains little from threads. Details are in
+[docs/solver.md](docs/solver.md#threading).
 
 The same build also produces `sl_compare`, which runs VBD, XPBD, and SIPD
 head to head on shared scenes. Results and the decision they support are in
@@ -164,6 +170,18 @@ const sl_vec3 *p = sl_world_cloth_positions(&world, id);
 
 `examples/headless/main.c` is a complete program. Build it with
 `-DSL_BUILD_EXAMPLE=ON`.
+
+To use several threads, give the world a `parallel_for` callback that runs
+a task over ranges of an index space on your own threads (see
+`sl_parallel_for_fn` in `silk/world.h`). silk never creates threads, and
+results are bitwise identical however the work is split.
+`examples/pool/pool.c` is a small pool implementing it:
+
+```c
+sp_pool *pool = sp_pool_create(8);
+config.parallel_for = sp_pool_parallel_for;
+config.parallel_context = pool;
+```
 
 An existing CMake project can embed silk without enabling its tests,
 examples, or install rules:

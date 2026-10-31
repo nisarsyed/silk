@@ -58,6 +58,11 @@ endif()
 # Deterministic cloth performance harness: an off-by-default developer
 # executable, never a CTest entry. Wall-clock timing remains outside silk.
 option(SL_BUILD_BENCH "Build the deterministic benchmark executable" OFF)
+option(SL_SANDBOX "Build the raylib sandbox example" OFF)
+# Example thread pool shared by the benchmark and the sandbox.
+if(SL_BUILD_BENCH OR SL_SANDBOX)
+    add_subdirectory(examples/pool)
+endif()
 if(SL_BUILD_BENCH)
     add_subdirectory(bench)
 endif()
@@ -66,7 +71,6 @@ endif()
 # artifact — enabling it fetches raylib at configure time and needs a
 # display to run, but it is compile-checked in CI (the sandbox job).
 # See examples/sandbox/CMakeLists.txt.
-option(SL_SANDBOX "Build the raylib sandbox example" OFF)
 if(SL_SANDBOX)
     add_subdirectory(examples/sandbox)
 endif()

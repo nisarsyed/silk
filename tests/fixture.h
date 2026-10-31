@@ -118,6 +118,32 @@ static inline bool sl_test_sheet(sl_world *world, const sl_world_config *c,
     return ok;
 }
 
+/* A parallel_for (sl_parallel_for_fn) for tests, with no threads: it runs
+ * each task on the calling thread, cut into ranges of pseudo-random sizes
+ * (1 to 13, ignoring grain) taken from the end backwards. A result that
+ * depended on the partition or the order would differ from the serial
+ * run. calls counts dispatches, so a test can check it was exercised. */
+typedef struct sl_test_scramble {
+    uint32_t seed;
+    uint32_t calls;
+} sl_test_scramble;
+
+static inline void sl_test_scrambled_for(sl_task_fn *task, uint32_t count,
+                                         uint32_t grain, void *task_context,
+                                         void *parallel_context)
+{
+    sl_test_scramble *scramble = parallel_context;
+    (void)grain;
+    scramble->calls++;
+    uint32_t end = count;
+    while (end > 0u) {
+        const uint32_t size = 1u + sl_test_rand(&scramble->seed) % 13u;
+        const uint32_t begin = (end > size) ? end - size : 0u;
+        task(begin, end, task_context);
+        end = begin;
+    }
+}
+
 /* FNV-1a over the bit patterns of every position and velocity. */
 static inline uint64_t sl_test_world_hash(const sl_world *world)
 {

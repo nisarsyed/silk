@@ -82,7 +82,9 @@ static inline float sl_pair_share(const sl_contact_pair *p)
  * 3 bytes + 3 uint32 = 91 bytes; per triangle capacity 3 + 4 + 1 words
  * plus 3 references, 1.5 bending stencils of 4 + 4 + 1 words and 4
  * references each, and 3 edges of 2 words: 146 bytes. A 64 x 64 cell grid
- * (4225 vertices, 8192 triangles) therefore needs about 1.6 MB. */
+ * (4225 vertices, 8192 triangles) therefore needs about 1.6 MB. Self
+ * contact adds its own arrays, including one vec3 per vertex for
+ * position_next. */
 struct sl_world_state {
     /* Configuration, validated at init. */
     sl_vec3 gravity;
@@ -111,7 +113,10 @@ struct sl_world_state {
     /* Self contact; every array below is empty when the capacity is 0. */
     uint32_t pair_capacity;
     uint32_t pair_count;
-    float self_stiffness;     /* N/m */
+    float self_stiffness; /* N/m */
+    /* Parallel execution, from the config; NULL runs serially. */
+    sl_parallel_for_fn *parallel_for;
+    void *parallel_context;
     float query_radius;       /* m, of the last detection */
     float self_motion;        /* m, inertial motion estimate of the substep */
     uint32_t self_detections; /* this step */
@@ -138,8 +143,13 @@ struct sl_world_state {
     uint32_t *owner_offset; /* edge_capacity + 1 */
     uint32_t stage_count;
     sl_vec3 *position_safe; /* positions at the last detection */
-    sl_bvh triangle_bvh;    /* over all triangles */
-    sl_bvh edge_bvh;        /* over all unique edges */
+    /* Positions solved in the current color, committed after it, so that
+     * same-color vertices joined by a contact read each other's
+     * start-of-color positions whatever the order or thread (see
+     * solver_self.c). */
+    sl_vec3 *position_next;
+    sl_bvh triangle_bvh; /* over all triangles */
+    sl_bvh edge_bvh;     /* over all unique edges */
 
     /* Vertex fields. */
     sl_vec3 *position;
@@ -228,6 +238,37 @@ void sl_solver_substep_end(sl_world_state *state, float h);
 
 /* One sweep including self-contact terms (solver_self.c). */
 void sl_solver_sweep_self(sl_world_state *state, float h);
+
+/* Smallest ranges worth handing to a thread (sl_parallel_for_fn's grain),
+ * sized so a range is a few microseconds of work, several times a spinning
+ * pool's dispatch cost.
+ *
+ * Vertex block solves cost about 150 ns each, so 32 is about 5 us. A
+ * 64 x 64 curtain has colors of a few hundred vertices: a grain of 128 left
+ * most of 8 threads idle (1.85x), while 16 to 64 all gave about 2.15x.
+ * Plain per-vertex loops cost a few ns per vertex: at a grain of 32 they
+ * cost more to dispatch than to run. */
+#define SL_PARALLEL_GRAIN_BLOCK 32u
+#define SL_PARALLEL_GRAIN_LOOP 2048u
+
+/* Runs task over [0, count) through the world's parallel_for, or on the
+ * calling thread when there is none. The host decides how to split, with
+ * grain as the hint (a pool runs a count under its grain inline). Tasks
+ * write only data owned by their own indices, so the result never depends
+ * on the partition. */
+static inline void sl_parallel(const sl_world_state *state, sl_task_fn *task,
+                               uint32_t count, uint32_t grain, void *context)
+{
+    if (count == 0u) {
+        return;
+    }
+    if (state->parallel_for != NULL) {
+        state->parallel_for(task, count, grain, context,
+                            state->parallel_context);
+    } else {
+        task(0u, count, context);
+    }
+}
 
 /* Re-detects contacts mid-substep when at least
  * SL_REDETECT_FRACTION of the vertices hit their bounds (OGC gamma_e). */

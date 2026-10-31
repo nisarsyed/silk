@@ -4,13 +4,18 @@
  * and velocities. Every scene runs twice; differing hashes are a
  * determinism failure and make the process exit nonzero.
  *
- * usage: sl_bench [--steps N] [--warmup N] [--scene NAME] */
+ * With --threads N (N > 1), each scene runs once more on an N-thread pool
+ * (examples/pool); its hash must equal the serial one, since results may
+ * not depend on the thread count.
+ *
+ * usage: sl_bench [--steps N] [--warmup N] [--scene NAME] [--threads N] */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#include "pool.h"
 #include "silk/mesh.h"
 #include "silk/silk.h"
 #include "silk/step.h"
@@ -40,6 +45,15 @@ static sl_cloth_desc sb_cotton(void)
     return d;
 }
 
+/* The pool scenes run on, or NULL for the calling thread only. */
+static sp_pool *sb_pool;
+
+static void sb_parallel(sl_world_config *c)
+{
+    c->parallel_for = (sb_pool != NULL) ? sp_pool_parallel_for : NULL;
+    c->parallel_context = sb_pool;
+}
+
 static bool sb_add_grid(sl_world *world, sl_vec3 origin, sl_vec3 u, sl_vec3 v,
                         uint32_t cells, uint32_t vertex_extra,
                         uint32_t triangle_extra)
@@ -48,6 +62,7 @@ static bool sb_add_grid(sl_world *world, sl_vec3 origin, sl_vec3 u, sl_vec3 v,
     const uint32_t tn = sl_mesh_grid_triangle_count(cells, cells);
     sl_world_config c;
     memset(&c, 0, sizeof(c));
+    sb_parallel(&c);
     c.vertex_capacity = n + vertex_extra;
     c.triangle_capacity = tn + triangle_extra;
     c.cloth_capacity = 1u;
@@ -126,6 +141,7 @@ static bool sb_build_pile(sl_world *world, uint32_t cells)
     const uint32_t tn = sl_mesh_grid_triangle_count(cells, cells);
     sl_world_config c;
     memset(&c, 0, sizeof(c));
+    sb_parallel(&c);
     c.vertex_capacity = layers * n;
     c.triangle_capacity = layers * tn;
     c.cloth_capacity = layers;
@@ -243,6 +259,7 @@ int main(int argc, char **argv)
     uint32_t steps = 120u;
     uint32_t warmup = 30u;
     const char *only = NULL;
+    uint32_t threads = 1u;
     for (int a = 1; a + 1 < argc; a += 2) {
         if (strcmp(argv[a], "--steps") == 0) {
             steps = sb_parse_count(argv[a + 1], steps);
@@ -250,6 +267,8 @@ int main(int argc, char **argv)
             warmup = sb_parse_count(argv[a + 1], warmup);
         } else if (strcmp(argv[a], "--scene") == 0) {
             only = argv[a + 1];
+        } else if (strcmp(argv[a], "--threads") == 0) {
+            threads = sb_parse_count(argv[a + 1], threads);
         }
     }
     const int version = sl_version();
@@ -257,6 +276,14 @@ int main(int argc, char **argv)
            "%u iteration(s) per substep, substeps from cloth stiffness\n",
            (version >> 16) & 0xff, (version >> 8) & 0xff, version & 0xff,
            warmup, steps, SL_ITERATION_COUNT_DEFAULT);
+    sp_pool *pool = (threads > 1u) ? sp_pool_create(threads) : NULL;
+    if (threads > 1u) {
+        if (pool == NULL) {
+            printf("thread pool creation failed\n");
+            return 1;
+        }
+        printf("threaded runs: %u thread(s)\n", sp_pool_thread_count(pool));
+    }
     int status = 0;
     uint32_t ran = 0;
     for (size_t s = 0; s < sizeof(k_scenes) / sizeof(k_scenes[0]); s++) {
@@ -287,8 +314,25 @@ int main(int argc, char **argv)
         if (hash[0] != hash[1]) {
             status = 1;
         }
+        if (pool != NULL) {
+            double ms_threaded = 0.0;
+            uint64_t hash_threaded = 0u;
+            sb_pool = pool;
+            const bool built = sb_run(scene, warmup, steps, &ms_threaded,
+                                      &hash_threaded, &stats);
+            sb_pool = NULL;
+            printf("%-12s threaded %8.3f ms/step (%.2fx) hash %016llx%s\n", "",
+                   ms_threaded, (ms_threaded > 0.0) ? best / ms_threaded : 0.0,
+                   (unsigned long long)hash_threaded,
+                   (built && hash_threaded == hash[0]) ? ""
+                                                       : " THREAD-MISMATCH");
+            if (!built || hash_threaded != hash[0]) {
+                status = 1;
+            }
+        }
         ran++;
     }
+    sp_pool_destroy(pool);
     if (ran == 0u) {
         printf("no scene matched\n");
         return 1;

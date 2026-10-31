@@ -88,7 +88,8 @@ browser work is archived at the `archive/wasm-2d*` tags.
 
 Make what exists fast, in a form the future core can reuse.
 
-- [ ] Deterministic threading within a color, with results identical to the serial order
+- [x] Deterministic threading through a host-supplied `parallel_for`: colored sweeps and per-vertex substep work, bitwise identical for any thread count (2.5× on the 64×64 curtain with 8 threads)
+- [ ] Parallel edge damping that keeps its strength: in color order it damped long waves far less and a stiff drape went unstable ([docs/solver.md](docs/solver.md#edge-damping-stays-serial))
 - [ ] Cheaper dense piles: fewer redetections and parallel detection
 - [ ] SIMD for the membrane and bending kernels, kept only if measurement shows a gain
 - [x] Faster CI: change-aware quick and full tiers, and optimized debug and sanitizer builds
