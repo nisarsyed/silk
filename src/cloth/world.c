@@ -59,6 +59,19 @@ static size_t sl_world_layout(sl_world_state *s, unsigned char *base)
     SL_TAKE(stage_owner, pc);
     SL_TAKE(stage_order, pc);
     SL_TAKE(owner_offset, on * ((size_t)s->edge_capacity + 1u));
+    s->record_capacity = (uint32_t)(on * SL_DETECT_RECORDS_PER_VERTEX * v);
+    const size_t vertex_chunks =
+        (v + SL_DETECT_CHUNK_VERTICES - 1u) / SL_DETECT_CHUNK_VERTICES;
+    s->chunk_capacity =
+        (uint32_t)(on * ((vertex_chunks > SL_DETECT_FRONTIER_MAX)
+                             ? vertex_chunks
+                             : SL_DETECT_FRONTIER_MAX));
+    SL_TAKE(records, s->record_capacity);
+    SL_TAKE(chunk_found, s->chunk_capacity);
+    SL_TAKE(chunk_offset, s->chunk_capacity);
+    SL_TAKE(chunk_redo, s->chunk_capacity);
+    SL_TAKE(frontier, on * SL_DETECT_FRONTIER_MAX);
+    SL_TAKE(frontier_scratch, on * SL_DETECT_FRONTIER_MAX);
     SL_TAKE(position_safe, on * v);
     SL_TAKE(position_next, on * v);
     SL_TAKE(triangle_bvh.node_lo, 2u * tri_bvh);

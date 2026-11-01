@@ -409,18 +409,182 @@ static sl_contact_pair sl_pair_make(sl_pair_kind kind, uint32_t count,
     return p;
 }
 
+/* Detection runs in chunks: ranges of SL_DETECT_CHUNK_VERTICES vertices
+ * for the vertex pass, and parts of the edge tree's self traversal
+ * (sl_bvh_pair_frontier) for the edge pass. A chunk only reads the world
+ * and writes what it finds, every primitive within the query radius and
+ * any contact, as records into its own region of s->records. A serial
+ * merge then applies the records chunk by chunk: the nearest distances,
+ * which set the bounds, and the contacts. Chunks may therefore run on any
+ * threads in any split, and the merge order never depends on the split.
+ * A chunk that finds more records than its region holds runs again (see
+ * sl_detect_pass_run); a rerun finds the same records in the same order,
+ * and when no storage is left it runs during the merge, applying each
+ * record as it finds it, so the result is identical either way. */
+
+/* Vertex-pass record codes (sl_detect_record.code): bits 0-1 hold
+ * SL_PAIR_VERTEX_VERTEX, _EDGE or _FACE plus 1 (0: no contact), bits 2-3
+ * and 4-5 the triangle corners of a vertex or edge feature, an edge's
+ * ordered by vertex index. Edge-pass codes (record a < b): bits 0-1 for
+ * edge a's side and bits 2-3 for edge b's, each SL_SIDE_*. */
+#define SL_SIDE_NONE 0u
+#define SL_SIDE_EDGE 1u
+#define SL_SIDE_FIRST 2u  /* the other edge's first vertex */
+#define SL_SIDE_SECOND 3u /* the other edge's second vertex */
+
+typedef enum sl_detect_pass {
+    SL_DETECT_VERTICES = 0,
+    SL_DETECT_EDGES = 1
+} sl_detect_pass;
+
+/* Per-owner state of the vertex-pass merge (see sl_pair_add). */
+typedef struct sl_vertex_merge {
+    uint32_t vertex; /* owner of the latest record, UINT32_MAX before any */
+    uint32_t first;  /* its first pair */
+    float distances[SL_VERTEX_CONTACT_COUNT_MAX];
+} sl_vertex_merge;
+
+/* Where a chunk's records go: its region, or applied at once. */
+typedef struct sl_emitter {
+    sl_detect_pass pass;
+    sl_detect_record *region;
+    uint32_t room;
+    uint32_t count; /* records found, including any beyond room */
+    /* Inline mode, during the merge only: apply instead of storing. */
+    sl_world_state *apply;
+    sl_vertex_merge *merge;
+} sl_emitter;
+
+/* Appends one staged edge contact for `owner` (edge o0, o1) against the
+ * other edge (f0, f1) as `side` describes. */
+static void sl_stage_side(sl_world_state *s, uint32_t owner, uint32_t o0,
+                          uint32_t o1, uint32_t f0, uint32_t f1, uint32_t side,
+                          float distance, float radius, float mu)
+{
+    if (side == SL_SIDE_NONE) {
+        return;
+    }
+    sl_contact_pair pair;
+    if (side == SL_SIDE_EDGE) {
+        const uint32_t vs[4] = { o0, o1, f0, f1 };
+        pair = sl_pair_make(SL_PAIR_EDGE_EDGE, 4u, vs, radius, mu);
+    } else {
+        const uint32_t vs[3] = { o0, o1, (side == SL_SIDE_FIRST) ? f0 : f1 };
+        pair = sl_pair_make(SL_PAIR_EDGE_VERTEX, 3u, vs, radius, mu);
+    }
+    if (s->stage_count >= s->pair_capacity) {
+        s->self_dropped++;
+        return;
+    }
+    s->stage_pair[s->stage_count] = pair;
+    s->stage_distance[s->stage_count] = distance;
+    s->stage_owner[s->stage_count] = owner;
+    s->stage_count++;
+}
+
+static void sl_apply_vertex(sl_world_state *s, sl_vertex_merge *m,
+                            const sl_detect_record *r)
+{
+    const uint32_t v = r->a;
+    const uint32_t t = r->b;
+    const float d = r->distance;
+    if (v != m->vertex) {
+        m->vertex = v;
+        m->first = s->pair_count;
+    }
+    const uint32_t *idx = s->triangle_index + 3u * t;
+    const uint32_t other_cloth = s->vertex_cloth[idx[0]];
+    if (other_cloth == s->vertex_cloth[v]) {
+        s->vertex_dmin[v] = sl_min(s->vertex_dmin[v], d);
+        s->triangle_dmin[t] = sl_min(s->triangle_dmin[t], d);
+    } else {
+        sl_cloth_record *a = &s->cloths[s->vertex_cloth[v]];
+        sl_cloth_record *b = &s->cloths[other_cloth];
+        a->inter_dmin = sl_min(a->inter_dmin, d);
+        b->inter_dmin = sl_min(b->inter_dmin, d);
+    }
+    const uint32_t kind = r->code & 3u;
+    if (kind == 0u) {
+        return;
+    }
+    const float radius = sl_thickness_of(s, v) + sl_thickness_of(s, idx[0]);
+    const float mu = sqrtf(sl_friction_of(s, v) * sl_friction_of(s, idx[0]));
+    const uint32_t ca = (r->code >> 2u) & 3u;
+    const uint32_t cb = (r->code >> 4u) & 3u;
+    sl_contact_pair p;
+    if (kind - 1u == (uint32_t)SL_PAIR_VERTEX_VERTEX) {
+        const uint32_t vs[2] = { v, idx[ca] };
+        p = sl_pair_make(SL_PAIR_VERTEX_VERTEX, 2u, vs, radius, mu);
+    } else if (kind - 1u == (uint32_t)SL_PAIR_VERTEX_EDGE) {
+        const uint32_t vs[3] = { v, idx[ca], idx[cb] };
+        p = sl_pair_make(SL_PAIR_VERTEX_EDGE, 3u, vs, radius, mu);
+    } else {
+        const uint32_t vs[4] = { v, idx[0], idx[1], idx[2] };
+        p = sl_pair_make(SL_PAIR_VERTEX_FACE, 4u, vs, radius, mu);
+    }
+    sl_pair_add(s, m->first, &p, d, m->distances);
+}
+
+static void sl_apply_edge(sl_world_state *s, const sl_detect_record *r)
+{
+    const uint32_t e = r->a;
+    const uint32_t f = r->b;
+    const float d = r->distance;
+    const uint32_t e0 = s->edge_index[2u * e];
+    const uint32_t e1 = s->edge_index[2u * e + 1u];
+    const uint32_t f0 = s->edge_index[2u * f];
+    const uint32_t f1 = s->edge_index[2u * f + 1u];
+    const uint32_t cloth_e = s->vertex_cloth[e0];
+    const uint32_t cloth_f = s->vertex_cloth[f0];
+    if (cloth_e == cloth_f) {
+        s->edge_dmin[e] = sl_min(s->edge_dmin[e], d);
+        s->edge_dmin[f] = sl_min(s->edge_dmin[f], d);
+    } else {
+        s->cloths[cloth_e].inter_dmin =
+            sl_min(s->cloths[cloth_e].inter_dmin, d);
+        s->cloths[cloth_f].inter_dmin =
+            sl_min(s->cloths[cloth_f].inter_dmin, d);
+    }
+    if (r->code == 0u) {
+        return;
+    }
+    const float radius = sl_thickness_of(s, e0) + sl_thickness_of(s, f0);
+    const float mu = sqrtf(sl_friction_of(s, e0) * sl_friction_of(s, f0));
+    sl_stage_side(s, e, e0, e1, f0, f1, r->code & 3u, d, radius, mu);
+    sl_stage_side(s, f, f0, f1, e0, e1, (r->code >> 2u) & 3u, d, radius, mu);
+}
+
+static void sl_emit(sl_emitter *o, uint32_t a, uint32_t b, float distance,
+                    uint32_t code)
+{
+    sl_detect_record r;
+    r.a = a;
+    r.b = b;
+    r.distance = distance;
+    r.code = code;
+    if (o->apply != NULL) {
+        if (o->pass == SL_DETECT_VERTICES) {
+            sl_apply_vertex(o->apply, o->merge, &r);
+        } else {
+            sl_apply_edge(o->apply, &r);
+        }
+    } else if (o->count < o->room) {
+        o->region[o->count] = r;
+    }
+    o->count++;
+}
+
 /* Paper Algorithm 1 for vertex v: a box query of half-width r_q on the
- * triangle tree. */
-static void sl_detect_vertex(sl_world_state *s, uint32_t v, float query)
+ * triangle tree. Emits every non-incident triangle within r_q, with the
+ * contact when it lies inside the contact radius and v is in the
+ * feature's offset block. */
+static void sl_detect_vertex(const sl_world_state *s, uint32_t v, float query,
+                             sl_emitter *out)
 {
     const sl_bvh *bvh = &s->triangle_bvh;
     const sl_vec3 x = s->position[v];
     const sl_vec3 grow = sl_vec3_make(query, query, query);
-    const uint32_t first = s->pair_count;
-    float distances[SL_VERTEX_CONTACT_COUNT_MAX];
-    float dmin = query;
     const float thickness = sl_thickness_of(s, v);
-    const float friction = sl_friction_of(s, v);
     const sl_vec3 box_lo = sl_vec3_sub(x, grow);
     const sl_vec3 box_hi = sl_vec3_add(x, grow);
     sl_bvh_cursor cursor;
@@ -448,92 +612,58 @@ static void sl_detect_vertex(sl_world_state *s, uint32_t v, float query)
             if (!(c.distance < query)) {
                 continue;
             }
-            const uint32_t other_cloth = s->vertex_cloth[idx[0]];
-            if (other_cloth == s->vertex_cloth[v]) {
-                dmin = sl_min(dmin, c.distance);
-                s->triangle_dmin[t] = sl_min(s->triangle_dmin[t], c.distance);
-            } else {
-                sl_cloth_record *a = &s->cloths[s->vertex_cloth[v]];
-                sl_cloth_record *b = &s->cloths[other_cloth];
-                a->inter_dmin = sl_min(a->inter_dmin, c.distance);
-                b->inter_dmin = sl_min(b->inter_dmin, c.distance);
-            }
             /* Pairs are kept inside the contact radius only (F_OGC, Eq. 12).
              * A primitive approaching between detections is held by its bound,
              * still intersection-free, until the next detection adds it. */
+            uint32_t code = 0u;
             const float radius = thickness + sl_thickness_of(s, idx[0]);
-            if (!(c.distance < radius) || !(c.distance > 0.0f)) {
-                continue;
+            if (c.distance < radius && c.distance > 0.0f) {
+                if (c.kind == SL_FEATURE_VERTEX) {
+                    if (sl_vertex_feasible(s, x, idx[c.a])) {
+                        code = (uint32_t)SL_PAIR_VERTEX_VERTEX + 1u;
+                        code |= c.a << 2u;
+                    }
+                } else if (c.kind == SL_FEATURE_EDGE) {
+                    uint32_t ca = c.a;
+                    uint32_t cb = c.b;
+                    if (idx[ca] > idx[cb]) {
+                        ca = c.b;
+                        cb = c.a;
+                    }
+                    if (sl_edge_feasible(s, x, idx[ca], idx[cb])) {
+                        code = (uint32_t)SL_PAIR_VERTEX_EDGE + 1u;
+                        code |= (ca << 2u) | (cb << 4u);
+                    }
+                } else {
+                    code = (uint32_t)SL_PAIR_VERTEX_FACE + 1u;
+                }
             }
-            const float mu = sqrtf(friction * sl_friction_of(s, idx[0]));
-            if (c.kind == SL_FEATURE_VERTEX) {
-                const uint32_t w = idx[c.a];
-                if (!sl_vertex_feasible(s, x, w)) {
-                    continue;
-                }
-                const uint32_t vs[2] = { v, w };
-                const sl_contact_pair p =
-                    sl_pair_make(SL_PAIR_VERTEX_VERTEX, 2u, vs, radius, mu);
-                sl_pair_add(s, first, &p, c.distance, distances);
-            } else if (c.kind == SL_FEATURE_EDGE) {
-                uint32_t a = idx[c.a];
-                uint32_t b = idx[c.b];
-                if (a > b) {
-                    const uint32_t tmp = a;
-                    a = b;
-                    b = tmp;
-                }
-                if (!sl_edge_feasible(s, x, a, b)) {
-                    continue;
-                }
-                const uint32_t vs[3] = { v, a, b };
-                const sl_contact_pair p =
-                    sl_pair_make(SL_PAIR_VERTEX_EDGE, 3u, vs, radius, mu);
-                sl_pair_add(s, first, &p, c.distance, distances);
-            } else {
-                const uint32_t vs[4] = { v, idx[0], idx[1], idx[2] };
-                const sl_contact_pair p =
-                    sl_pair_make(SL_PAIR_VERTEX_FACE, 4u, vs, radius, mu);
-                sl_pair_add(s, first, &p, c.distance, distances);
-            }
+            sl_emit(out, v, t, c.distance, code);
         }
     }
-    s->vertex_dmin[v] = dmin;
 }
 
-/* Stages the contact of `owner` (edge o0, o1) against the other edge's
- * closest feature: its vertex w when the closest point sits at an end
- * (t <= 0 or t >= 1, feasible in w's vertex block for the point x on the
- * owner), else its interior (f0, f1). */
-static void sl_stage_edge(sl_world_state *s, uint32_t owner, uint32_t o0,
-                          uint32_t o1, uint32_t f0, uint32_t f1, float t,
-                          sl_vec3 x, float distance, float radius, float mu)
+/* The side of the contact owned by edge (o0, o1) against the other edge
+ * (f0, f1), whose closest point has parameter t: the other edge's vertex
+ * when the closest point sits at an end (t <= 0 or t >= 1, feasible in
+ * that vertex's block for the point x on the owner), else its interior. */
+static uint32_t sl_edge_side(const sl_world_state *s, uint32_t f0, uint32_t f1,
+                             float t, sl_vec3 x)
 {
-    sl_contact_pair pair;
     if (t <= 0.0f || t >= 1.0f) {
         const uint32_t w = (t <= 0.0f) ? f0 : f1;
         if (!sl_vertex_feasible(s, x, w)) {
-            return;
+            return SL_SIDE_NONE;
         }
-        const uint32_t vs[3] = { o0, o1, w };
-        pair = sl_pair_make(SL_PAIR_EDGE_VERTEX, 3u, vs, radius, mu);
-    } else {
-        const uint32_t vs[4] = { o0, o1, f0, f1 };
-        pair = sl_pair_make(SL_PAIR_EDGE_EDGE, 4u, vs, radius, mu);
+        return (t <= 0.0f) ? SL_SIDE_FIRST : SL_SIDE_SECOND;
     }
-    if (s->stage_count >= s->pair_capacity) {
-        s->self_dropped++;
-        return;
-    }
-    s->stage_pair[s->stage_count] = pair;
-    s->stage_distance[s->stage_count] = distance;
-    s->stage_owner[s->stage_count] = owner;
-    s->stage_count++;
+    return SL_SIDE_EDGE;
 }
 
-/* One unordered edge pair (e, f), paper Algorithm 2 from both sides:
- * updates both minimal distances and stages each side's contact. */
-static void sl_edge_pair(sl_world_state *s, uint32_t e, uint32_t f, float query)
+/* One unordered edge pair (e, f), e < f, paper Algorithm 2 from both
+ * sides: emits the pair when within r_q, with each side's contact. */
+static void sl_edge_pair(const sl_world_state *s, uint32_t e, uint32_t f,
+                         float query, sl_emitter *out)
 {
     const sl_bvh *bvh = &s->edge_bvh;
     /* Box then sphere cull (paper Alg. 2: radius r_q + l / 2 about the
@@ -566,33 +696,42 @@ static void sl_edge_pair(sl_world_state *s, uint32_t e, uint32_t f, float query)
     if (!(d < query)) {
         return;
     }
-    const uint32_t cloth_e = s->vertex_cloth[e0];
-    const uint32_t cloth_f = s->vertex_cloth[f0];
-    if (cloth_e == cloth_f) {
-        s->edge_dmin[e] = sl_min(s->edge_dmin[e], d);
-        s->edge_dmin[f] = sl_min(s->edge_dmin[f], d);
-    } else {
-        s->cloths[cloth_e].inter_dmin =
-            sl_min(s->cloths[cloth_e].inter_dmin, d);
-        s->cloths[cloth_f].inter_dmin =
-            sl_min(s->cloths[cloth_f].inter_dmin, d);
-    }
+    uint32_t code = 0u;
     const float radius = sl_thickness_of(s, e0) + sl_thickness_of(s, f0);
-    if (!(d < radius) || !(d > 0.0f)) {
-        return;
+    if (d < radius && d > 0.0f) {
+        code = sl_edge_side(s, f0, f1, b, pc) |
+               (sl_edge_side(s, e0, e1, a, qc) << 2u);
     }
-    const float mu = sqrtf(sl_friction_of(s, e0) * sl_friction_of(s, f0));
-    sl_stage_edge(s, e, e0, e1, f0, f1, b, pc, d, radius, mu);
-    sl_stage_edge(s, f, f0, f1, e0, e1, a, qc, d, radius, mu);
+    sl_emit(out, e, f, d, code);
 }
 
-/* All edge pairs within r_q through one self traversal of the edge tree:
- * each unordered pair is visited exactly once. */
-static void sl_detect_edges(sl_world_state *s, float query)
+/* Vertex-pass chunk c: vertices [c, c + 1) * SL_DETECT_CHUNK_VERTICES. */
+static void sl_vertex_chunk(const sl_world_state *s, uint32_t c,
+                            sl_emitter *out)
+{
+    const uint32_t begin = c * SL_DETECT_CHUNK_VERTICES;
+    const uint32_t end = (s->vertex_count - begin > SL_DETECT_CHUNK_VERTICES)
+                             ? begin + SL_DETECT_CHUNK_VERTICES
+                             : s->vertex_count;
+    for (uint32_t v = begin; v < end; v++) {
+        sl_detect_vertex(s, v, s->query_radius, out);
+    }
+}
+
+/* Edge-pass chunk c: the self traversal from frontier pair c. Each
+ * unordered pair is visited once. Before scanning leaf b for an element of
+ * leaf a, the element's box is tested against b's whole box, grown by a
+ * margin that absorbs rounding, so that only pairs the element test would
+ * reject anyway are skipped (13% less edge-pass time in the pile scene). */
+static void sl_edge_chunk(const sl_world_state *s, uint32_t c, sl_emitter *out)
 {
     const sl_bvh *bvh = &s->edge_bvh;
+    const float query = s->query_radius;
+    const float margin = query + 1e-5f * (1.0f + query);
+    const sl_vec3 grow = sl_vec3_make(margin, margin, margin);
     sl_bvh_pair_cursor cursor;
-    sl_bvh_pair_cursor_init(&cursor, bvh, query);
+    sl_bvh_pair_cursor_start(&cursor, query, s->frontier[c][0],
+                             s->frontier[c][1]);
     uint32_t a_first;
     uint32_t a_count;
     uint32_t b_first;
@@ -600,12 +739,141 @@ static void sl_detect_edges(sl_world_state *s, float query)
     bool same;
     while (sl_bvh_next_leaf_pair(&cursor, bvh, &a_first, &a_count, &b_first,
                                  &b_count, &same)) {
+        sl_vec3 lo = bvh->elem_lo[bvh->perm[b_first]];
+        sl_vec3 hi = bvh->elem_hi[bvh->perm[b_first]];
+        for (uint32_t j = b_first + 1u; j < b_first + b_count; j++) {
+            lo = sl_vec3_min3(lo, bvh->elem_lo[bvh->perm[j]]);
+            hi = sl_vec3_max3(hi, bvh->elem_hi[bvh->perm[j]]);
+        }
+        lo = sl_vec3_sub(lo, grow);
+        hi = sl_vec3_add(hi, grow);
         for (uint32_t i = a_first; i < a_first + a_count; i++) {
+            const uint32_t x = bvh->perm[i];
+            if (!sl_element_overlaps(bvh, x, lo, hi)) {
+                continue;
+            }
             const uint32_t j_begin = same ? i + 1u : b_first;
             for (uint32_t j = j_begin; j < b_first + b_count; j++) {
-                const uint32_t x = bvh->perm[i];
                 const uint32_t y = bvh->perm[j];
-                sl_edge_pair(s, (x < y) ? x : y, (x < y) ? y : x, query);
+                sl_edge_pair(s, (x < y) ? x : y, (x < y) ? y : x, query, out);
+            }
+        }
+    }
+}
+
+static void sl_run_chunk(const sl_world_state *s, sl_detect_pass pass,
+                         uint32_t c, sl_emitter *out)
+{
+    if (pass == SL_DETECT_VERTICES) {
+        sl_vertex_chunk(s, c, out);
+    } else {
+        sl_edge_chunk(s, c, out);
+    }
+}
+
+typedef struct sl_detect_task {
+    sl_world_state *state;
+    sl_detect_pass pass;
+    uint32_t room; /* first round: records per chunk region */
+} sl_detect_task;
+
+/* First round, chunks [begin, end): each writes its own region and
+ * chunk_found entry only. */
+static void sl_detect_chunks(uint32_t begin, uint32_t end, void *context)
+{
+    const sl_detect_task *task = context;
+    sl_world_state *s = task->state;
+    for (uint32_t c = begin; c < end; c++) {
+        sl_emitter out;
+        memset(&out, 0, sizeof(out));
+        out.pass = task->pass;
+        out.region = s->records + (size_t)c * task->room;
+        out.room = task->room;
+        sl_run_chunk(s, task->pass, c, &out);
+        s->chunk_found[c] = out.count;
+    }
+}
+
+/* Second round, entries [begin, end) of chunk_redo: each chunk runs again
+ * into its exact-size slot at chunk_offset. */
+static void sl_detect_redo(uint32_t begin, uint32_t end, void *context)
+{
+    const sl_detect_task *task = context;
+    sl_world_state *s = task->state;
+    for (uint32_t k = begin; k < end; k++) {
+        const uint32_t c = s->chunk_redo[k];
+        sl_emitter out;
+        memset(&out, 0, sizeof(out));
+        out.pass = task->pass;
+        out.region = s->records + s->chunk_offset[c];
+        out.room = s->chunk_found[c];
+        sl_run_chunk(s, task->pass, c, &out);
+        SL_ASSERT(out.count == s->chunk_found[c]);
+    }
+}
+
+/* Runs one pass over `chunks` chunks and merges it in chunk order.
+ *
+ * Round one gives every chunk an equal region. Chunks count all they find,
+ * so afterwards the records that fit are compacted to the front (each
+ * moves down: the records before chunk c number at most c * room) and each
+ * chunk that overflowed gets an exact-size slot after them, if the buffer
+ * has room, and runs again there in round two. A chunk left without a slot
+ * runs inline during the merge. */
+static void sl_detect_pass_run(sl_world_state *s, sl_detect_pass pass,
+                               uint32_t chunks)
+{
+    SL_ASSERT(chunks <= s->chunk_capacity);
+    if (chunks == 0u) {
+        return;
+    }
+    sl_detect_task task = { s, pass, s->record_capacity / chunks };
+    sl_parallel(s, sl_detect_chunks, chunks, 1u, &task);
+    uint32_t at = 0u;
+    for (uint32_t c = 0; c < chunks; c++) {
+        const uint32_t found = s->chunk_found[c];
+        if (found <= task.room) {
+            memmove(s->records + at, s->records + (size_t)c * task.room,
+                    sizeof(sl_detect_record) * found);
+            s->chunk_offset[c] = at;
+            at += found;
+        }
+    }
+    uint32_t redo = 0u;
+    for (uint32_t c = 0; c < chunks; c++) {
+        const uint32_t found = s->chunk_found[c];
+        if (found > task.room) {
+            if (found <= s->record_capacity - at) {
+                s->chunk_offset[c] = at;
+                at += found;
+                s->chunk_redo[redo++] = c;
+            } else {
+                s->chunk_offset[c] = UINT32_MAX; /* inline in the merge */
+            }
+        }
+    }
+    s->self_overflows += redo;
+    sl_parallel(s, sl_detect_redo, redo, 1u, &task);
+    sl_vertex_merge merge;
+    memset(&merge, 0, sizeof(merge));
+    merge.vertex = UINT32_MAX;
+    for (uint32_t c = 0; c < chunks; c++) {
+        if (s->chunk_offset[c] == UINT32_MAX) {
+            s->self_inline++;
+            sl_emitter out;
+            memset(&out, 0, sizeof(out));
+            out.pass = pass;
+            out.apply = s;
+            out.merge = &merge;
+            sl_run_chunk(s, pass, c, &out);
+            continue;
+        }
+        const sl_detect_record *r = s->records + s->chunk_offset[c];
+        for (uint32_t k = 0; k < s->chunk_found[c]; k++) {
+            if (pass == SL_DETECT_VERTICES) {
+                sl_apply_vertex(s, &merge, &r[k]);
+            } else {
+                sl_apply_edge(s, &r[k]);
             }
         }
     }
@@ -722,13 +990,20 @@ void sl_self_detect(sl_world_state *s, float motion)
         }
     }
     for (uint32_t v = 0; v < s->vertex_count; v++) {
-        sl_detect_vertex(s, v, query);
+        s->vertex_dmin[v] = query;
     }
+    sl_detect_pass_run(s, SL_DETECT_VERTICES,
+                       (s->vertex_count + SL_DETECT_CHUNK_VERTICES - 1u) /
+                           SL_DETECT_CHUNK_VERTICES);
     for (uint32_t e = 0; e < s->edge_count; e++) {
         s->edge_dmin[e] = query;
     }
     s->stage_count = 0u;
-    sl_detect_edges(s, query);
+    sl_detect_pass_run(s, SL_DETECT_EDGES,
+                       sl_bvh_pair_frontier(&s->edge_bvh, query, s->frontier,
+                                            s->frontier_scratch,
+                                            SL_DETECT_FRONTIER_MAX,
+                                            SL_DETECT_FRONTIER_TARGET));
     sl_commit_edges(s);
 
     /* Bounds (Eq. 21): the nearest of v's own distance to faces, its edges'

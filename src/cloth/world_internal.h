@@ -69,6 +69,29 @@ typedef struct sl_contact_pair {
     float friction; /* combined Coulomb coefficient */
 } sl_contact_pair;
 
+/* Detection work units and storage (see self_contact.c). A vertex chunk
+ * of 64 costs about 40 us in a dense pile, well above a pool's dispatch
+ * cost. The edge traversal is split into at least 256 parts when the tree
+ * allows, enough for 8 threads to balance parts of uneven size; the
+ * frontier stops before exceeding SL_DETECT_FRONTIER_MAX. Records take 8
+ * per vertex of capacity (16 bytes each); the pile scene finds about 1.7
+ * per vertex per detection. A chunk that overflows its share runs again,
+ * so these sizes affect speed only, never results. */
+#define SL_DETECT_CHUNK_VERTICES 64u
+#define SL_DETECT_FRONTIER_TARGET 256u
+#define SL_DETECT_FRONTIER_MAX 1024u
+#define SL_DETECT_RECORDS_PER_VERTEX 8u
+
+/* A primitive found within the query radius by a detection chunk: vertex a
+ * and triangle b, or edges a < b, their distance (m), and the contact
+ * found, coded per pass (self_contact.c). Transient AoS: consumed whole. */
+typedef struct sl_detect_record {
+    uint32_t a;
+    uint32_t b;
+    float distance;
+    uint32_t code;
+} sl_detect_record;
+
 /* Weight of a pair in the contact energy (see sl_contact_pair). */
 static inline float sl_pair_share(const sl_contact_pair *p)
 {
@@ -124,6 +147,8 @@ struct sl_world_state {
     uint32_t self_dropped;    /* this step */
     uint32_t self_bound_hits; /* this step */
     uint32_t bound_exceeded;  /* distinct vertices held, since detection */
+    uint32_t self_overflows;  /* detection chunks run twice, this step */
+    uint32_t self_inline;     /* chunks run inline in the merge, this step */
     sl_contact_pair *pairs;
     uint32_t *pair_ref_offset; /* vertex_capacity + 1: pairs pushing a vertex */
     uint32_t *pair_ref;        /* pair * 4 + slot */
@@ -143,6 +168,16 @@ struct sl_world_state {
     uint32_t *stage_order;  /* pair_capacity: staged indices by owner */
     uint32_t *owner_offset; /* edge_capacity + 1 */
     uint32_t stage_count;
+    /* Detection chunks: record regions, records each chunk found, and the
+     * edge traversal frontier with its scratch. */
+    sl_detect_record *records;
+    uint32_t record_capacity;
+    uint32_t *chunk_found;
+    uint32_t *chunk_offset; /* into records; UINT32_MAX: run inline */
+    uint32_t *chunk_redo;   /* chunks rerun in the second round */
+    uint32_t chunk_capacity;
+    uint32_t (*frontier)[2];
+    uint32_t (*frontier_scratch)[2];
     sl_vec3 *position_safe; /* positions at the last detection */
     /* Positions solved in the current color, committed after it, so that
      * same-color vertices joined by a contact read each other's

@@ -397,10 +397,67 @@ and thread count, including running everything on the calling thread.
 - **Per-vertex substep loops:** the inertial targets, initial guess,
   velocities, collider friction, and speed clamp.
 
-Still serial: edge damping (below), self-contact detection, bounds and
-contact friction, and the detection-time BVH work. In the pile scene,
-detection is about 70% of the step, so threading gains little there (issue
-#117).
+- **Self-contact detection**, in chunks merged in a fixed order (below).
+
+Still serial: edge damping (below), the bounds, contact friction, and the
+BVH refit and merges around detection.
+
+### Parallel detection
+
+Profiling the three-sheet pile (`pile-30`, one thread, 57 ms per step)
+before the change:
+
+- **Detection was about 60% of the step,** 5.9 ms per detection at 5.9
+  detections per step. The edge–edge traversal took 3.9 ms of that and the
+  vertex–triangle queries 1.8 ms. Refit, merge and bounds took 0.1 ms.
+- **The rest was the sweeps** (membrane, bending and contact blocks).
+- **Detecting less often had no safe headroom.** The pile never settles:
+  sheets slide off the sphere at 2–5 m/s for the whole run, and the
+  vertices held at their bounds were nearly all in real proximity, since
+  only 2 of the 47 at a redetection had bounds capped by the query radius.
+  One idea was to translate cloths in contact as one group, which extends
+  the per-cloth translation of the bounds. That made it worse: 2,004
+  detections against 1,770, with no crossings either way. Raising the 1%
+  trigger is known to show as sticking.
+
+So each detection is now split into chunks that run in parallel:
+
+- **Chunks.** The vertex pass uses ranges of 64 vertices. The edge pass
+  uses parts of the edge tree's self traversal: node pairs expanded
+  breadth-first until there are at least 256 of them. The traversals
+  started from them yield every leaf pair once, which a test checks
+  against the full traversal.
+- **Records.** A chunk only reads. It writes every primitive it finds
+  within the query radius, and any contact, as 16-byte records into its
+  own region of a buffer sized at init (8 records per vertex of capacity).
+- **Merge.** A serial merge applies the records chunk by chunk: the
+  nearest distances, which set the bounds, then the contacts. The merge
+  order is the same for every split, so threaded results are bitwise
+  identical to serial ones. The pile's hash did not change at all.
+- **Overflow.** Regions are equal, so dense chunks can overflow. A chunk
+  counts everything it finds, though. After the first round, the records
+  that fit are compacted, and each overflowed chunk runs again into an
+  exact-size slot. In the pile this reruns about 18 chunks per detection.
+  Only when the buffer is short does a chunk run inline during the merge.
+  A test cuts the buffer to force both cases and checks the hash.
+
+Alternatives measured and rejected:
+
+- **Per-edge queries** instead of the self traversal, so that each edge
+  owns its results. The edge pass took 6.1 ms against 3.9 ms on one
+  thread, a regression for single-threaded hosts such as WebAssembly.
+- **Fixed contact slots per vertex and edge** (the GPU layout). About
+  0.8 KB per vertex for 16 slots each, nearly all empty.
+- **Counting before filling.** It doubles the detection work.
+- **Contiguous, leaf-ordered element records** for the traversal. No gain
+  (3.8 ms against 3.4 ms), so memory layout is not the limit.
+- **Smaller BVH leaves.** 4 elements per leaf took the edge pass from 3.9
+  to 3.3 ms but changes the rigid broad phase too. Not taken.
+
+Kept from the same profiling: before an element of one leaf scans another
+leaf, its box is tested against that leaf's whole box, grown by a rounding
+margin. That cut element visits from 722k to 301k per detection and the
+edge pass by 13%, with identical results.
 
 ### Edge damping stays serial
 
@@ -460,10 +517,11 @@ release build, ms per 1/60 s step:
 | 64×64 curtain | 40.6 | 18.5 (2.2×) | 16.1 (2.5×) |
 | 64×64 drape | 36.0 | 16.1 (2.2×) | 13.9 (2.6×) |
 | 48×48 flag | 15.1 | 7.3 (2.1×) | 6.3 (2.4×) |
-| three 30×30 sheets (self contact) | 57.8 | 49.2 (1.2×) | 49.9 (1.2×) |
+| three 30×30 sheets (self contact) | 56.8 | 20.0 (2.8×) | 14.7 (3.9×) |
 
 Single-threaded times and contact-free hashes are unchanged from before
-threading. The threaded hash matches the serial one in every scene and at
+threading. The pile ran at 49.2 ms (4 threads) and 49.9 ms (8) before
+detection was parallel, with the same hash. The threaded hash matches the serial one in every scene and at
 every thread count tried (2–12). Beyond the performance cores, speed falls:
 the 64×64 curtain runs at 1.85× on 10 threads and 1.7× on 12, because every
 color waits for its slowest range and efficiency cores are slower. Use at

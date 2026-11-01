@@ -90,7 +90,7 @@ Make what exists fast, in a form the future core can reuse.
 
 - [x] Deterministic threading through a host-supplied `parallel_for`: colored sweeps and per-vertex substep work, bitwise identical for any thread count (2.5× on the 64×64 curtain with 8 threads)
 - [ ] Parallel edge damping that keeps its strength: in color order it damped long waves far less and a stiff drape went unstable ([docs/solver.md](docs/solver.md#edge-damping-stays-serial))
-- [ ] Cheaper dense piles: fewer redetections and parallel detection
+- [x] Cheaper dense piles: self-contact detection runs in parallel chunks merged in a fixed order, bitwise identical to serial (the 30×30 pile from 1.2× to 3.9× on 8 threads, 56.8 to 14.7 ms per step). Fewer redetections had no safe headroom: the pile never settles, and held vertices are nearly all in real proximity ([docs/solver.md](docs/solver.md#parallel-detection))
 - [ ] SIMD for the membrane and bending kernels, kept only if measurement shows a gain
 - [x] Faster CI: change-aware quick and full tiers, and optimized debug and sanitizer builds
 - [x] Contact debug drawing in the sandbox: self-contact pairs by kind, vertices held at their bounds, and collider contacts, through a small read-only diagnostics query (`sl_world_self_contacts`, `sl_world_vertex_flags`)
