@@ -93,7 +93,7 @@ Make what exists fast, in a form the future core can reuse.
 - [ ] Cheaper dense piles: fewer redetections and parallel detection
 - [ ] SIMD for the membrane and bending kernels, kept only if measurement shows a gain
 - [x] Faster CI: change-aware quick and full tiers, and optimized debug and sanitizer builds
-- [ ] Contact debug drawing in the sandbox
+- [x] Contact debug drawing in the sandbox: self-contact pairs by kind, vertices held at their bounds, and collider contacts, through a small read-only diagnostics query (`sl_world_self_contacts`, `sl_world_vertex_flags`)
 
 ### Milestone 4 — Core and rigid bodies
 

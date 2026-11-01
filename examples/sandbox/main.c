@@ -5,6 +5,7 @@
  *   S      single step (paused)  wheel       zoom
  *   R      reset scene           W           toggle wind
  *   C      toggle self contact (rebuilds the scene)
+ *   D      toggle contact debug drawing
  *
  * The simulation advances at most one fixed step per rendered frame, so a
  * scene that is costlier than real time runs in slow motion (shown in the
@@ -15,7 +16,7 @@
  * a step waits for the slowest thread at every color.
  *
  * For visual checks without interaction:
- *   sandbox [--scene 1-5] [--wind] [--threads N]
+ *   sandbox [--scene 1-5] [--wind] [--contacts] [--threads N]
  *           [--frames N --screenshot FILE.png]
  * runs N frames, saves a screenshot (raylib writes it relative to the
  * working directory) and exits.
@@ -23,7 +24,15 @@
  * Palette (Box2D v3 conventions on graphite): dynamic cloth carries the
  * saturation, pinned (kinematic) vertices are royal blue, the held vertex
  * is a white-smoke highlight, colliders are static grey-green with the fill
- * at 0.6x the outline, forces (wind) magenta, red only for PAUSED. */
+ * at 0.6x the outline, forces (wind) magenta, red only for PAUSED.
+ *
+ * Contact debug drawing (D) is a screen-space overlay drawn over the cloth,
+ * since contacts sit inside the cloth's thickness: a self-contact pair is
+ * a segment between its closest points with a dot at the first, chartreuse
+ * for vertex-facet and gold for edge-edge pairs, grey when the pair is
+ * found but not yet pushing (as Box2D greys speculative points). Vertices
+ * touching a collider are aqua and vertices held by their self-contact
+ * bound deep pink. */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,9 +62,14 @@ static const Color k_cloth_front[SB_CLOTH_COUNT_MAX] = {
     { 0xC9, 0x5B, 0xD6, 255 }
 };
 static const Color k_collider = { 0x8B, 0xB4, 0x8B, 255 };
-static const Color k_pinned = { 0x41, 0x69, 0xE1, 255 }; /* RoyalBlue */
-static const Color k_held = { 0xF5, 0xF5, 0xF5, 255 };   /* WhiteSmoke */
-static const Color k_wind = { 0xFF, 0x00, 0xFF, 255 };   /* Magenta */
+static const Color k_pinned = { 0x41, 0x69, 0xE1, 255 };       /* RoyalBlue */
+static const Color k_held = { 0xF5, 0xF5, 0xF5, 255 };         /* WhiteSmoke */
+static const Color k_wind = { 0xFF, 0x00, 0xFF, 255 };         /* Magenta */
+static const Color k_vertex_facet = { 0x7F, 0xFF, 0x00, 255 }; /* Chartreuse */
+static const Color k_edge_edge = { 0xFF, 0xD7, 0x00, 255 };    /* Gold */
+static const Color k_pair_idle = { 0x80, 0x80, 0x80, 255 };    /* Gray */
+static const Color k_touching = { 0x00, 0xFF, 0xFF, 255 };     /* Aqua */
+static const Color k_at_bound = { 0xFF, 0x14, 0x93, 255 };     /* DeepPink */
 
 typedef enum sb_scene_id {
     SB_SCENE_CURTAIN = 0,
@@ -83,6 +97,10 @@ typedef struct sb_app {
     bool wind_on;
     bool paused;
     bool self_contact;
+    bool show_contacts;
+    /* Self-contact pairs for debug drawing, self_contact_capacity long. */
+    sl_self_contact *contacts;
+    uint32_t contact_capacity;
     double sim_time; /* seconds simulated since the scene loaded */
     /* Curtain: ring indices and their starting x, gathered over time. */
     uint32_t ring_count;
@@ -133,8 +151,11 @@ static void sb_scene_free(sb_app *app)
     sl_world_destroy(&app->world);
     free(app->indices);
     free(app->normals);
+    free(app->contacts);
     app->indices = NULL;
     app->normals = NULL;
+    app->contacts = NULL;
+    app->contact_capacity = 0;
     app->cloth_count = 0;
     app->vertex_count = 0;
     app->triangle_count = 0;
@@ -171,6 +192,12 @@ static bool sb_scene_layers(sb_app *app, sl_vec3 origin, sl_vec3 u, sl_vec3 v,
     config.cloth_capacity = layers;
     config.gravity = sl_vec3_make(0.0f, -9.81f, 0.0f);
     config.self_contact_capacity = app->self_contact ? 8u * n * layers : 0u;
+    if (config.self_contact_capacity > 0u) {
+        app->contacts =
+            malloc(sizeof(sl_self_contact) * config.self_contact_capacity);
+        app->contact_capacity =
+            (app->contacts != NULL) ? config.self_contact_capacity : 0u;
+    }
     config.parallel_for = (app->pool != NULL) ? sp_pool_parallel_for : NULL;
     config.parallel_context = app->pool;
     bool ok = positions != NULL && app->indices != NULL &&
@@ -593,6 +620,85 @@ static void sb_draw_wind(const sb_app *app)
     DrawSphere(sb_v(to), 0.02f, k_wind);
 }
 
+/* Screen position of p; false when p is behind the camera. */
+static bool sb_screen(Camera3D camera, sl_vec3 forward, sl_vec3 p, Vector2 *out)
+{
+    if (sl_vec3_dot(sl_vec3_sub(p, sb_sl(camera.position)), forward) <= 0.0f) {
+        return false;
+    }
+    *out = GetWorldToScreen(sb_v(p), camera);
+    return true;
+}
+
+static void sb_dot(Vector2 at, float size, Color color)
+{
+    DrawRectangleV((Vector2){ at.x - 0.5f * size, at.y - 0.5f * size },
+                   (Vector2){ size, size }, color);
+}
+
+/* Contact overlay (see the palette notes at the top); 2D, after the 3D
+ * pass. Returns the number of vertices held at their bounds. */
+static uint32_t sb_draw_contacts(const sb_app *app, Camera3D camera)
+{
+    const sl_vec3 forward = sb_sl(sb_camera_forward(camera));
+    const uint32_t pair_count = sl_world_self_contacts(
+        &app->world, app->contacts, app->contact_capacity);
+    for (uint32_t k = 0; k < pair_count; k++) {
+        const sl_self_contact *p = &app->contacts[k];
+        Vector2 a;
+        Vector2 b;
+        if (!sb_screen(camera, forward, p->point_a, &a) ||
+            !sb_screen(camera, forward, p->point_b, &b)) {
+            continue;
+        }
+        const bool pushing =
+            sl_vec3_length(sl_vec3_sub(p->point_a, p->point_b)) < p->radius;
+        const Color color = !pushing ? k_pair_idle
+                            : (p->kind == SL_SELF_CONTACT_EDGE_EDGE)
+                                ? k_edge_edge
+                                : k_vertex_facet;
+        DrawLineV(a, b, color);
+        sb_dot(a, 3.0f, color);
+    }
+    uint32_t held = 0;
+    for (uint32_t c = 0; c < app->cloth_count; c++) {
+        const sl_vec3 *x = sl_world_cloth_positions(&app->world, c);
+        for (uint32_t i = 0; i < app->vertex_count; i++) {
+            const uint32_t flags = sl_world_vertex_flags(&app->world, c, i);
+            Vector2 at;
+            if (flags == 0u || !sb_screen(camera, forward, x[i], &at)) {
+                continue;
+            }
+            if ((flags & SL_VERTEX_COLLIDER_CONTACT) != 0u) {
+                sb_dot(at, 3.0f, k_touching);
+            }
+            if ((flags & SL_VERTEX_AT_BOUND) != 0u) {
+                sb_dot(at, 6.0f, k_at_bound);
+                held++;
+            }
+        }
+    }
+    return held;
+}
+
+/* Draws text at *x and advances *x past it. */
+static void sb_text_run(const char *text, int *x, int y, Color color)
+{
+    DrawText(text, *x, y, SB_TEXT, color);
+    *x += MeasureText(text, SB_TEXT);
+}
+
+static void sb_draw_legend(uint32_t held)
+{
+    int x = 12;
+    const int y = 88;
+    sb_text_run("vertex-facet  ", &x, y, k_vertex_facet);
+    sb_text_run("edge-edge  ", &x, y, k_edge_edge);
+    sb_text_run("not pushing  ", &x, y, k_pair_idle);
+    sb_text_run("collider contact  ", &x, y, k_touching);
+    sb_text_run(TextFormat("%d held at bound", (int)held), &x, y, k_at_bound);
+}
+
 static void sb_draw_hud(const sb_app *app)
 {
     const sl_world_stats stats = sl_world_stats_get(&app->world);
@@ -614,7 +720,7 @@ static void sb_draw_hud(const sb_app *app)
                         (int)stats.self_detection_count),
              12, 62, SB_TEXT, GRAY);
     DrawText("1-5 scene  space pause  S step  R reset  W wind  C contact  "
-             "LMB grab  RMB orbit  wheel zoom",
+             "D draw contacts  LMB grab  RMB orbit  wheel zoom",
              12, SB_HEIGHT - 30, SB_TEXT, GRAY);
     if (app->wind_on) {
         DrawText("WIND", SB_WIDTH - 90, 10, SB_TEXT, k_wind);
@@ -644,6 +750,9 @@ static void sb_handle_keys(sb_app *app)
         app->self_contact = !app->self_contact;
         (void)sb_scene_load(app, app->scene);
     }
+    if (IsKeyPressed(KEY_D)) {
+        app->show_contacts = !app->show_contacts;
+    }
     if (IsKeyPressed(KEY_SPACE)) {
         app->paused = !app->paused;
     }
@@ -668,12 +777,15 @@ int main(int argc, char **argv)
 {
     sb_scene_id first = SB_SCENE_CURTAIN;
     bool wind = false;
+    bool contacts = false;
     uint32_t frames = 0;
     const char *screenshot = NULL;
     uint32_t threads = 4u;
     for (int a = 1; a < argc; a++) {
         if (strcmp(argv[a], "--wind") == 0) {
             wind = true;
+        } else if (strcmp(argv[a], "--contacts") == 0) {
+            contacts = true;
         } else if (a + 1 < argc && strcmp(argv[a], "--scene") == 0) {
             const uint32_t n = sb_arg_count(argv[++a]);
             if (n >= 1u && n <= (uint32_t)SB_SCENE_COUNT) {
@@ -697,6 +809,7 @@ int main(int argc, char **argv)
     app.pitch = 0.35f;
     app.distance = 4.0f;
     app.wind_on = wind;
+    app.show_contacts = contacts;
     app.self_contact = true;
     app.pool = sp_pool_create(threads);
     if (app.pool == NULL) {
@@ -753,6 +866,9 @@ int main(int argc, char **argv)
         }
         EndMode3D();
         if (app.vertex_count > 0u) {
+            if (app.show_contacts) {
+                sb_draw_legend(sb_draw_contacts(&app, camera));
+            }
             sb_draw_hud(&app);
         } else {
             DrawText("scene failed to build", 12, 10, SB_TEXT, RED);

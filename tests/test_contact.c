@@ -506,6 +506,178 @@ static void test_capacity_and_validation(void)
     sl_world_destroy(&w2);
 }
 
+/* Exact equality: the query copies positions, so equality is the
+ * property under test. */
+static bool sl_vec3_equal(sl_vec3 a, sl_vec3 b)
+{
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+/* Is p exactly one of the world's vertex positions? */
+static bool sl_is_vertex(const sl_world *w, sl_vec3 p)
+{
+    for (uint32_t c = 0; c < sl_world_stats_get(w).cloth_count; c++) {
+        const sl_vec3 *x = sl_world_cloth_positions(w, c);
+        for (uint32_t i = 0; i < sl_world_cloth_vertex_count(w, c); i++) {
+            if (sl_vec3_equal(x[i], p)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Distances from p to the nearest triangle and to the nearest edge. */
+static float sl_triangle_gap(const sl_world_state *s, sl_vec3 p)
+{
+    float gap = INFINITY;
+    for (uint32_t t = 0; t < s->triangle_count; t++) {
+        const uint32_t *idx = s->triangle_index + 3u * t;
+        gap = sl_min(gap, sl_triangle_closest_point(p, s->position[idx[0]],
+                                                    s->position[idx[1]],
+                                                    s->position[idx[2]])
+                              .distance);
+    }
+    return gap;
+}
+
+static float sl_edge_gap(const sl_world_state *s, sl_vec3 p)
+{
+    float gap = INFINITY;
+    for (uint32_t e = 0; e < s->edge_count; e++) {
+        const sl_vec3 a = s->position[s->edge_index[2u * e]];
+        const sl_vec3 b = s->position[s->edge_index[2u * e + 1u]];
+        const float t = sl_segment_closest_param(p, a, b);
+        gap = sl_min(gap, sl_vec3_length(sl_vec3_sub(
+                              p, sl_vec3_mul_add(a, sl_vec3_sub(b, a), t))));
+    }
+    return gap;
+}
+
+static void test_self_contact_query(void)
+{
+    /* Two sheets dropped flat onto the ground, the upper one resting on
+     * the lower inside the 8 mm contact radius. */
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(400u, 800u);
+    c.self_contact_capacity = 4096u;
+    SL_EXPECT(sl_world_init(&world, &c));
+    sl_add_flat(&world, 0.1f, 0.8f, 10u);
+    sl_add_flat(&world, 0.15f, 0.7f, 10u);
+    const sl_collider ground = { SL_COLLIDER_PLANE, sl_vec3_zero(),
+                                 sl_vec3_make(0.0f, 1.0f, 0.0f), 0.0f, 0.5f };
+    uint32_t id = 0;
+    SL_EXPECT(sl_world_collider_add(&world, &ground, &id));
+    SL_EXPECT_INT_EQ(sl_world_self_contacts(&world, NULL, 0u), 0);
+    for (uint32_t k = 0; k < 60u; k++) {
+        sl_world_step(&world, 1.0f / 60.0f);
+    }
+    const uint32_t count = sl_world_stats_get(&world).self_contact_count;
+    SL_EXPECT(count > 10u && count <= 4096u);
+    sl_self_contact *all = malloc(sizeof(sl_self_contact) * count);
+    SL_EXPECT(all != NULL);
+    if (all == NULL) {
+        sl_world_destroy(&world);
+        return;
+    }
+    /* No degenerate primitive in a flat grid, so every pair is listed. */
+    SL_EXPECT_INT_EQ(sl_world_self_contacts(&world, all, count), count);
+    uint32_t kinds[2] = { 0u, 0u };
+    uint32_t pushing = 0u;
+    float gap_max = 0.0f; /* of a closest point from its primitive, m */
+    for (uint32_t k = 0; k < count; k++) {
+        const sl_self_contact *p = &all[k];
+        SL_EXPECT(sl_vec3_is_finite(p->point_a) &&
+                  sl_vec3_is_finite(p->point_b));
+        SL_EXPECT_NEAR(p->radius, 0.008f, 1e-6f);
+        SL_EXPECT(p->kind == SL_SELF_CONTACT_VERTEX_FACET ||
+                  p->kind == SL_SELF_CONTACT_EDGE_EDGE);
+        kinds[p->kind == SL_SELF_CONTACT_EDGE_EDGE ? 1 : 0]++;
+        /* The sheets lie flat: the closest points are one above the
+         * other, and a vertex pair starts at a vertex. */
+        const sl_vec3 d = sl_vec3_sub(p->point_a, p->point_b);
+        SL_EXPECT(sl_abs(d.y) > 0.9f * sl_vec3_length(d));
+        SL_EXPECT(sl_vec3_length(d) < 2.0f * p->radius);
+        if (p->kind == SL_SELF_CONTACT_VERTEX_FACET) {
+            SL_EXPECT(sl_is_vertex(&world, p->point_a));
+            gap_max = sl_max(gap_max, sl_triangle_gap(world.state, p->point_b));
+        } else {
+            gap_max = sl_max(gap_max, sl_edge_gap(world.state, p->point_a));
+            gap_max = sl_max(gap_max, sl_edge_gap(world.state, p->point_b));
+        }
+        pushing += (sl_vec3_length(d) < p->radius) ? 1u : 0u;
+    }
+    SL_EXPECT(kinds[0] > 0u && kinds[1] > 0u);
+    SL_EXPECT(pushing > 0u);
+    /* Each closest point lies on its primitive up to float rounding
+     * (measured 3e-8 m). */
+    SL_EXPECT(gap_max < 1e-6f);
+    /* A short buffer gets the leading pairs, in the same order. */
+    sl_self_contact head[3];
+    SL_EXPECT_INT_EQ(sl_world_self_contacts(&world, head, 3u), 3);
+    for (uint32_t k = 0; k < 3u; k++) {
+        SL_EXPECT(sl_vec3_equal(head[k].point_a, all[k].point_a) &&
+                  sl_vec3_equal(head[k].point_b, all[k].point_b) &&
+                  head[k].kind == all[k].kind);
+    }
+    free(all);
+    sl_world_destroy(&world);
+
+    /* Disabled self contact lists nothing and flags no bound. */
+    SL_EXPECT(sl_contact_world(&world, 0u, 0.004f, 0.6f, 6u, 0.5f));
+    sl_world_step(&world, 1.0f / 60.0f);
+    sl_self_contact one;
+    SL_EXPECT_INT_EQ(sl_world_self_contacts(&world, &one, 1u), 0);
+    SL_EXPECT_INT_EQ(sl_world_vertex_flags(&world, 0u, 0u), 0);
+    sl_world_destroy(&world);
+}
+
+/* Counts the vertices carrying flag over every cloth. */
+static uint32_t sl_flag_count(const sl_world *w, uint32_t flag)
+{
+    uint32_t count = 0u;
+    for (uint32_t c = 0; c < sl_world_stats_get(w).cloth_count; c++) {
+        for (uint32_t i = 0; i < sl_world_cloth_vertex_count(w, c); i++) {
+            count += ((sl_world_vertex_flags(w, c, i) & flag) != 0u) ? 1u : 0u;
+        }
+    }
+    return count;
+}
+
+static void test_vertex_flags(void)
+{
+    /* Two sheets dropped on a sphere above the ground: the flags match the
+     * collider contact count and the distinct bound-held vertices at every
+     * step, and both occur. */
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(400u, 800u);
+    c.self_contact_capacity = 4096u;
+    SL_EXPECT(sl_world_init(&world, &c));
+    sl_add_flat(&world, 0.4f, 0.8f, 10u);
+    sl_add_flat(&world, 0.5f, 0.7f, 10u);
+    const sl_collider sphere = { SL_COLLIDER_SPHERE, sl_vec3_zero(),
+                                 sl_vec3_zero(), 0.2f, 0.5f };
+    uint32_t id = 0;
+    SL_EXPECT(sl_world_collider_add(&world, &sphere, &id));
+    uint32_t touching_max = 0u;
+    uint32_t held_max = 0u;
+    for (uint32_t k = 0; k < 90u; k++) {
+        sl_world_step(&world, 1.0f / 60.0f);
+        const uint32_t touching =
+            sl_flag_count(&world, SL_VERTEX_COLLIDER_CONTACT);
+        const uint32_t held = sl_flag_count(&world, SL_VERTEX_AT_BOUND);
+        SL_EXPECT_INT_EQ(touching, sl_world_stats_get(&world).contact_count);
+        SL_EXPECT_INT_EQ(held, world.state->bound_exceeded);
+        touching_max = (touching > touching_max) ? touching : touching_max;
+        held_max = (held > held_max) ? held : held_max;
+    }
+    SL_EXPECT(touching_max > 0u);
+    SL_EXPECT(held_max > 0u);
+    SL_EXPECT_INT_EQ(sl_world_vertex_flags(&world, 2u, 0u), 0);
+    SL_EXPECT_INT_EQ(sl_world_vertex_flags(&world, 0u, 121u), 0);
+    sl_world_destroy(&world);
+}
+
 static const sl_test_case k_cases[] = {
     { "triangle_closest_sampling", test_triangle_closest_matches_sampling },
     { "segment_closest_sampling", test_segment_closest_matches_sampling },
@@ -517,6 +689,8 @@ static const sl_test_case k_cases[] = {
     { "self_contact_deterministic", test_self_contact_is_deterministic },
     { "self_contact_parallel", test_self_contact_parallel_matches_serial },
     { "capacity_and_validation", test_capacity_and_validation },
+    { "self_contact_query", test_self_contact_query },
+    { "vertex_flags", test_vertex_flags },
 };
 
 int sl_contact_suite(void)

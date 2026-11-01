@@ -270,6 +270,28 @@ static bool sl_pair_separation(const sl_world_state *s,
     return sl_vec3_is_finite(sum);
 }
 
+bool sl_self_pair_points(const sl_world_state *s, uint32_t k, sl_vec3 *point_a,
+                         sl_vec3 *point_b)
+{
+    SL_ASSERT(k < s->pair_count);
+    const sl_contact_pair *p = &s->pairs[k];
+    float w[4];
+    sl_vec3 sep;
+    if (!sl_pair_separation(s, p, w, &sep)) {
+        return false;
+    }
+    /* s = a - b: a is vertex 0 for vertex pairs, and the point
+     * w0 x0 + w1 x1 (w0 + w1 = 1) on the first edge for edge pairs. */
+    const sl_vec3 *x = s->position;
+    sl_vec3 a = x[p->vertex[0]];
+    if (p->kind == SL_PAIR_EDGE_EDGE || p->kind == SL_PAIR_EDGE_VERTEX) {
+        a = sl_vec3_mul_add(a, sl_vec3_sub(x[p->vertex[1]], a), w[1]);
+    }
+    *point_a = a;
+    *point_b = sl_vec3_sub(a, sep);
+    return true;
+}
+
 /* Distances below this fraction of the radius are clamped: the barrier is
  * then very stiff but finite. */
 #define SL_CONTACT_DISTANCE_MIN_FRACTION 1.0e-4f

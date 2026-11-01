@@ -360,6 +360,47 @@ bool sl_world_vertex_is_pinned(const sl_world *world, uint32_t cloth,
     return i != UINT32_MAX && world->state->pinned[i] != 0u;
 }
 
+uint32_t sl_world_vertex_flags(const sl_world *world, uint32_t cloth,
+                               uint32_t vertex)
+{
+    SL_ASSERT(world != NULL && world->state != NULL);
+    const sl_world_state *s = world->state;
+    const uint32_t i = sl_vertex_global(s, cloth, vertex);
+    if (i == UINT32_MAX) {
+        return 0u;
+    }
+    uint32_t flags = 0u;
+    if (s->contact[i] != 0u) {
+        flags |= SL_VERTEX_COLLIDER_CONTACT;
+    }
+    if (sl_self_enabled(s) && s->at_bound[i] != 0u) {
+        flags |= SL_VERTEX_AT_BOUND;
+    }
+    return flags;
+}
+
+uint32_t sl_world_self_contacts(const sl_world *world,
+                                sl_self_contact *contacts, uint32_t capacity)
+{
+    SL_ASSERT(world != NULL && world->state != NULL);
+    SL_ASSERT(contacts != NULL || capacity == 0u);
+    const sl_world_state *s = world->state;
+    uint32_t written = 0u;
+    for (uint32_t k = 0; k < s->pair_count && written < capacity; k++) {
+        sl_self_contact *out = &contacts[written];
+        if (!sl_self_pair_points(s, k, &out->point_a, &out->point_b)) {
+            continue;
+        }
+        const uint8_t kind = s->pairs[k].kind;
+        out->kind = (kind == SL_PAIR_EDGE_EDGE || kind == SL_PAIR_EDGE_VERTEX)
+                        ? SL_SELF_CONTACT_EDGE_EDGE
+                        : SL_SELF_CONTACT_VERTEX_FACET;
+        out->radius = s->pairs[k].radius;
+        written++;
+    }
+    return written;
+}
+
 sl_world_stats sl_world_stats_get(const sl_world *world)
 {
     SL_ASSERT(world != NULL && world->state != NULL);

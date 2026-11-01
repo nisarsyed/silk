@@ -40,6 +40,9 @@ static void test_public_api_round_trip(void)
     sl_world_step(&world, 1.0f / 60.0f);
     const sl_vec3 *p = sl_world_cloth_positions(&world, cloth);
     SL_EXPECT(p != NULL && p[0].y == 1.0f && p[8].y < 0.0f);
+    /* Diagnostics: no colliders and no self contact. */
+    SL_EXPECT_INT_EQ(sl_world_vertex_flags(&world, cloth, 8u), 0);
+    SL_EXPECT_INT_EQ(sl_world_self_contacts(&world, NULL, 0u), 0);
     sl_world_destroy(&world);
 }
 
