@@ -23,6 +23,8 @@ void sl_world_step(sl_world *world, float dt)
     s->self_detections = 0u;
     s->self_dropped = 0u;
     s->self_bound_hits = 0u;
+    s->self_overflows = 0u;
+    s->self_inline = 0u;
     for (uint32_t i = 0; i < s->vertex_count; i++) {
         if (s->pinned[i] != 0u) {
             s->pin_origin[i] = s->position[i];

@@ -90,4 +90,20 @@ bool sl_bvh_next_leaf_pair(sl_bvh_pair_cursor *cursor, const sl_bvh *bvh,
                            uint32_t *a_first, uint32_t *a_count,
                            uint32_t *b_first, uint32_t *b_count, bool *same);
 
+/* Starts a self traversal at node pair (a, b) instead of the root. */
+void sl_bvh_pair_cursor_start(sl_bvh_pair_cursor *cursor, float grow,
+                              uint32_t a, uint32_t b);
+
+/* Splits the self traversal into independent parts for parallel work:
+ * writes node pairs to pairs[0, count) such that the traversals started at
+ * each (sl_bvh_pair_cursor_start) together yield every leaf pair of the
+ * full traversal exactly once. Expands breadth-first by the traversal's own
+ * rules, level by level, until at least `target` pairs exist, nothing is
+ * left to expand, or the next level could exceed `capacity`. The result is
+ * a pure function of the tree and grow. scratch holds capacity pairs.
+ * Returns the count (0 for an empty tree). */
+uint32_t sl_bvh_pair_frontier(const sl_bvh *bvh, float grow,
+                              uint32_t (*pairs)[2], uint32_t (*scratch)[2],
+                              uint32_t capacity, uint32_t target);
+
 #endif /* SILK_BVH_H */

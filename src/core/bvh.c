@@ -291,3 +291,105 @@ bool sl_bvh_next_leaf_pair(sl_bvh_pair_cursor *c, const sl_bvh *b,
     }
     return false;
 }
+
+void sl_bvh_pair_cursor_start(sl_bvh_pair_cursor *c, float grow, uint32_t a,
+                              uint32_t b)
+{
+    c->grow = grow;
+    c->stack[0][0] = a;
+    c->stack[0][1] = b;
+    c->depth = 1u;
+}
+
+/* One expansion step of the self traversal for node pair (a, n), by the
+ * rules of sl_bvh_next_leaf_pair: writes the child pairs to out and
+ * returns their count. A pair that yields a leaf pair is kept whole
+ * (*keep); a pair whose boxes are too far apart yields nothing. */
+static uint32_t sl_pair_expand(const sl_bvh *b, sl_vec3 grow, uint32_t a,
+                               uint32_t n, uint32_t out[3][2], bool *keep)
+{
+    const bool a_leaf = b->node_count_of[a] > 0u;
+    const bool n_leaf = b->node_count_of[n] > 0u;
+    *keep = false;
+    if (a == n) {
+        if (a_leaf) {
+            *keep = true;
+            return 0u;
+        }
+        const uint32_t l = b->node_first[a];
+        out[0][0] = l;
+        out[0][1] = l;
+        out[1][0] = l + 1u;
+        out[1][1] = l + 1u;
+        out[2][0] = l;
+        out[2][1] = l + 1u;
+        return 3u;
+    }
+    if (!sl_box_overlap(sl_vec3_sub(b->node_lo[a], grow),
+                        sl_vec3_add(b->node_hi[a], grow), b->node_lo[n],
+                        b->node_hi[n])) {
+        return 0u;
+    }
+    if (a_leaf && n_leaf) {
+        *keep = true;
+        return 0u;
+    }
+    const bool split_a =
+        !a_leaf && (n_leaf || sl_box_volume(b->node_lo[a], b->node_hi[a]) >=
+                                  sl_box_volume(b->node_lo[n], b->node_hi[n]));
+    const uint32_t l = b->node_first[split_a ? a : n];
+    out[0][0] = split_a ? l : a;
+    out[0][1] = split_a ? n : l;
+    out[1][0] = split_a ? l + 1u : a;
+    out[1][1] = split_a ? n : l + 1u;
+    return 2u;
+}
+
+uint32_t sl_bvh_pair_frontier(const sl_bvh *b, float grow, uint32_t (*pairs)[2],
+                              uint32_t (*scratch)[2], uint32_t capacity,
+                              uint32_t target)
+{
+    SL_ASSERT(capacity >= 1u);
+    if (b->node_count == 0u) {
+        return 0u;
+    }
+    const sl_vec3 g = sl_vec3_make(grow, grow, grow);
+    pairs[0][0] = 0u;
+    pairs[0][1] = 0u;
+    uint32_t count = 1u;
+    /* Each level at least halves the remaining depth of some pair, so the
+     * tree depth bounds the levels. */
+    for (uint32_t level = 0; level < 2u * SL_BVH_DEPTH_MAX; level++) {
+        if (count >= target || 3u * count > capacity) {
+            break;
+        }
+        uint32_t next = 0u;
+        bool expanded = false;
+        for (uint32_t k = 0; k < count; k++) {
+            uint32_t out[3][2];
+            bool keep;
+            const uint32_t children =
+                sl_pair_expand(b, g, pairs[k][0], pairs[k][1], out, &keep);
+            if (keep) {
+                scratch[next][0] = pairs[k][0];
+                scratch[next][1] = pairs[k][1];
+                next++;
+            }
+            for (uint32_t j = 0; j < children; j++) {
+                scratch[next][0] = out[j][0];
+                scratch[next][1] = out[j][1];
+                next++;
+            }
+            expanded = expanded || !keep; /* split or dropped */
+        }
+        for (uint32_t k = 0; k < next; k++) {
+            pairs[k][0] = scratch[k][0];
+            pairs[k][1] = scratch[k][1];
+        }
+        count = next;
+        if (!expanded) {
+            break;
+        }
+    }
+    return count;
+}

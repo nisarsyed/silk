@@ -213,11 +213,58 @@ static float sl_brute_edge_distance(const sl_world_state *s, uint32_t e)
     return best;
 }
 
+/* Brute-force distance from triangle t to the nearest vertex of its own
+ * cloth that it does not contain. */
+static float sl_brute_triangle_distance(const sl_world_state *s, uint32_t t)
+{
+    const uint32_t *idx = s->triangle_index + 3u * t;
+    float best = INFINITY;
+    for (uint32_t v = 0; v < s->vertex_count; v++) {
+        if (idx[0] == v || idx[1] == v || idx[2] == v ||
+            s->vertex_cloth[idx[0]] != s->vertex_cloth[v]) {
+            continue;
+        }
+        best = sl_min(best, sl_triangle_closest_point(
+                                s->position[v], s->position[idx[0]],
+                                s->position[idx[1]], s->position[idx[2]])
+                                .distance);
+    }
+    return best;
+}
+
+/* Detects at the world's positions and checks every nearest distance the
+ * bounds use against brute force (capped at the query radius). Returns the
+ * number of vertices with a triangle inside the query radius. */
+static uint32_t sl_check_broad_phase(sl_world_state *s, float motion)
+{
+    sl_self_detect(s, motion);
+    const float query = s->query_radius;
+    uint32_t near = 0u;
+    for (uint32_t v = 0; v < s->vertex_count; v++) {
+        const float brute = sl_min(sl_brute_vertex_distance(s, v), query);
+        /* bound = gamma_p * min(vertex, edge, triangle distances); each
+         * term is checked through its own array, which the bounds step
+         * does not touch. */
+        SL_EXPECT_NEAR(s->vertex_dmin[v], brute, 1e-6f);
+        near += (brute < query) ? 1u : 0u;
+    }
+    /* Edge pairs come from a self traversal of the edge tree; it must
+     * reach every pair within the query radius as well. */
+    for (uint32_t e = 0; e < s->edge_count; e++) {
+        const float brute = sl_min(sl_brute_edge_distance(s, e), query);
+        SL_EXPECT_NEAR(s->edge_dmin[e], brute, 1e-6f);
+    }
+    for (uint32_t t = 0; t < s->triangle_count; t++) {
+        const float brute = sl_min(sl_brute_triangle_distance(s, t), query);
+        SL_EXPECT_NEAR(s->triangle_dmin[t], brute, 1e-6f);
+    }
+    return near;
+}
+
 static void test_broad_phase_finds_every_near_triangle(void)
 {
-    /* Crumple a sheet deterministically; every vertex's detected nearest
-     * non-incident distance must equal brute force (capped at the query
-     * radius), i.e. the spatial hash misses nothing. */
+    /* Crumple a sheet deterministically; the detected distances must equal
+     * brute force, i.e. the broad phase misses nothing. */
     sl_world world = { 0 };
     SL_EXPECT(sl_contact_world(&world, 8192u, 0.01f, 1.0f, 12u, 1.0f));
     sl_world_state *s = world.state;
@@ -230,23 +277,26 @@ static void test_broad_phase_finds_every_near_triangle(void)
                                       0.25f * cosf(7.0f * p.y) +
                                           sl_test_randf(&seed, -0.03f, 0.03f));
     }
-    sl_self_detect(s, 0.08f);
-    const float query = s->query_radius;
+    (void)sl_check_broad_phase(s, 0.08f);
     /* The motion term widens the query past the 2 cm contact radius. */
-    SL_EXPECT(query > 0.02f);
-    for (uint32_t v = 0; v < s->vertex_count; v++) {
-        const float brute = sl_min(sl_brute_vertex_distance(s, v), query);
-        /* bound = gamma_p * min(vertex, edge, triangle distances) <=
-         * gamma_p * vertex distance; equality on the vertex term is checked
-         * through vertex_dmin, which the bounds step does not touch. */
-        SL_EXPECT_NEAR(s->vertex_dmin[v], brute, 1e-6f);
+    SL_EXPECT(s->query_radius > 0.02f);
+    sl_world_destroy(&world);
+
+    /* The crumple leaves few vertices near anything (7 of 169), so a sheet
+     * folded 7 mm onto itself, inside the 8 mm query radius, checks the
+     * same with most vertices near another layer, across several detection
+     * chunks. Boxes 7 mm apart also catch a leaf cull missing a millimetre
+     * of its margin. */
+    SL_EXPECT(sl_contact_world(&world, 8192u, 0.004f, 0.6f, 20u, 0.5f));
+    s = world.state;
+    for (uint32_t i = 0; i < s->vertex_count; i++) {
+        if (s->position[i].y < 0.2f) {
+            s->position[i].y = 0.4f - s->position[i].y;
+            s->position[i].z = 0.007f;
+        }
     }
-    /* Edge pairs come from a self traversal of the edge tree; it must
-     * reach every pair within the query radius as well. */
-    for (uint32_t e = 0; e < s->edge_count; e++) {
-        const float brute = sl_min(sl_brute_edge_distance(s, e), query);
-        SL_EXPECT_NEAR(s->edge_dmin[e], brute, 1e-6f);
-    }
+    SL_EXPECT(s->vertex_count > 3u * SL_DETECT_CHUNK_VERTICES);
+    SL_EXPECT(sl_check_broad_phase(s, 0.0f) > s->vertex_count / 3u);
     sl_world_destroy(&world);
 }
 
@@ -474,6 +524,152 @@ static void test_self_contact_parallel_matches_serial(void)
     }
 }
 
+/* Leaf pairs of a self traversal from (a, b), as sorted keys
+ * (lower leaf start << 32 | higher), appended at keys[*count]. */
+static void sl_collect_leaf_pairs(const sl_bvh *bvh, float grow, uint32_t a,
+                                  uint32_t b, uint64_t *keys, uint32_t *count,
+                                  uint32_t capacity)
+{
+    sl_bvh_pair_cursor cursor;
+    sl_bvh_pair_cursor_start(&cursor, grow, a, b);
+    uint32_t a_first;
+    uint32_t a_count;
+    uint32_t b_first;
+    uint32_t b_count;
+    bool same;
+    while (sl_bvh_next_leaf_pair(&cursor, bvh, &a_first, &a_count, &b_first,
+                                 &b_count, &same)) {
+        SL_EXPECT(same == (a_first == b_first));
+        const uint32_t lo = (a_first < b_first) ? a_first : b_first;
+        const uint32_t hi = (a_first < b_first) ? b_first : a_first;
+        if (*count < capacity) {
+            keys[*count] = ((uint64_t)lo << 32u) | hi;
+        }
+        (*count)++;
+    }
+}
+
+static void sl_sort_keys(uint64_t *keys, uint32_t count)
+{
+    for (uint32_t i = 1; i < count; i++) {
+        const uint64_t key = keys[i];
+        uint32_t j = i;
+        for (; j > 0u && keys[j - 1u] > key; j--) {
+            keys[j] = keys[j - 1u];
+        }
+        keys[j] = key;
+    }
+}
+
+static void test_traversal_frontier_covers_once(void)
+{
+    /* The edge tree of a crumpled sheet: the traversals started at the
+     * frontier's pairs must yield exactly the leaf pairs of one full
+     * traversal, each once, at any frontier size. */
+    sl_world world = { 0 };
+    SL_EXPECT(sl_contact_world(&world, 8192u, 0.01f, 1.0f, 12u, 1.0f));
+    sl_world_state *s = world.state;
+    for (uint32_t i = 0; i < s->vertex_count; i++) {
+        const sl_vec3 p = s->position[i];
+        s->position[i] = sl_vec3_make(p.x, p.y + 0.15f * sinf(9.0f * p.x),
+                                      0.25f * cosf(7.0f * p.y));
+    }
+    sl_self_detect(s, 0.08f);
+    const sl_bvh *bvh = &s->edge_bvh;
+    const float grow = s->query_radius;
+    const uint32_t capacity = 1u << 16;
+    uint64_t *full = malloc(sizeof(uint64_t) * capacity);
+    uint64_t *part = malloc(sizeof(uint64_t) * capacity);
+    uint32_t (*pairs)[2] = malloc(sizeof(*pairs) * SL_DETECT_FRONTIER_MAX);
+    uint32_t (*scratch)[2] = malloc(sizeof(*scratch) * SL_DETECT_FRONTIER_MAX);
+    SL_EXPECT(full != NULL && part != NULL && pairs != NULL && scratch != NULL);
+    if (full != NULL && part != NULL && pairs != NULL && scratch != NULL) {
+        uint32_t full_count = 0u;
+        sl_collect_leaf_pairs(bvh, grow, 0u, 0u, full, &full_count, capacity);
+        SL_EXPECT(full_count > 100u && full_count <= capacity);
+        sl_sort_keys(full, full_count);
+        const uint32_t targets[5] = { 1u, 3u, 40u, 256u, 100000u };
+        const uint32_t limits[5] = { 1u, 8u, 64u, SL_DETECT_FRONTIER_MAX,
+                                     SL_DETECT_FRONTIER_MAX };
+        for (uint32_t t = 0; t < 5u; t++) {
+            const uint32_t n = sl_bvh_pair_frontier(bvh, grow, pairs, scratch,
+                                                    limits[t], targets[t]);
+            SL_EXPECT(n >= 1u && n <= limits[t]);
+            if (t >= 2u) {
+                SL_EXPECT(n > 1u); /* the frontier did split */
+            }
+            uint32_t part_count = 0u;
+            for (uint32_t k = 0; k < n; k++) {
+                sl_collect_leaf_pairs(bvh, grow, pairs[k][0], pairs[k][1], part,
+                                      &part_count, capacity);
+            }
+            SL_EXPECT_INT_EQ(part_count, full_count);
+            if (part_count == full_count) {
+                sl_sort_keys(part, part_count);
+                SL_EXPECT(memcmp(part, full, sizeof(uint64_t) * full_count) ==
+                          0);
+            }
+        }
+    }
+    free(full);
+    free(part);
+    free(pairs);
+    free(scratch);
+    sl_world_destroy(&world);
+}
+
+/* The stacked-sheet drop with the detection record buffer cut to
+ * `records`: its hash, and how many chunks ran twice or inline. */
+static uint64_t sl_records_hash(uint32_t records, sl_test_scramble *scramble,
+                                uint32_t *reruns, uint32_t *inlined)
+{
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(400u, 800u);
+    c.self_contact_capacity = 4096u;
+    if (scramble != NULL) {
+        c.parallel_for = sl_test_scrambled_for;
+        c.parallel_context = scramble;
+    }
+    SL_EXPECT(sl_world_init(&world, &c));
+    sl_world_state *s = world.state;
+    if (records < s->record_capacity) {
+        s->record_capacity = records;
+    }
+    sl_add_flat(&world, 0.4f, 0.8f, 10u);
+    sl_add_flat(&world, 0.45f, 0.7f, 10u);
+    const sl_collider sphere = { SL_COLLIDER_SPHERE, sl_vec3_zero(),
+                                 sl_vec3_zero(), 0.2f, 0.5f };
+    uint32_t id = 0;
+    SL_EXPECT(sl_world_collider_add(&world, &sphere, &id));
+    *reruns = 0u;
+    *inlined = 0u;
+    for (uint32_t k = 0; k < 60u; k++) {
+        sl_world_step(&world, 1.0f / 60.0f);
+        *reruns += s->self_overflows;
+        *inlined += s->self_inline;
+    }
+    const uint64_t hash = sl_test_world_hash(&world);
+    sl_world_destroy(&world);
+    return hash;
+}
+
+static void test_detection_overflow_is_exact(void)
+{
+    /* Chunks that outgrow their record regions run again, or inline in the
+     * merge when the buffer is short; neither may change the result. */
+    uint32_t reruns = 0u;
+    uint32_t inlined = 0u;
+    const uint64_t full = sl_records_hash(UINT32_MAX, NULL, &reruns, &inlined);
+    SL_EXPECT_INT_EQ(inlined, 0);
+    SL_EXPECT(sl_records_hash(64u, NULL, &reruns, &inlined) == full);
+    SL_EXPECT(reruns > 0u);
+    SL_EXPECT(sl_records_hash(0u, NULL, &reruns, &inlined) == full);
+    SL_EXPECT(inlined > 0u);
+    sl_test_scramble scramble = { 0x2545F491u, 0u };
+    SL_EXPECT(sl_records_hash(64u, &scramble, &reruns, &inlined) == full);
+    SL_EXPECT(reruns > 0u && scramble.calls > 1000u);
+}
+
 static void test_capacity_and_validation(void)
 {
     sl_world world = { 0 };
@@ -689,6 +885,8 @@ static const sl_test_case k_cases[] = {
     { "self_contact_deterministic", test_self_contact_is_deterministic },
     { "self_contact_parallel", test_self_contact_parallel_matches_serial },
     { "capacity_and_validation", test_capacity_and_validation },
+    { "traversal_frontier_covers_once", test_traversal_frontier_covers_once },
+    { "detection_overflow_is_exact", test_detection_overflow_is_exact },
     { "self_contact_query", test_self_contact_query },
     { "vertex_flags", test_vertex_flags },
 };
