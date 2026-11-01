@@ -102,8 +102,8 @@ static inline float sl_pair_share(const sl_contact_pair *p)
 
 /* Vertex state is SoA by field; each field is a packed array of vec3 (or
  * scalars) indexed by the global vertex index. Triangle, bending and edge
- * data are SoA likewise. Memory per vertex capacity is 6 vec3 + float +
- * 3 bytes + 3 uint32 = 91 bytes; per triangle capacity 3 + 4 + 1 words
+ * data are SoA likewise. Memory per vertex capacity is 6 vec3 + 2 float +
+ * 3 bytes + 3 uint32 = 95 bytes; per triangle capacity 3 + 4 + 1 words
  * plus 3 references, 1.5 bending stencils of 4 + 4 + 1 words and 4
  * references each, and 3 edges of 2 words: 146 bytes. A 64 x 64 cell grid
  * (4225 vertices, 8192 triangles) therefore needs about 1.6 MB. Self
@@ -191,12 +191,17 @@ struct sl_world_state {
     sl_vec3 *position;
     sl_vec3 *position_start; /* x at the start of the current substep */
     sl_vec3 *velocity;
-    sl_vec3 *inertia_target; /* y */
-    sl_vec3 *pin_target;     /* pinned: position at the end of the step */
-    sl_vec3 *pin_origin;     /* pinned: position at the start of the step */
-    float *mass;             /* kg, > 0 */
-    uint32_t *vertex_cloth;  /* owning cloth index */
-    uint8_t *pinned;         /* 0 or 1 */
+    sl_vec3 *inertia_target; /* y, with any attachment folded in */
+    /* Pinned vertices move, and attached vertices' anchors move, from
+     * pin_origin at the start of the step to pin_target at its end. */
+    sl_vec3 *pin_target;
+    sl_vec3 *pin_origin;
+    /* Attachment spring stiffness, N/m; 0 when not attached. A substep's
+     * anchor is lerp(pin_origin, pin_target, alpha). */
+    float *attach_stiffness;
+    float *mass;            /* kg, > 0 */
+    uint32_t *vertex_cloth; /* owning cloth index */
+    uint8_t *pinned;        /* 0 or 1 */
     uint8_t *contact;       /* 0 or 1: touched a collider in the latest sweep */
     uint8_t *color_scratch; /* cloth add only */
     uint32_t *color_order;  /* global vertex indices, see sl_cloth_record */

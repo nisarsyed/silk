@@ -335,6 +335,7 @@ bool sl_world_cloth_add(sl_world *world, const sl_cloth_desc *desc,
         s->mass[v] = 0.0f;
         s->vertex_cloth[v] = s->cloth_count;
         s->pinned[v] = 0u;
+        s->attach_stiffness[v] = 0.0f;
         s->contact[v] = 0u;
     }
     for (uint32_t t = 0; t < tn; t++) {

@@ -78,6 +78,12 @@ extern "C" {
 #define SL_SELF_CONTACT_STIFFNESS_DEFAULT 1.0e4f
 #define SL_VERTEX_CONTACT_COUNT_MAX 16u
 
+/* Largest attachment stiffness, N/m. A vertex's inertia term m / h^2 is
+ * about 1e3 N/m for 0.3 g at 27 substeps of a 1/60 s step, so 1e8 already
+ * holds a vertex to its anchor like a pin, and k |x - anchor| stays far
+ * below float range across the whole position domain. */
+#define SL_ATTACH_STIFFNESS_MAX 1.0e8f
+
 /* Every stored and accepted coordinate lies in [-max, max] meters. float
  * spacing at 1e4 is about 1 mm, the coarsest resolution we accept for cloth.
  */
@@ -249,11 +255,25 @@ bool sl_world_wind_set(sl_world *world, sl_vec3 wind);
 bool sl_world_vertex_pin_set(sl_world *world, uint32_t cloth, uint32_t vertex,
                              bool pinned);
 
-/* Moves a pinned vertex to target over the next step, linearly across its
- * substeps. Returns false for an unpinned or out-of-range vertex, or a
- * non-finite or out-of-domain target. */
+/* Moves a pinned vertex, or an attached vertex's anchor, to target over
+ * the next step, linearly across its substeps. Returns false for a vertex
+ * that is neither, an out-of-range one, or a non-finite or out-of-domain
+ * target. */
 bool sl_world_vertex_target_set(sl_world *world, uint32_t cloth,
                                 uint32_t vertex, sl_vec3 target);
+
+/* Attaches a free vertex to an anchor by a spring of `stiffness` N/m, in
+ * (0, SL_ATTACH_STIFFNESS_MAX]; 0 detaches. The anchor starts at the
+ * vertex's position and moves with sl_world_vertex_target_set. The spring
+ * is solved implicitly with the vertex, so any stiffness is stable. Unlike
+ * a pin, the vertex stays dynamic and keeps its contact bounds: dragged
+ * faster than they allow, it trails its anchor instead of pulling cloth
+ * through cloth (a pinned vertex is not bounded; see sl_world_step). Use it
+ * to grab or hold cloth. Pinning a vertex detaches it. Returns false for an
+ * out-of-range or pinned vertex, or a stiffness out of range, without
+ * mutation. */
+bool sl_world_vertex_attach_set(sl_world *world, uint32_t cloth,
+                                uint32_t vertex, float stiffness);
 
 /* Read-only views of one cloth's vertices, in the order they were given.
  * Pointers stay valid until sl_world_destroy; the contents change on every

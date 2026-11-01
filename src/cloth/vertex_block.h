@@ -27,7 +27,11 @@ static inline sl_vec3 sl_vertex_block(sl_world_state *s,
                                       const sl_cloth_record *rec, uint32_t i,
                                       float h, bool self)
 {
-    const float inertia = s->mass[i] / (h * h);
+    /* With an attachment its spring is folded in (sl_guess_vertices). An
+     * array rewritten every substep in place of this sum cost the sweep 10%
+     * (curtain-64, 40.8 against 45.0 ms); attach_stiffness is read-only
+     * during a step. */
+    const float inertia = s->mass[i] / (h * h) + s->attach_stiffness[i];
     const sl_vec3 x = s->position[i];
     sl_vec3 force =
         sl_vec3_scale(sl_vec3_sub(s->inertia_target[i], x), inertia);

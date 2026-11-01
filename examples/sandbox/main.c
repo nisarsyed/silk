@@ -1,6 +1,6 @@
 /* silk cloth sandbox: interactive raylib front end over the public API.
  *
- *   1-5    switch scene          left drag   grab and pull cloth
+ *   1-5    switch scene          left drag   grab and pull cloth (a spring)
  *   space  pause / resume        right drag  orbit camera
  *   S      single step (paused)  wheel       zoom
  *   R      reset scene           W           toggle wind
@@ -51,6 +51,11 @@
 #define SB_HEIGHT 800
 #define SB_DT (1.0f / 60.0f)
 #define SB_TEXT 20
+/* Grab spring, N/m: about 5 Hz on the scenes' 0.25-0.5 kg cloths
+ * (k = M (2 pi 5 Hz)^2 = 490 N/m for 0.5 kg), the convention of Box2D's
+ * mouse joint. The held vertex stays dynamic, so a fast drag cannot pull
+ * cloth through cloth; it trails the cursor instead. */
+#define SB_GRAB_STIFFNESS 500.0f
 
 static const Color k_background = { 0x2B, 0x2D, 0x31, 255 };
 static const Color k_ground = { 0x33, 0x35, 0x3A, 255 };
@@ -376,11 +381,17 @@ static bool sb_scene_load(sb_app *app, sb_scene_id scene)
 /* Moves the curtain rings toward 65% of their spread, smoothly, reaching
  * it SB_GATHER_TIME after the scene loads. Targets are for the end of the
  * next step. A held ring is left to the mouse. */
-static void sb_gather_rings(sb_app *app)
+/* Fraction of the gathering done by the end of the next step, eased. */
+static float sb_gather_ease(const sb_app *app)
 {
     const float t = sl_clamp(
         (float)(app->sim_time + (double)SB_DT) / SB_GATHER_TIME, 0.0f, 1.0f);
-    const float ease = t * t * (3.0f - 2.0f * t);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+static void sb_gather_rings(sb_app *app)
+{
+    const float ease = sb_gather_ease(app);
     const sl_vec3 *p = sl_world_cloth_positions(&app->world, 0u);
     for (uint32_t r = 0; r < app->ring_count; r++) {
         const uint32_t i = app->ring_vertex[r];
@@ -467,16 +478,32 @@ static void sb_update_grab(sb_app *app, Camera3D camera)
             app->held_was_pinned =
                 sl_world_vertex_is_pinned(&app->world, cloth, vertex);
             app->held_plane_point = hit;
-            (void)sl_world_vertex_pin_set(&app->world, cloth, vertex, true);
+            /* A pinned vertex (a curtain ring) is held by the spring too,
+             * and pinned again where it is dropped. */
+            (void)sl_world_vertex_pin_set(&app->world, cloth, vertex, false);
+            (void)sl_world_vertex_attach_set(&app->world, cloth, vertex,
+                                             SB_GRAB_STIFFNESS);
         }
     }
     if (app->held == UINT32_MAX) {
         return;
     }
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        if (!app->held_was_pinned) {
+        (void)sl_world_vertex_attach_set(&app->world, app->held_cloth,
+                                         app->held, 0.0f);
+        if (app->held_was_pinned) {
             (void)sl_world_vertex_pin_set(&app->world, app->held_cloth,
-                                          app->held, false);
+                                          app->held, true);
+            /* A dropped ring gathers from where it lies; otherwise its
+             * pinned target would jump back across the cloth. */
+            const float x = sl_world_cloth_positions(&app->world,
+                                                     app->held_cloth)[app->held]
+                                .x;
+            for (uint32_t r = 0; r < app->ring_count; r++) {
+                if (app->held_cloth == 0u && app->ring_vertex[r] == app->held) {
+                    app->ring_x[r] = x / (1.0f - 0.35f * sb_gather_ease(app));
+                }
+            }
         }
         app->held = UINT32_MAX;
         return;

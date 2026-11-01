@@ -1,3 +1,4 @@
+#include <float.h>
 #include <math.h>
 #include <string.h>
 
@@ -43,6 +44,20 @@
  * with 0.05 and 51 ms with 0 (14.5 ms without self contact); a draped
  * 40 x 40 sheet stayed near 12 ms. All runs stayed intersection-free. */
 #define SL_QUERY_MOTION_EXTENT 0.05f
+
+/* Rounding floor of the bounds, in float ulps of the largest coordinate.
+ * The bound argument holds in exact arithmetic only. A pair can come
+ * closer at every detection (by up to 0.9 of its distance) when a pull
+ * beats the barrier, whose force is capped below
+ * SL_CONTACT_DISTANCE_MIN_FRACTION of the radius: with cloth stretched to
+ * several times its length by a fast grab, a vertex came within 6e-8 m of
+ * a triangle in a flat fold, and the cloth's 1.8 mm translation then
+ * carried it across by rounding alone (each coordinate near 1 m rounds by
+ * about 1e-7 m). Bounds therefore come from d - floor, which keeps every
+ * pair at least the floor apart, far above rounding: 64 ulps is 15 um for
+ * a scene within 2 m of the origin. Pairs already within the floor at a
+ * detection get no bound and move only with their cloth's translation. */
+#define SL_BOUND_FLOOR_ULPS 64.0f
 
 /* Stand-in for "no other cloth": larger than any distance in the domain. */
 #define SL_SELF_UNBOUNDED (8.0f * SL_POSITION_ABS_MAX)
@@ -989,6 +1004,17 @@ void sl_self_detect(sl_world_state *s, float motion)
                                        sl_max(rec->box_hi.z, x.z));
         }
     }
+    float scale = 0.0f; /* largest coordinate magnitude, m */
+    for (uint32_t c = 0; c < s->cloth_count; c++) {
+        const sl_cloth_record *rec = &s->cloths[c];
+        scale = sl_max(
+            scale,
+            sl_max(
+                sl_max(sl_abs(rec->box_lo.x), sl_abs(rec->box_hi.x)),
+                sl_max(sl_max(sl_abs(rec->box_lo.y), sl_abs(rec->box_hi.y)),
+                       sl_max(sl_abs(rec->box_lo.z), sl_abs(rec->box_hi.z)))));
+    }
+    const float bound_floor = SL_BOUND_FLOOR_ULPS * FLT_EPSILON * scale;
     for (uint32_t v = 0; v < s->vertex_count; v++) {
         s->vertex_dmin[v] = query;
     }
@@ -1046,12 +1072,15 @@ void sl_self_detect(sl_world_state *s, float motion)
                                       ? box_gap
                                       : sl_min(a->inter_dmin, query));
         }
-        a->translation_cap = SL_BOUND_RELAXATION * inter; /* B_c for now */
+        /* B_c for now */
+        a->translation_cap =
+            SL_BOUND_RELAXATION * sl_max(inter - bound_floor, 0.0f);
     }
     for (uint32_t v = 0; v < s->vertex_count; v++) {
         const sl_cloth_record *rec = &s->cloths[s->vertex_cloth[v]];
-        s->bound[v] =
-            sl_min(SL_BOUND_RELAXATION * s->bound[v], rec->translation_cap);
+        s->bound[v] = sl_min(SL_BOUND_RELAXATION *
+                                 sl_max(s->bound[v] - bound_floor, 0.0f),
+                             rec->translation_cap);
         s->position_safe[v] = s->position[v];
     }
     for (uint32_t c = 0; c < s->cloth_count; c++) {

@@ -148,6 +148,15 @@ static void test_sweeps_decrease_incremental_potential(void)
     d.friction = 0.0f;
     SL_EXPECT(sl_test_sheet(&world, &c, &d, 1.0f, 16u, 1.0f, true));
     sl_run(&world, 20u); /* swinging, deformed state */
+    /* An attachment pulling the centre 2 mm aside: its spring is part of
+     * the potential the sweeps minimize. (A 5 cm pull within one substep
+     * makes one Newton step overshoot the membrane, which has no
+     * out-of-plane stiffness at this flat state: VBD has no line search.) */
+    const uint32_t centre = 8u * 17u + 8u;
+    SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, centre, 500.0f));
+    const sl_vec3 x = sl_world_cloth_positions(&world, 0u)[centre];
+    SL_EXPECT(sl_world_vertex_target_set(
+        &world, 0u, centre, sl_vec3_add(x, sl_vec3_make(0.0f, 0.0f, 0.002f))));
     sl_world_state *s = world.state;
     const float h = SL_TEST_DT / (float)s->substep_count;
     sl_solver_substep_begin(s, h, 1.0f);
@@ -211,6 +220,166 @@ static void test_pin_targets_interpolate_over_substeps(void)
     const sl_vec3 q = sl_world_cloth_positions(&world, 0u)[0];
     SL_EXPECT(q.x == target.x && q.y == target.y && q.z == target.z);
     SL_EXPECT_NEAR(sl_world_cloth_velocities(&world, 0u)[0].y, 0.0f, 0.0f);
+    sl_world_destroy(&world);
+}
+
+/* d/dx_i of the incremental potential along e, by central differences. */
+static double sl_energy_slope(sl_world_state *s, float h, uint32_t i, sl_vec3 e)
+{
+    const float eps = 1e-4f;
+    const sl_vec3 p = s->position[i];
+    s->position[i] = sl_vec3_mul_add(p, e, eps);
+    const double plus = sl_solver_energy(s, h);
+    s->position[i] = sl_vec3_mul_add(p, e, -eps);
+    const double minus = sl_solver_energy(s, h);
+    s->position[i] = p;
+    return (plus - minus) / (2.0 * (double)eps);
+}
+
+static void test_attachment_energy_is_its_spring(void)
+{
+    /* The attachment is folded into the inertia term (sl_guess_vertices).
+     * Up to a constant, the potential with it minus the potential without
+     * it must be the spring k / 2 |x - a|^2, so its slope along any
+     * direction is k (x - a) . e. */
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(200u, 400u);
+    sl_cloth_desc d = sl_test_cloth_desc();
+    SL_EXPECT(sl_test_sheet(&world, &c, &d, 1.0f, 8u, 1.0f, true));
+    sl_run(&world, 10u);
+    sl_world_state *s = world.state;
+    const uint32_t n = s->vertex_count;
+    sl_vec3 *x = malloc(sizeof(sl_vec3) * n);
+    sl_vec3 *v = malloc(sizeof(sl_vec3) * n);
+    SL_EXPECT(x != NULL && v != NULL);
+    if (x == NULL || v == NULL) {
+        free(x);
+        free(v);
+        sl_world_destroy(&world);
+        return;
+    }
+    memcpy(x, s->position, sizeof(sl_vec3) * n);
+    memcpy(v, s->velocity, sizeof(sl_vec3) * n);
+    const float h = SL_TEST_DT / (float)s->substep_count;
+    const uint32_t i = 40u;
+    const float k = 300.0f;
+    const sl_vec3 a =
+        sl_vec3_add(s->position[i], sl_vec3_make(0.01f, 0.02f, -0.03f));
+    const sl_vec3 dirs[3] = { sl_vec3_make(1.0f, 0.0f, 0.0f),
+                              sl_vec3_make(0.0f, 1.0f, 0.0f),
+                              sl_vec3_make(0.0f, 0.0f, 1.0f) };
+    double plain[3];
+    sl_solver_substep_begin(s, h, 1.0f);
+    for (uint32_t j = 0; j < 3u; j++) {
+        plain[j] = sl_energy_slope(s, h, i, dirs[j]);
+    }
+    memcpy(s->position, x, sizeof(sl_vec3) * n);
+    memcpy(s->velocity, v, sizeof(sl_vec3) * n);
+    SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, i, k));
+    SL_EXPECT(sl_world_vertex_target_set(&world, 0u, i, a));
+    sl_solver_substep_begin(s, h, 1.0f);
+    const sl_vec3 p = s->position[i]; /* the same guess, y */
+    for (uint32_t j = 0; j < 3u; j++) {
+        const double spring =
+            (double)k * (double)sl_vec3_dot(sl_vec3_sub(p, a), dirs[j]);
+        SL_EXPECT_NEAR(sl_energy_slope(s, h, i, dirs[j]) - plain[j], spring,
+                       0.01 * fabs(spring) + 1e-3);
+    }
+    free(x);
+    free(v);
+    sl_world_destroy(&world);
+}
+
+static void test_attachment_validation(void)
+{
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(200u, 400u);
+    sl_cloth_desc d = sl_test_cloth_desc();
+    SL_EXPECT(sl_test_sheet(&world, &c, &d, 1.0f, 8u, 1.0f, true));
+    const sl_vec3 far = sl_vec3_make(0.0f, 2.0f, 0.0f);
+    /* Free vertex 40: no target until attached. */
+    SL_EXPECT(!sl_world_vertex_target_set(&world, 0u, 40u, far));
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 0u, 40u, -1.0f));
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 0u, 40u, NAN));
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 0u, 40u, INFINITY));
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 0u, 40u,
+                                          2.0f * SL_ATTACH_STIFFNESS_MAX));
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 0u, 81u, 10.0f));
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 1u, 40u, 10.0f));
+    /* Vertex 0 is pinned: pinned vertices cannot be attached. */
+    SL_EXPECT(!sl_world_vertex_attach_set(&world, 0u, 0u, 10.0f));
+    SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, 40u, 10.0f));
+    SL_EXPECT(sl_world_vertex_target_set(&world, 0u, 40u, far));
+    SL_EXPECT(!sl_world_vertex_is_pinned(&world, 0u, 40u));
+    /* Detaching, or pinning, ends the attachment. */
+    SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, 40u, 0.0f));
+    SL_EXPECT(!sl_world_vertex_target_set(&world, 0u, 40u, far));
+    SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, 40u, 10.0f));
+    SL_EXPECT(sl_world_vertex_pin_set(&world, 0u, 40u, true));
+    SL_EXPECT(sl_world_vertex_pin_set(&world, 0u, 40u, false));
+    SL_EXPECT(!sl_world_vertex_target_set(&world, 0u, 40u, far));
+    sl_world_destroy(&world);
+}
+
+static void test_attachment_carries_the_weight(void)
+{
+    /* A horizontal sheet held by its four corners settles with the
+     * springs carrying the weight: by symmetry each stretches vertically
+     * by M g / (4 k), 0.6 mm here. Drag damps the bounce, which is motion along
+     * the normal. A stiff spring whose anchor moves over one step then tracks
+     * it like a pin. */
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(200u, 400u);
+    /* Converged sweeps: one sweep per substep settles lower than the
+     * equilibrium (the stretch error in docs/solver.md), 16% here; 16
+     * iterations bring the corners within 0.1% of M g / (4 k). */
+    c.iteration_count = 16u;
+    SL_EXPECT(sl_world_init(&world, &c));
+    sl_cloth_desc d = sl_test_cloth_desc();
+    d.damping = 20.0f;
+    d.drag = 0.6f;
+    const float side = 0.5f;
+    sl_test_grid g = sl_test_grid_make(
+        sl_vec3_make(-0.5f * side, 1.0f, -0.5f * side),
+        sl_vec3_make(side, 0.0f, 0.0f), sl_vec3_make(0.0f, 0.0f, side), 8u, 8u);
+    d.positions = g.positions;
+    d.vertex_count = g.vertex_count;
+    d.indices = g.indices;
+    d.triangle_count = g.triangle_count;
+    uint32_t cloth = 0;
+    SL_EXPECT(sl_world_cloth_add(&world, &d, &cloth));
+    sl_test_grid_free(&g);
+    const float k = 200.0f;
+    const uint32_t corners[4] = { 0u, 8u, 72u, 80u };
+    for (uint32_t j = 0; j < 4u; j++) {
+        SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, corners[j], k));
+    }
+    sl_run(&world, 600u);
+    const sl_vec3 *x = sl_world_cloth_positions(&world, 0u);
+    const float sag = d.density * side * side * 9.81f / (4.0f * k);
+    for (uint32_t j = 0; j < 4u; j++) {
+        SL_EXPECT_NEAR(1.0f - x[corners[j]].y, sag, 0.01f * sag);
+    }
+    float speed = 0.0f;
+    const sl_vec3 *v = sl_world_cloth_velocities(&world, 0u);
+    for (uint32_t i = 0; i < 81u; i++) {
+        speed = sl_max(speed, sl_vec3_length(v[i]));
+    }
+    SL_EXPECT(speed < 1e-3f);
+
+    SL_EXPECT(
+        sl_world_vertex_attach_set(&world, 0u, 0u, SL_ATTACH_STIFFNESS_MAX));
+    const sl_vec3 target = sl_vec3_make(-0.3f, 1.05f, -0.25f);
+    SL_EXPECT(sl_world_vertex_target_set(&world, 0u, 0u, target));
+    sl_world_step(&world, SL_TEST_DT);
+    const sl_vec3 y = sl_world_cloth_positions(&world, 0u)[0];
+    SL_EXPECT(sl_vec3_length(sl_vec3_sub(y, target)) < 1e-4f);
+    /* The anchor stays at the target on the next step: the vertex rests
+     * there rather than replaying the move. */
+    sl_world_step(&world, SL_TEST_DT);
+    const sl_vec3 z = sl_world_cloth_positions(&world, 0u)[0];
+    SL_EXPECT(sl_vec3_length(sl_vec3_sub(z, target)) < 1e-4f);
+    SL_EXPECT(sl_vec3_length(sl_world_cloth_velocities(&world, 0u)[0]) < 0.1f);
     sl_world_destroy(&world);
 }
 
@@ -595,6 +764,9 @@ static const sl_test_case k_cases[] = {
     { "sweeps_decrease_potential", test_sweeps_decrease_incremental_potential },
     { "hanging_sheet_settles", test_hanging_sheet_settles_with_small_stretch },
     { "pin_targets_interpolate", test_pin_targets_interpolate_over_substeps },
+    { "attachment_energy_is_spring", test_attachment_energy_is_its_spring },
+    { "attachment_validation", test_attachment_validation },
+    { "attachment_carries_weight", test_attachment_carries_the_weight },
     { "deterministic", test_simulation_is_deterministic },
     { "parallel_matches_serial", test_parallel_matches_serial },
     { "ground_contact_rests", test_ground_contact_rests_on_thickness },
