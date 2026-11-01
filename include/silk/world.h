@@ -270,6 +270,54 @@ bool sl_world_vertex_is_pinned(const sl_world *world, uint32_t cloth,
 
 sl_world_stats sl_world_stats_get(const sl_world *world);
 
+/* Diagnostics: read-only views of contact state for debug drawing and
+ * tests. They never change simulation results. */
+
+/* Per-vertex contact state of the last step, as bit flags. */
+/* Touched a collider during the final sweep of the last step. */
+#define SL_VERTEX_COLLIDER_CONTACT 0x1u
+/* Held by its self-contact displacement bound since the last detection
+ * (see sl_world_step); never set with self contact disabled. */
+#define SL_VERTEX_AT_BOUND 0x2u
+
+/* The SL_VERTEX_* flags of one vertex; 0 for an out-of-range cloth or
+ * vertex. */
+uint32_t sl_world_vertex_flags(const sl_world *world, uint32_t cloth,
+                               uint32_t vertex);
+
+/* The two contact types of Offset Geometric Contact. */
+typedef enum sl_self_contact_kind {
+    /* A vertex against a triangle, or against one of its edges or
+     * vertices. */
+    SL_SELF_CONTACT_VERTEX_FACET = 0,
+    /* An edge against another edge, or against one of its end vertices. */
+    SL_SELF_CONTACT_EDGE_EDGE = 1
+} sl_self_contact_kind;
+
+/* One self-contact pair at the current positions. point_a is the vertex
+ * (VERTEX_FACET) or the closest point on the first edge (EDGE_EDGE);
+ * point_b is the closest point on the other primitive, so the pair pushes
+ * point_a away from point_b while |point_a - point_b| < radius. Pairs
+ * found within the detection query radius but no closer than radius exert
+ * no force. */
+typedef struct sl_self_contact {
+    sl_vec3 point_a; /* m */
+    sl_vec3 point_b; /* m */
+    float radius;    /* m: the sum of the two cloths' thicknesses */
+    sl_self_contact_kind kind;
+} sl_self_contact;
+
+/* Copies up to capacity self-contact pairs, those found at the last
+ * detection, into contacts, with closest points from the current
+ * positions, and returns the number written. The order is the solver's
+ * and deterministic. An edge pair accepted from both of its edges is
+ * listed once from each; a pair whose closest points are undefined (a
+ * degenerate triangle or edge) is skipped, so the result can be smaller
+ * than sl_world_stats.self_contact_count. 0 with self contact disabled.
+ * contacts may be NULL only when capacity is 0. */
+uint32_t sl_world_self_contacts(const sl_world *world,
+                                sl_self_contact *contacts, uint32_t capacity);
+
 #ifdef __cplusplus
 }
 #endif

@@ -227,6 +227,10 @@ double sl_self_energy(const sl_world_state *state);
 void sl_self_build(sl_world_state *state);
 /* Rebuilds the vertex -> pair references after pairs change. */
 void sl_self_index(sl_world_state *state);
+/* Closest points of pair k at the current positions (see
+ * sl_self_contact); false when they are undefined. */
+bool sl_self_pair_points(const sl_world_state *state, uint32_t k,
+                         sl_vec3 *point_a, sl_vec3 *point_b);
 
 /* Validates and normalizes a collider description. */
 bool sl_collider_validate(const sl_collider *desc, sl_collider *out);
