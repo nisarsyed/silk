@@ -103,10 +103,11 @@ rigid solver is designed against it.
 
 - [x] Research: rigid-body solvers surveyed, with claims checked against independent evidence ([docs/rigid.md](docs/rigid.md)). AVBD is not adopted on the evidence alone: its joints and coupling are strong, but its paper parameters are tuned to one set of units and its contact stability on a CPU is unproven against Soft Step.
 - [x] Collision foundation shared by either solver: box–box and box–plane contacts (separating axis test, clipping, 4-point reduction), warm data persisting by feature id and distance, and a BVH broad phase over bodies ([docs/rigid.md](docs/rigid.md#collision-foundation))
-- [ ] Head-to-head at equal CPU time: VBD-family rigid bodies (compliant augmented Lagrangian) against Soft Step, decided by the rule in [docs/rigid.md](docs/rigid.md#proposed-experiment). If Soft Step wins, rigid bodies are a second solver coupled to cloth by staggering.
+- [x] Head-to-head at equal CPU time (`sl_rigid_compare`): under the pre-set rule, Soft Step. AVBD with inertia-scaled penalties wins stacks, density invariance and chains (4% stretch against 229% at a 1000:1 mass ratio), but slides only half as far as theory on a 35° slope at equal time. Newton's compliant ALM with projected friction slides right but fails stacks and chains, and no VBD variant passed all three ([docs/rigid.md](docs/rigid.md#head-to-head-results-november-2026)). A separate joint pass fixed free chains but broke where joints meet contacts. Rigid bodies become a second solver coupled to cloth by staggering.
 - [ ] Split the code into the core and a cloth module, with rigid bodies as the second consumer
 - [ ] Rigid bodies: box, sphere, capsule, and convex-hull shapes; mass properties; contact with friction; stable stacking
-- [ ] Joints: ball, hinge, prismatic, and fixed, with limits and motors
+- [ ] Joints: ball, hinge, prismatic, and fixed, with limits and motors, solved in Soft Step's loop
+- [ ] Later: reduced-coordinate articulations (Featherstone) coupled inside the contact loop, for ragdolls and robots with heavy mass ratios
 - [ ] Sleeping and islands, if measurement shows a need
 - [ ] Two-way cloth–rigid coupling: cloth draped on and pushed by moving rigid bodies
 

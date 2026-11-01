@@ -283,6 +283,191 @@ The tests check:
 Two planted bugs were caught: a sign error in clipping failed five tests,
 and a wrongly scaled edge axis failed the rotated-face test.
 
+## Head-to-head results (November 2026)
+
+`bench/rigid_compare.c` (`sl_rigid_compare`) implements both candidates on
+the collision foundation above: same bodies, same contacts (detected once
+per step, 2 cm margin), same warm-start storage. Only the solver differs.
+
+- **Soft Step** follows Box2D v3:
+  - per substep, warm start, solve with bias, integrate, then relax;
+  - contacts at 30 Hz (capped at a quarter of the substep rate), damping
+    ratio 10, push-out capped at 3 m/s;
+  - ball joints at 60 Hz, damping ratio 2.
+- **AVBD** follows the paper: 6×6 block Newton steps, augmented Lagrangian
+  rows, diagonal geometric stiffness, α stabilization, and warm-started k
+  and λ. It ran with four parameter sets:
+  - **paper:** β = 10, α = 0.95, γ = 0.99;
+  - **demo:** the 3D demo's β = 10⁴, α = 0.99, γ = 0.999;
+  - **scaled:** this harness's stand-in for compliant ALM. The penalty
+    starts at m/h² and ramps by 1000 m/h² per meter of error, m being the
+    row's smaller dynamic mass;
+  - **vfric:** scaled, with friction moved to a velocity-level pass after
+    the solve.
+
+Budgets were swept: substeps 1–16 for Soft Step, iterations 1–32 for AVBD.
+Measured on an Apple M4 Pro, single-threaded, over 5 s at 60 Hz (2 s on
+the slopes). Contacts between jointed bodies are excluded, as engines do by
+default.
+
+**Equal time.** At budget 4 both cost the same per step: 0.019 ms on the
+10-stack and about 0.75 ms on the 210-box pyramid. AVBD-scaled against Soft
+Step:
+
+| Scene | Soft Step | AVBD-scaled |
+| --- | --- | --- |
+| 10-stack: deepest penetration, rest speed | 5.0 mm, 0.002 m/s | 0.08 mm, 0.034 m/s |
+| 30-stack: penetration, sway, rest speed | 22 mm, 0.72 m, 0.46 m/s | 0.9 mm, 0, 0.16 m/s |
+| Pyramid (210 boxes): penetration, rest speed | 3.9 mm, 0.002 m/s | 0.29 mm, 0.067 m/s |
+| Density 1, 10³, 10⁵ (one set of constants) | identical | identical |
+| 5 km from the origin; bodies in reversed order | as at the origin | as at the origin |
+| 50-link chain stretch, end mass 1 link | 2.8% | 0.75% |
+| 50-link chain stretch, end mass 10³ links | 229% | 4.3% |
+| 50-link chain stretch, end mass 5 × 10⁴ links | 392% | 36% |
+| Cube on 20° slope, μ = 0.5 (must stick) | sticks | sticks |
+| Cube on 35° slope, μ = 0.5 (theory: 3.22 m in 2 s) | 3.23 m | **1.71 m** |
+
+**Friction convergence on the 35° slope** (slide in 2 s; theory 3.22 m):
+
+| Budget | 1 | 2 | 4 | 8 | 16 | 32 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Soft Step | 3.25 | 3.24 | 3.23 | 3.22 | 3.22 | — |
+| AVBD-scaled | 0.61 | 1.07 | 1.71 | 2.51 | 3.10 | 3.24 |
+
+**What else was found:**
+
+- **The paper's and the demo's constants fail.**
+  - At budget 4, the paper's constants sank 1000 kg/m³ cubes 15 m into a
+    10-stack.
+  - The demo's sank them 0.3 m and failed outright at 10⁵ kg/m³.
+  - This reproduces the units problem the author confirmed (avbd-demo2d
+    #11). The scaled variant removes it by construction.
+- **Stiffness rescaling for clamped rows (paper Eq. 14) did not reproduce
+  the paper's one-iteration friction.**
+  - Applied to every row, it made stacks jitter and the sliding cube
+    diverge.
+  - Applied to friction rows only, the cube slid 0.47, 2.08, 7.51 and
+    3.28 m at 1, 2, 4 and 8 iterations, worse than the monotone convergence
+    without it.
+- **Velocity-level friction (vfric) is worse.** The position solve slides
+  the body with no friction before the velocity pass can stop it, so a cube
+  that must stick crept 0.3–0.5 m on 20°. It works for cloth, but not here.
+- **Soft Step's chain stretch is its documented weakness.**
+  - Its joints are fixed-frequency springs, so more substeps barely help:
+    81% at 8 and 16 substeps with end mass 10³.
+  - AVBD's hard joints converge as iterations rise: 0.26% at 32 iterations
+    with end mass 10³.
+- **AVBD rests less still at equal time.** Rest speeds of 0.03–0.16 m/s at
+  budget 4 fall to 0–0.11 at budget 8, against Soft Step's 0.001–0.4. The
+  30-stack sways under Soft Step at every budget tried.
+
+### Round 2: compliant ALM with projected friction
+
+Round 1 failed AVBD on friction alone. Newton's compliant ALM is the
+strongest current VBD-family formulation, so it was read from the source
+(`newton/_src/solvers/vbd/rigid_vbd_kernels.py`, August 2026) and added to
+the harness.
+
+- **Fixed penalties.** ρ = 1/(W h²) from each row's Delassus term W; no
+  ramp.
+- **Vector multiplier.** One 3-vector multiplier per contact. Its tangent
+  part is projected onto the Coulomb disk of radius μλₙ, both in the force
+  and in the dual step.
+- **Friction from slip,** with Newton's sliding Hessian metric.
+- **Defaults.** α = 0, and multipliers retained by γ = 0.999.
+
+Results at equal time (budget 4 unless stated):
+
+| Variant | 35° slide (3.22 m) | 10-stack | 210-box pyramid | Chain, 10³ |
+| --- | --- | --- | --- | --- |
+| alm (α = 0, hard contacts) | 3.23 m | 129 mm, 7.5 m/s | — | — |
+| alm with α = 0.95 | 3.23 m; 20° sticks | 18 mm, 1.8 m/s; still at 16 iterations | 12 mm, 2.1 m/s; 0.7 m/s even at 32 | 267% |
+| alm, substepped | 0.35 m | diverges | diverges | diverges |
+| Hybrid: AVBD-scaled ramp for normals and joints, projected friction | erratic, 0.5–4.7 m | diverges at 2–8 iterations | diverges at 2–8 | 4.3% |
+
+- **Projected friction fixes sliding.** The per-row clamp of round 1 was
+  the cause.
+- **Fixed penalties do not hold stacks or joints at equal budget.** They
+  need about 16 iterations to settle a 10-stack (twice Soft Step's time),
+  never quiet the pyramid, and leave chains stretching. Newton pairs α = 0
+  with a finite authored contact stiffness, and it runs substeps. With hard
+  contacts, α = 0 corrects whole penetrations per substep while ρ grows as
+  1/h², and the substepped runs diverged.
+- **The hybrid diverged.** Combining AVBD's ramp with the vector contact
+  did not combine their strengths. It diverged whether the friction
+  penalty ramped with the normal one or stayed fixed.
+
+No VBD-family variant passed stack, friction and chain at equal time.
+
+### Round 3: two solvers, joints separate from contacts
+
+Could Soft Step keep contacts and friction while a stronger method handles
+joints? Two splits were measured.
+
+- **soft+joints:** after each substep's position update, a block-Newton
+  pass enforces joints only, with AVBD-scaled rows (α = 0), each body's
+  inertia anchored at its Soft Step position, and the correction fed back
+  into velocity. Contacts then relax.
+- **joints-first:** the same pass, run before the contact solve on
+  predicted positions and kept only as a velocity correction, so contacts
+  have the last word.
+
+A new scene, a 50-link chain anchored at 4 m falling across a static block
+onto the ground, makes joints and contacts act on the same links. The new
+metric is the worst joint gap: the largest distance between a joint's two
+anchors.
+
+| Scene, budget 4 | Soft Step | soft+joints | joints-first |
+| --- | --- | --- | --- |
+| Free chain, 10³: stretch, joint gap | 229%, 3.2 m | 0.6%, 12 mm | 0.6%, 10 mm |
+| Free chain, 5 × 10⁴ | 392%, 4.5 m | 3%, 26 mm | 3%, 22 mm |
+| Drape, 10³: penetration, joint gap, rest speed | 17 mm, 26 mm, 1.1 m/s | 142 mm, 79 mm, 2.0 m/s | diverges |
+| Stacks, slopes (no joints) | — | identical to Soft Step | identical |
+
+- **The joint pass fixes free chains,** better than AVBD-scaled itself
+  (4.3% at 10³), at about twice Soft Step's time.
+- **It fails where joints and contacts meet.**
+  - **After the contact solve,** the pass pushes links into the block. The
+    drape then penetrates 8× deeper than with Soft Step alone, its joint
+    gaps reach 270 mm at 8 substeps, and it jitters.
+  - **Before the contact solve,** contacts undo the joint correction and
+    the scene diverges.
+- **Joints and contacts on the same bodies must be solved together.**
+  PhysX does this by computing its articulations' response inside the
+  contact solver loop, and Box2D solves joints and contacts in one
+  Gauss–Seidel sweep.
+- **The route to strong joints** is reduced-coordinate articulations
+  (Featherstone) coupled inside Soft Step's loop, not a separate pass.
+
+### Outcome under the decision rule
+
+The rule fixed before measuring (Proposed experiment above) adopts A only if
+it matches B on stack, pile and friction at equal time, passes the density
+sweep with one set of constants, and keeps its lead on chains and coupling.
+
+- **Stack and pile:** A is far more accurate, with 10–25× less
+  penetration, and keeps a tall stack standing where Soft Step sways. But it
+  rests noisier at equal time.
+- **Density sweep:** A (scaled) passes. The paper's and demo's constants
+  fail.
+- **Chains:** A leads by 1–2 orders of magnitude.
+- **Friction:** **A fails.** At equal time a sliding cube moves half the
+  distance theory gives. A needs about 8× Soft Step's budget to slide
+  right, and the paper's remedy (Eq. 14) did not help here. Round 2's
+  compliant ALM fixes friction, but then fails stacks and chains.
+- **Coupling:** not run. It was phase 2, needed only if A passed the rest.
+
+**Decision: Soft Step is the rigid-body solver**, with joints in the same
+loop, coupled to cloth by staggering. It was confirmed after round 2 tried
+the strongest current formulation, and after round 3 showed that a
+separate joint solver breaks where joints meet contacts. Ragdolls and
+robots with heavy mass ratios need articulations coupled inside Soft
+Step's loop, as a later module. AVBD-scaled is the better solver for joints, tall stacks and
+mass ratios, and its friction is the one thing standing between it and the
+one-solve design. Revisit the VBD family when one formulation gets stacks,
+joints and friction right at low budgets: the harness reruns any candidate
+against these scenes.
+
 ## Sources
 
 - AVBD paper and project page:

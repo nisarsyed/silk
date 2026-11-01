@@ -6,3 +6,10 @@ target_link_libraries(sl_bench PRIVATE silk silk_pool silk_warnings)
 add_executable(sl_compare compare.c)
 target_link_libraries(sl_compare PRIVATE silk silk_warnings)
 target_include_directories(sl_compare PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# Research harness comparing rigid-body solvers (Soft Step and augmented
+# VBD) on silk's rigid collision pipeline; reads private state like
+# sl_compare.
+add_executable(sl_rigid_compare rigid_compare.c)
+target_link_libraries(sl_rigid_compare PRIVATE silk silk_warnings)
+target_include_directories(sl_rigid_compare PRIVATE ${PROJECT_SOURCE_DIR}/src)
