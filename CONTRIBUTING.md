@@ -116,8 +116,11 @@ benchmark run 14–17 times slower, and no check depends on `-O0`. The local
 
 Add the `full-ci` label to a pull request whose risk is platform-specific:
 threading, floating-point or determinism changes, compiler-sensitive code, or
-anything that touches the Windows or macOS build. A failure on `main` from the
-full tier is fixed before other work lands.
+anything that touches the Windows or macOS build. Add it when opening the pull
+request (`gh pr create --label full-ci`); a label added later takes effect on
+the next push, or at once with `gh workflow run CI --ref <branch>`, which runs
+the full tier on the branch head. A failure on `main` from the full tier is
+fixed before other work lands.
 
 Record the exact checks and results in the pull request.
 
