@@ -253,7 +253,8 @@ shipped as a parameter that can explode.
 ## Self contact: Offset Geometric Contact
 
 silk implements Offset Geometric Contact (OGC; Chen et al., SIGGRAPH 2025)
-from the paper's text: `src/self_contact.c`, `src/contact.c`, `src/bvh.c`.
+from the paper's text: `src/cloth/self_contact.c`, `src/cloth/contact.c`,
+`src/core/geometry.c`, `src/core/bvh.c`.
 
 ### Taken from the paper
 

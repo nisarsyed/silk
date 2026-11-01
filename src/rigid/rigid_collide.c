@@ -1,7 +1,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "contact.h"
+#include "geometry.h"
 #include "rigid.h"
 
 /* Box narrow phase by the separating axis test (Gottschalk et al. 1996;
