@@ -9,6 +9,7 @@ int sl_energy_suite(void);
 int sl_mesh_suite(void);
 int sl_solver_suite(void);
 int sl_contact_suite(void);
+int sl_rigid_suite(void);
 int sl_step_suite(void);
 int sl_consumer_suite(void);
 

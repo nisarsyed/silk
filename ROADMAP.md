@@ -102,7 +102,7 @@ module that defines the core. Threading (Milestone 3) lands first, so the
 rigid solver is designed against it.
 
 - [x] Research: rigid-body solvers surveyed, with claims checked against independent evidence ([docs/rigid.md](docs/rigid.md)). AVBD is not adopted on the evidence alone: its joints and coupling are strong, but its paper parameters are tuned to one set of units and its contact stability on a CPU is unproven against Soft Step.
-- [ ] Collision foundation shared by either solver: convex contact generation (box first), contacts persisting across steps, and a broad phase over bodies
+- [x] Collision foundation shared by either solver: box–box and box–plane contacts (separating axis test, clipping, 4-point reduction), warm data persisting by feature id and distance, and a BVH broad phase over bodies ([docs/rigid.md](docs/rigid.md#collision-foundation))
 - [ ] Head-to-head at equal CPU time: VBD-family rigid bodies (compliant augmented Lagrangian) against Soft Step, decided by the rule in [docs/rigid.md](docs/rigid.md#proposed-experiment). If Soft Step wins, rigid bodies are a second solver coupled to cloth by staggering.
 - [ ] Split the code into the core and a cloth module, with rigid bodies as the second consumer
 - [ ] Rigid bodies: box, sphere, capsule, and convex-hull shapes; mass properties; contact with friction; stable stacking

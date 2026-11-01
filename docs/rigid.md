@@ -212,6 +212,77 @@ persistence across steps, and a broad phase over bodies. Those are needed by
 whichever solver wins, so they are built first, as the shared part of
 Milestone 4.
 
+## Collision foundation
+
+The part shared by either solver is implemented (`src/rigid.h`,
+`src/rigid.c`, `src/rigid_collide.c`, `tests/test_rigid.c`). It is internal
+until the head-to-head picks a solver, because bodies cannot move without
+one. The public API gained only `sl_quat` in `silk/math.h`.
+
+- **Bodies.** SoA position, orientation (unit quaternion), half extents,
+  velocities, inverse mass and principal inverse inertia, all in one
+  allocation made at init. Boxes only for now; density 0 is static.
+- **Narrow phase, box–box.** The separating axis test over 15 axes (Ericson
+  4.4.1), with hysteresis: a face of the second box replaces a face of the
+  first only if it separates more by 0.5 mm, and an edge axis replaces a
+  face only if it separates more by 1 mm, so nearly equal axes do not
+  alternate between steps. Nearly parallel edge axes (|a × b|² < 10⁻⁶) are
+  skipped.
+  - **Face contact:** the most opposed face of the other box is clipped
+    against the reference face's four side planes (Sutherland–Hodgman), up
+    to 8 points.
+  - **Edge contact:** the closest points of the two supporting edges.
+- **Narrow phase, box–plane.** Box vertices within the margin.
+- **Reduction.** At most 4 points per manifold: the deepest, the farthest
+  from it, the one making the largest triangle with those two, and the one
+  adding the most area to that triangle. Ties go to the lower index. On two
+  equal cubes turned 45°, the four points keep over half of the octagonal
+  overlap.
+- **Feature ids.** A face point is identified by the two features it lies
+  on (incident edges, reference side planes), its reference and incident
+  faces, and which box is the reference. An edge point is identified by its
+  two edges, and a plane point by its box vertex.
+- **Persistence.** Each point carries 6 floats of solver-owned warm data:
+  3 impulses for Soft Step, or 3 multipliers and 3 stiffnesses for an
+  augmented Lagrangian. Manifolds are sorted by body pair and merged with
+  the previous detection's. Points match first by id, then to the nearest
+  unmatched previous point within 5 mm.
+  - **Why the distance fallback:** ids alone failed in the most common
+    stack, equal boxes standing flush. Their side planes coincide, and a
+    0.001 rad twist turned a corner from (incident edge, side plane) into
+    (side plane, side plane), dropping its warm data every step.
+- **Broad phase.** The cloth BVH, rebuilt from body centres at every
+  detection (rigid bodies, unlike cloth, do not keep their neighbourhoods),
+  and its self traversal over margin-expanded boxes. Pairs of two static
+  bodies are skipped. Pair keys (a << 16 | b) are radix-sorted, not
+  qsort'ed: glibc's qsort can allocate.
+- **Capacity.** Pairs and manifolds beyond capacity are dropped and
+  counted, never written past the end.
+
+Cost per detection, Apple M4 Pro, one thread:
+
+| Layout | Bodies | Manifolds | Time |
+| --- | ---: | ---: | ---: |
+| Stacked columns, faces touching | 1,000 | 1,165 | 0.89 ms |
+| Stacked columns, faces touching | 5,000 | 5,869 | 2.7 ms |
+| Lattice, every box overlapping its 26 neighbours | 1,000 | 10,576 | 2.2 ms |
+| Lattice, every box overlapping its 26 neighbours | 5,000 | 57,678 | 10.1 ms |
+
+The tests check:
+
+- hand-built face, clipped face, rotated face, crossed edges, speculative
+  margin, and plane contacts;
+- 2,000 random box pairs, where every point must lie on both boxes with a
+  separation consistent with the normal, and "no contact" must mean no
+  vertex of either box is inside the other;
+- id stability under small motion;
+- persistence of warm data, including the flush stack;
+- broad phase against an O(n²) brute force on 300 boxes;
+- bitwise determinism and capacity.
+
+Two planted bugs were caught: a sign error in clipping failed five tests,
+and a wrongly scaled edge axis failed the rotated-face test.
+
 ## Sources
 
 - AVBD paper and project page:

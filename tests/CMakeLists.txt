@@ -6,6 +6,7 @@ add_executable(sl_tests
     test_mesh.c
     test_solver.c
     test_contact.c
+    test_rigid.c
     test_step.c
 )
 target_link_libraries(sl_tests PRIVATE silk silk_warnings)
