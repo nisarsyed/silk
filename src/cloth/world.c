@@ -20,6 +20,7 @@ static size_t sl_world_layout(sl_world_state *s, unsigned char *base)
     SL_TAKE(inertia_target, v);
     SL_TAKE(pin_target, v);
     SL_TAKE(pin_origin, v);
+    SL_TAKE(attach_stiffness, v);
     SL_TAKE(mass, v);
     SL_TAKE(vertex_cloth, v);
     SL_TAKE(pinned, v);
@@ -318,6 +319,7 @@ bool sl_world_vertex_pin_set(sl_world *world, uint32_t cloth, uint32_t vertex,
         return false;
     }
     s->pinned[i] = (uint8_t)(pinned ? 1u : 0u);
+    s->attach_stiffness[i] = 0.0f;
     s->pin_target[i] = s->position[i];
     if (pinned) {
         s->velocity[i] = sl_vec3_zero();
@@ -331,10 +333,30 @@ bool sl_world_vertex_target_set(sl_world *world, uint32_t cloth,
     SL_ASSERT(world != NULL && world->state != NULL);
     sl_world_state *s = world->state;
     const uint32_t i = sl_vertex_global(s, cloth, vertex);
-    if (i == UINT32_MAX || s->pinned[i] == 0u || !sl_vec3_in_domain(target)) {
+    if (i == UINT32_MAX ||
+        (s->pinned[i] == 0u && !(s->attach_stiffness[i] > 0.0f)) ||
+        !sl_vec3_in_domain(target)) {
         return false;
     }
     s->pin_target[i] = target;
+    return true;
+}
+
+bool sl_world_vertex_attach_set(sl_world *world, uint32_t cloth,
+                                uint32_t vertex, float stiffness)
+{
+    SL_ASSERT(world != NULL && world->state != NULL);
+    sl_world_state *s = world->state;
+    const uint32_t i = sl_vertex_global(s, cloth, vertex);
+    if (i == UINT32_MAX || s->pinned[i] != 0u || !sl_is_finite(stiffness) ||
+        stiffness < 0.0f || stiffness > SL_ATTACH_STIFFNESS_MAX) {
+        return false;
+    }
+    if (!(s->attach_stiffness[i] > 0.0f)) {
+        s->pin_origin[i] = s->position[i];
+        s->pin_target[i] = s->position[i];
+    }
+    s->attach_stiffness[i] = stiffness;
     return true;
 }
 

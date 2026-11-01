@@ -65,6 +65,12 @@ void sl_world_step(sl_world *world, float dt)
         }
         sl_solver_substep_end(s, h);
     }
+    /* Anchors reached their targets; the next step starts from there. */
+    for (uint32_t i = 0; i < s->vertex_count; i++) {
+        if (s->attach_stiffness[i] > 0.0f) {
+            s->pin_origin[i] = s->pin_target[i];
+        }
+    }
 }
 
 bool sl_stepper_init(sl_stepper *stepper, float timestep)

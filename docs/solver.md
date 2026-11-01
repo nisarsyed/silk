@@ -322,6 +322,23 @@ from the paper's text: `src/cloth/self_contact.c`, `src/cloth/contact.c`,
 - **Query cap.** The query's motion term is capped at 0.05 triangle
   extents. Three-sheet pile cost by cap: 82 ms/step at 0.25, 61 at 0.1, 50
   at 0.05, 51 at 0. All runs stayed intersection-free.
+- **A rounding floor on the bounds.** The bound argument holds in exact
+  arithmetic only. A pair can come closer at every detection, by up to 0.9
+  of its distance, whenever a pull beats the barrier, whose force stops
+  growing below 10⁻⁴ of the contact radius. With cloth stretched to
+  several times its length by a fast grab, a vertex came within 6×10⁻⁸ m
+  of a triangle two cells away in a flat fold. Its bound held (2.8×10⁻⁸ m),
+  but the cloth's 1.8 mm translation carried it across by rounding alone:
+  each coordinate near 1 m rounds by about 10⁻⁷ m. A per-substep crossing
+  check located the first crossing. Bounds now come from `d − floor`, so
+  every pair stays at least the floor apart. The floor is 64 float ulps of
+  the largest coordinate, 15 µm for a scene within 2 m of the origin.
+  Pairs already within it get no bound and move only with their cloth's
+  translation. A test folds a sheet 50 nm onto itself and checks that.
+  The pile's trajectory changes with it (`pile-30` hash `a6a746…`), and
+  with the floor at 0 the old hash returns exactly. Its detections per
+  step varied from 4.9 to 6.7 across floors of 0–256 ulps with no trend,
+  which is the pile being chaotic, not a speed change.
 - **Flat sheets.** Vertex contacts never act within a flat sheet, at any
   radius (`tests/test_contact.c`). Edge–edge contacts live on the
   wireframe, so the radius must stay below the spacing of non-adjacent
@@ -345,10 +362,45 @@ Cost per 1/60 s step, single-threaded on an Apple M4 Pro, release build:
 
 The pile cost rose from 48.6 ms when edge pairs began pushing both edges.
 
+### Grabbing: attachments, not pins
+
+The sandbox grabbed cloth by pinning a vertex and moving its target with
+the mouse. Pinned vertices are kinematic and unbounded, so a fast drag
+moved the held vertex and its triangles centimetres per substep while the
+rest of the cloth was bounded to millimetres. In a scripted drag through a
+draped 40×40 sheet, crossings appeared from 2 m/s on and none at 1 m/s
+or below. Every first crossing involved the held vertex (40 of 40). Once
+the cloth intersected itself, detection ran every substep, and the cloth
+either froze in a crumple or reached the 100 m/s speed cap.
+
+`sl_world_vertex_attach_set` holds a vertex with a spring to an anchor
+instead. The vertex stays dynamic, keeps its bounds, and trails the anchor
+when dragged faster than they allow:
+
+- **Measured.** With springs of 100, 1,000 and 10⁴ N/m at 3 and 6 m/s,
+  there were no crossings in any run, and the cloth settled after release
+  (2–5 detections per step). Pins in the same drags left 59 and 126
+  crossings.
+- **Solved implicitly.** The spring k/2 |x − a|² joins the inertia term:
+  weight m/h² + k about (m/h² · y + k·a)/(m/h² + k), up to a constant. The
+  block solve then has no attachment term.
+  - A branch there, or an inertia-weight array rewritten every substep,
+    each cost the contact-free sweep 9–10% (curtain-64, 45 against
+    41 ms). Adding the read-only stiffness costs nothing.
+  - The guess stays y. Starting from the blended target left 16-iteration
+    sweeps 5% off the equilibrium of a sheet held by four springs, against
+    0.04%.
+- **The sandbox** grabs with 500 N/m, about 5 Hz on its 0.25–0.5 kg cloths
+  (the convention of Box2D's mouse joint). A grabbed curtain ring is held
+  the same way and pinned again where it is dropped.
+
 ### Known limits
 
 - Pinned vertices are kinematic and unbounded. A target that drags cloth
-  through cloth is not prevented.
+  through cloth is not prevented; hold cloth with an attachment
+  (`sl_world_vertex_attach_set`) when it may move fast.
+- Cloth that already intersects itself stays tangled: detection assumes an
+  intersection-free state, and nothing untangles it.
 - An exactly planar sheet compressed within its plane (a flat curtain
   gathered on rings, with nothing to push it out of plane) crumples inside
   the plane. Coplanar triangles then overlap at distance 0, the vertices
@@ -538,6 +590,11 @@ found no races in the pool.
 - **Stretch error.** One sweep per substep leaves long-wavelength stretch
   error. The hanging sheet above stretches 2.9% off the pins at the automatic
   22 substeps, against 0.6% at 64. More substeps or iterations reduce it.
+  A 0.5 m sheet held by four springs settled with the springs stretched 16%
+  past the static equilibrium and its centre 7% lower, at the default one
+  iteration per substep; 8 iterations brought the springs within 0.3% and
+  16 within 0.04%. Accuracy claims against measured fabric need converged
+  iterations, or the default's error reported beside them.
   Multigrid (MGPBD-style) or global coarse corrections are the known remedies.
 - **Colliders.** Colliders are analytic only. Self and cloth-cloth
   contact are covered above.

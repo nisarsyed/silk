@@ -670,6 +670,126 @@ static void test_detection_overflow_is_exact(void)
     SL_EXPECT(reruns > 0u && scramble.calls > 1000u);
 }
 
+/* A 12 x 12 sheet draped on a sphere, then one vertex dragged at 6 m/s
+ * up, across and back down through the sheet, held by a pin (spring 0) or
+ * an attachment. Returns the worst crossing count over the drag. */
+static uint32_t sl_grab_drag(float spring)
+{
+    sl_world world = { 0 };
+    sl_world_config c = sl_test_config(200u, 400u);
+    c.self_contact_capacity = 4096u;
+    (void)sl_world_init(&world, &c);
+    sl_cloth_desc d = sl_test_cloth_desc();
+    d.thickness = 0.004f;
+    d.damping = 20.0f;
+    d.drag = 0.3f;
+    sl_test_grid g = sl_test_grid_make(
+        sl_vec3_make(-0.4f, 0.6f, -0.4f), sl_vec3_make(0.8f, 0.0f, 0.0f),
+        sl_vec3_make(0.0f, 0.0f, 0.8f), 12u, 12u);
+    d.positions = g.positions;
+    d.vertex_count = g.vertex_count;
+    d.indices = g.indices;
+    d.triangle_count = g.triangle_count;
+    uint32_t id = 0;
+    SL_EXPECT(sl_world_cloth_add(&world, &d, &id));
+    sl_test_grid_free(&g);
+    const sl_collider sphere = { SL_COLLIDER_SPHERE,
+                                 sl_vec3_make(0.0f, 0.3f, 0.0f), sl_vec3_zero(),
+                                 0.2f, 0.5f };
+    SL_EXPECT(sl_world_collider_add(&world, &sphere, &id));
+    for (uint32_t k = 0; k < 60u; k++) {
+        sl_world_step(&world, 1.0f / 60.0f);
+    }
+    const uint32_t held = 3u * 13u + 6u;
+    if (spring > 0.0f) {
+        SL_EXPECT(sl_world_vertex_attach_set(&world, 0u, held, spring));
+    } else {
+        SL_EXPECT(sl_world_vertex_pin_set(&world, 0u, held, true));
+    }
+    sl_vec3 target = sl_world_cloth_positions(&world, 0u)[held];
+    const sl_vec3 legs[3] = { sl_vec3_make(0.0f, 1.0f, 0.0f),
+                              sl_vec3_make(0.3f, 0.0f, 1.0f),
+                              sl_vec3_make(-0.2f, -1.0f, -0.5f) };
+    const float lengths[3] = { 0.4f, 0.6f, 0.5f };
+    uint32_t worst = 0u;
+    for (uint32_t leg = 0; leg < 3u; leg++) {
+        const sl_vec3 step = sl_vec3_scale(sl_vec3_normalize(legs[leg]),
+                                           6.0f / 60.0f); /* 6 m/s */
+        const uint32_t steps = (uint32_t)(lengths[leg] / 0.1f + 0.5f);
+        for (uint32_t k = 0; k < steps; k++) {
+            target = sl_vec3_add(target, step);
+            SL_EXPECT(sl_world_vertex_target_set(&world, 0u, held, target));
+            sl_world_step(&world, 1.0f / 60.0f);
+            const uint32_t crossings = sl_crossings(world.state);
+            worst = (crossings > worst) ? crossings : worst;
+        }
+    }
+    sl_world_destroy(&world);
+    return worst;
+}
+
+static void test_grab_by_attachment_never_crosses(void)
+{
+    /* A pinned vertex is not bounded: dragged fast, its triangles pass
+     * through the sheet (the sandbox grab glitch). An attached vertex
+     * keeps its bounds and trails the anchor instead, at any stiffness. */
+    SL_EXPECT(sl_grab_drag(0.0f) > 0u);
+    SL_EXPECT_INT_EQ(sl_grab_drag(100.0f), 0);
+    SL_EXPECT_INT_EQ(sl_grab_drag(1.0e4f), 0);
+}
+
+static void test_bounds_keep_a_rounding_floor(void)
+{
+    /* Two flat sheets 50 nm apart, under the bound floor (64 ulps of the
+     * 0.4 m coordinates, 3 um): no relative motion is allowed at all, since
+     * rounding alone could carry a vertex across. 1 mm apart they get
+     * bounds as usual. */
+    const float gaps[2] = { 5.0e-8f, 1.0e-3f };
+    for (uint32_t k = 0; k < 2u; k++) {
+        sl_world world = { 0 };
+        sl_world_config c = sl_test_config(400u, 800u);
+        c.self_contact_capacity = 4096u;
+        SL_EXPECT(sl_world_init(&world, &c));
+        sl_add_flat(&world, 0.4f, 0.8f, 6u);
+        sl_add_flat(&world, 0.4f + gaps[k], 0.7f, 6u);
+        sl_world_state *s = world.state;
+        sl_self_detect(s, 0.0f);
+        float bound_max = 0.0f;
+        for (uint32_t v = 0; v < s->vertex_count; v++) {
+            bound_max = sl_max(bound_max, s->bound[v]);
+        }
+        if (k == 0u) {
+            SL_EXPECT(bound_max == 0.0f);
+            SL_EXPECT(s->cloths[0].translation_cap == 0.0f);
+        } else {
+            SL_EXPECT(bound_max > 1e-4f);
+        }
+        sl_world_destroy(&world);
+    }
+
+    /* The same within one cloth: a sheet folded 50 nm onto itself. Every
+     * vertex nearer than the floor to a triangle of its own gets no bound. */
+    sl_world world = { 0 };
+    SL_EXPECT(sl_contact_world(&world, 8192u, 0.004f, 0.6f, 20u, 0.5f));
+    sl_world_state *s = world.state;
+    for (uint32_t i = 0; i < s->vertex_count; i++) {
+        if (s->position[i].y < 0.2f) {
+            s->position[i].y = 0.4f - s->position[i].y;
+            s->position[i].z = 5.0e-8f;
+        }
+    }
+    sl_self_detect(s, 0.0f);
+    uint32_t touching = 0u;
+    for (uint32_t v = 0; v < s->vertex_count; v++) {
+        if (s->vertex_dmin[v] < 1e-6f) {
+            touching++;
+            SL_EXPECT(s->bound[v] == 0.0f);
+        }
+    }
+    SL_EXPECT(touching > s->vertex_count / 3u);
+    sl_world_destroy(&world);
+}
+
 static void test_capacity_and_validation(void)
 {
     sl_world world = { 0 };
@@ -887,6 +1007,9 @@ static const sl_test_case k_cases[] = {
     { "capacity_and_validation", test_capacity_and_validation },
     { "traversal_frontier_covers_once", test_traversal_frontier_covers_once },
     { "detection_overflow_is_exact", test_detection_overflow_is_exact },
+    { "grab_by_attachment_never_crosses",
+      test_grab_by_attachment_never_crosses },
+    { "bounds_keep_a_rounding_floor", test_bounds_keep_a_rounding_floor },
     { "self_contact_query", test_self_contact_query },
     { "vertex_flags", test_vertex_flags },
 };
