@@ -1,23 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "world_internal.h"
-
-static size_t sl_align_up(size_t value)
-{
-    const size_t align = 16u;
-    return (value + align - 1u) & ~(align - 1u);
-}
-
-/* Reserves count * size bytes at *cursor; with base == NULL only measures.
- */
-static void *sl_arena_take(unsigned char *base, size_t *cursor, size_t count,
-                           size_t size)
-{
-    const size_t at = sl_align_up(*cursor);
-    *cursor = at + count * size;
-    return (base != NULL) ? (void *)(base + at) : NULL;
-}
 
 /* Lays out every array; returns the total size. Pass base == NULL to
  * measure without assigning. */
@@ -97,7 +82,7 @@ static size_t sl_world_layout(sl_world_state *s, unsigned char *base)
     SL_TAKE(edge_bvh.sphere_center, edge_bvh);
     SL_TAKE(edge_bvh.sphere_radius, edge_bvh);
 #undef SL_TAKE
-    return sl_align_up(at);
+    return sl_arena_align(at);
 }
 
 static bool sl_vec3_in_domain(sl_vec3 v)

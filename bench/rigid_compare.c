@@ -1,7 +1,7 @@
 /* Head-to-head rigid-body solver comparison (research harness for issue
  * #125, not part of the library). Both solvers run on silk's rigid
- * collision pipeline (src/rigid.h): the same bodies, contacts detected once
- * per step with the same margin, and the same warm-start storage, so only
+ * collision pipeline (src/rigid/rigid.h): the same bodies, contacts detected
+ * once per step with the same margin, and the same warm-start storage, so only
  * the solver differs.
  *
  *   soft-step   Catto's Soft Step (Solver2D; Box2D v3; Box3D): per substep,

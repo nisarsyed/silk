@@ -9,11 +9,28 @@ Project direction and non-goals live in [ROADMAP.md](ROADMAP.md).
 
 `include/silk/` contains public headers, `src/` the implementation, `tests/`
 the self-contained test framework and suites, `bench/` the deterministic
-benchmark, `examples/headless/` the minimal consumer, and `examples/sandbox/`
-the optional raylib 3D demo. The root `CMakeLists.txt` defines the static
-library target `silk::silk`. `docs/solver.md` records the measured evidence
-behind the solver's design. Read it before changing the initial guess,
-damping, friction, or substep rules.
+benchmark and research harnesses, `examples/headless/` the minimal consumer,
+`examples/pool/` the example thread pool, and `examples/sandbox/` the
+optional raylib 3D demo. The root `CMakeLists.txt` defines the static
+library target `silk::silk`.
+
+`src/` is a core and modules:
+
+- `src/core/`: shared by every module (geometry, BVH, arena, parallel
+  dispatch).
+- `src/cloth/`: the VBD cloth solver, Offset Geometric Contact, and the
+  world and step.
+- `src/rigid/`: rigid bodies.
+
+Each is its own object library that sees only the public headers, core's
+headers, and its own (`src/CMakeLists.txt`). The core must not depend on a
+module, nor a module on another, and such an include fails to compile. Put
+code in the core only when a second module uses it.
+
+`docs/solver.md` records the measured evidence behind the cloth solver's
+design. Read it before changing the initial guess, damping, friction, or
+substep rules. `docs/rigid.md` records the rigid-body solver research and
+head-to-head.
 
 ## Non-negotiable engine constraints
 

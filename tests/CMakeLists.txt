@@ -16,7 +16,11 @@ target_compile_definitions(sl_tests PRIVATE
     SL_TEST_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 target_include_directories(sl_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(sl_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_include_directories(sl_tests PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/core
+    ${PROJECT_SOURCE_DIR}/src/cloth
+    ${PROJECT_SOURCE_DIR}/src/rigid
+)
 
 # One entry: the runner has no per-suite filter, so per-suite registrations
 # would each re-execute the whole binary.

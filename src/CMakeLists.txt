@@ -1,17 +1,49 @@
+# silk is a core plus modules. Each is an object library that sees the
+# public headers, core's private headers, and its own -- nothing else -- so
+# the core cannot depend on a module and modules cannot depend on each
+# other: such an include fails to compile. Consumers link the one static
+# library they combine into.
+#
+#   core   shared by every module: geometry, the BVH, arena layout, parallel
+#          dispatch, version
+#   cloth  the VBD cloth solver, Offset Geometric Contact, the world and step
+#   rigid  rigid bodies: box collision, contact persistence, broad phase
+function(silk_module name)
+    add_library(silk_${name} OBJECT ${ARGN})
+    target_include_directories(silk_${name} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/${name}
+    )
+    target_compile_features(silk_${name} PRIVATE c_std_17)
+    target_link_libraries(silk_${name} PRIVATE silk_warnings)
+endfunction()
+
+silk_module(core
+    core/bvh.c
+    core/geometry.c
+    core/silk.c
+)
+silk_module(cloth
+    cloth/contact.c
+    cloth/energy.c
+    cloth/grid.c
+    cloth/mesh.c
+    cloth/self_contact.c
+    cloth/solver.c
+    cloth/solver_self.c
+    cloth/step.c
+    cloth/world.c
+)
+silk_module(rigid
+    rigid/rigid.c
+    rigid/rigid_collide.c
+)
+
 add_library(silk STATIC
-    silk.c
-    bvh.c
-    contact.c
-    energy.c
-    grid.c
-    mesh.c
-    rigid.c
-    rigid_collide.c
-    self_contact.c
-    solver.c
-    solver_self.c
-    step.c
-    world.c
+    $<TARGET_OBJECTS:silk_core>
+    $<TARGET_OBJECTS:silk_cloth>
+    $<TARGET_OBJECTS:silk_rigid>
 )
 add_library(silk::silk ALIAS silk)
 

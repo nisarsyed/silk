@@ -1,24 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "rigid.h"
 #include "silk/world.h"
 
 /* Bound on manifold capacity, so arena sizes stay far from overflow. */
 #define SL_MANIFOLD_CAPACITY_MAX (1u << 20)
-
-static size_t sl_rigid_align(size_t value)
-{
-    return (value + 15u) & ~(size_t)15u;
-}
-
-static void *sl_rigid_take(unsigned char *base, size_t *cursor, size_t count,
-                           size_t size)
-{
-    const size_t at = sl_rigid_align(*cursor);
-    *cursor = at + count * size;
-    return (base != NULL) ? (void *)(base + at) : NULL;
-}
 
 /* Lays out every array; with base NULL, only measures. */
 static size_t sl_body_set_layout(sl_body_set *set, unsigned char *base)
@@ -27,7 +15,7 @@ static size_t sl_body_set_layout(sl_body_set *set, unsigned char *base)
     const size_t n = set->capacity;
     const size_t m = set->manifold_capacity;
 #define SL_TAKE(field, count)                                                  \
-    set->field = sl_rigid_take(base, &at, (count), sizeof(*set->field))
+    set->field = sl_arena_take(base, &at, (count), sizeof(*set->field))
     SL_TAKE(position, n);
     SL_TAKE(orientation, n);
     SL_TAKE(half_extent, n);
@@ -48,7 +36,7 @@ static size_t sl_body_set_layout(sl_body_set *set, unsigned char *base)
     SL_TAKE(bvh.elem_lo, n);
     SL_TAKE(bvh.elem_hi, n);
 #undef SL_TAKE
-    return sl_rigid_align(at);
+    return sl_arena_align(at);
 }
 
 bool sl_body_set_init(sl_body_set *set, uint32_t capacity,

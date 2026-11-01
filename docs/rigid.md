@@ -214,8 +214,8 @@ Milestone 4.
 
 ## Collision foundation
 
-The part shared by either solver is implemented (`src/rigid.h`,
-`src/rigid.c`, `src/rigid_collide.c`, `tests/test_rigid.c`). It is internal
+The part shared by either solver is implemented (`src/rigid/rigid.h`,
+`src/rigid/rigid.c`, `src/rigid/rigid_collide.c`, `tests/test_rigid.c`). It is internal
 until the head-to-head picks a solver, because bodies cannot move without
 one. The public API gained only `sl_quat` in `silk/math.h`.
 
