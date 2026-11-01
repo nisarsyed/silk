@@ -5,6 +5,8 @@ add_library(silk STATIC
     energy.c
     grid.c
     mesh.c
+    rigid.c
+    rigid_collide.c
     self_contact.c
     solver.c
     solver_self.c

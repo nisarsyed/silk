@@ -12,6 +12,7 @@ int main(void)
     failures += sl_mesh_suite();
     failures += sl_solver_suite();
     failures += sl_contact_suite();
+    failures += sl_rigid_suite();
     failures += sl_step_suite();
     failures += sl_consumer_suite();
 
