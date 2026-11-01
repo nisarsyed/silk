@@ -19,8 +19,12 @@ name: CI
 on:
   push:
     branches: [main]
+    # No `labeled` trigger: a pull request opened with a label fired both
+  # `opened` and `labeled`, the second run cancelled the first, and the
+  # cancelled jobs showed as failures. The `opened` and `synchronize`
+  # payloads carry the labels, so `full-ci` applies from the next push; a
+  # manual run (workflow_dispatch) gives the full tier at once.
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 env:
